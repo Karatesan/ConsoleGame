@@ -3,6 +3,7 @@ package com.archon.verb;
 import com.archon.command.Ast;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.system.combat.CombatEngine;
 
 public final class ShootVerb implements Verb {
     @Override public String name() { return "shoot"; }
@@ -31,19 +32,21 @@ public final class ShootVerb implements Verb {
         if (e == null) { c.say("target gone"); return ExitCode.BLOCKED; }
         c.thrall.nocked = false;
 
-        int dist = e.pos.chebyshev(c.thrall.pos);
         BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
-        int band = dist <= 1 ? -20 : dist <= 4 ? 0 : dist <= 8 ? -10 : -25;
-        int hit = 70 + part.hitMod + band - e.evasion;
+        CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
+                c.world.dice,
+                c.world,
+                c.thrall,
+                e,
+                part
+        );
 
-        if (!c.world.dice.chance(Math.max(5, Math.min(95, hit)))) {
+        if (!result.hit()) {
             c.say("Arrow flies wide of " + e.name + ".");
             return ExitCode.MISS;
         }
-        int dmg = Math.max(1, c.world.dice.between(5, 10) - e.armor);
-        e.hp -= dmg;
-        c.say("Arrow strikes " + e.name + "'s " + part.path + ". " + dmg + " dmg.");
-        if (!e.alive()) { c.say(e.name + " falls."); return ExitCode.SUCCESS; }
+        c.say("Arrow strikes " + e.name + "'s " + part.path + ". " + result.damage() + " dmg.");
+        if (result.killed()) { c.say(e.name + " falls."); return ExitCode.SUCCESS; }
         return ExitCode.PARTIAL;
     }
 }

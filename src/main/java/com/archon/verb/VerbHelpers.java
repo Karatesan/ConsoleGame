@@ -7,7 +7,7 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
-import com.archon.model.World;
+import com.archon.system.environment.SimulationSystem;
 
 import java.util.List;
 
@@ -54,14 +54,7 @@ public final class VerbHelpers {
     }
 
     public static void spill(VerbContext c, Vec2 at, Tag substance) {
-        World.Tile t = c.world.tile(at);
-        if (t == null) return;
-        t.tags.add(Tag.LIQUID);
-        t.tags.add(substance);
-        if (substance == Tag.OIL) t.tags.add(Tag.FLAMMABLE);
-        if (substance == Tag.WATER) t.tags.add(Tag.CONDUCTIVE);
-        Entity occ = c.world.entityAt(at);
-        if (occ != null && substance == Tag.OIL) occ.tags.add(Tag.FLAMMABLE);
+        SimulationSystem.spill(c.world, at, substance);
         c.say(substance.name().toLowerCase() + " spreads across " + at + ".");
     }
 }

@@ -92,6 +92,7 @@ public final class CombatEngine {
 
     public static RangedHitResult resolveRanged(
             Dice dice,
+            World world,
             Thrall attacker,
             Entity target,
             BodyPart part
@@ -108,6 +109,19 @@ public final class CombatEngine {
         int dmg = Math.max(1, dice.between(5, 10) - target.armor);
         target.hp -= dmg;
         boolean killed = !target.alive();
+        if (killed && target.held != null && world != null) {
+            world.tile(target.pos).ground.add(target.held);
+            target.held = null;
+        }
         return new RangedHitResult(true, clampedHit, dmg, part, killed);
+    }
+
+    public static RangedHitResult resolveRanged(
+            Dice dice,
+            Thrall attacker,
+            Entity target,
+            BodyPart part
+    ) {
+        return resolveRanged(dice, null, attacker, target, part);
     }
 }
