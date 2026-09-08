@@ -35,6 +35,7 @@ public final class ShootVerb implements Verb {
         BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
         CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
                 c.world.dice,
+                c.world,
                 c.thrall,
                 e,
                 part
