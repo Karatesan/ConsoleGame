@@ -4,7 +4,6 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
-import com.archon.model.Item;
 import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
 
@@ -83,6 +82,7 @@ public final class StrikeVerb implements Verb {
         Entity e = ((Resolved.OnEntity) r).entity();
         BodyPart part = VerbHelpers.aimPart(c.inv, targetArg);
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
+
         CombatEngine.MeleeHitResult result = CombatEngine.resolveMelee(
                 c.world.dice,
                 c.world,
