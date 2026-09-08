@@ -1,5 +1,7 @@
 package com.archon.model;
 
+import com.archon.system.environment.SimulationSystem;
+
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -112,42 +114,6 @@ public final class World {
     // ---------- World tick ----------
 
     public List<String> tick() {
-        List<String> log = new ArrayList<>();
-        roundNumber++;
-
-        for (Entity e : new ArrayList<>(entities.values())) {
-            if (e.alive() && e.has(Tag.BURNING)) {
-                e.hp -= 3;
-                log.add(e.name + " burns for 3.");
-                if (!e.alive()) log.add(e.name + " is consumed.");
-            }
-            e.readiedSpent = false;
-            e.guarded = false;
-        }
-        if (thrall.has(Tag.BURNING)) {
-            thrall.hp -= 3;
-            log.add("Thrall burns for 3.");
-        }
-
-        // Fire spreads across contiguous oil.
-        List<Vec2> ignite = new ArrayList<>();
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++) {
-                Vec2 p = new Vec2(x, y);
-                Tile t = tile(p);
-                if (t.has(Tag.BURNING)) {
-                    for (Vec2 d : List.of(Vec2.dir("n"), Vec2.dir("s"), Vec2.dir("e"), Vec2.dir("w"))) {
-                        Vec2 q = p.plus(d);
-                        Tile u = tile(q);
-                        if (u != null && u.has(Tag.OIL) && !u.has(Tag.BURNING)) ignite.add(q);
-                    }
-                }
-            }
-        for (Vec2 p : ignite) {
-            tile(p).tags.add(Tag.BURNING);
-            log.add("Fire spreads to " + p + ".");
-        }
-
-        return log;
+        return SimulationSystem.tick(this);
     }
 }
