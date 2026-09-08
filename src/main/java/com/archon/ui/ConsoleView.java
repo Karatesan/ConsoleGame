@@ -157,3 +157,4 @@ public final class ConsoleView implements View {
 
     private String name(Item i) {return i == null ? "empty" : i.name;}
 }
+}

@@ -4,8 +4,8 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.Item;
 import com.archon.model.Tag;
-import com.archon.system.combat.CombatEngine;
 
 import java.util.List;
 
@@ -70,9 +70,10 @@ public final class StrikeVerb implements Verb {
             String ownerId = oi.container().split("/")[0];
             Entity owner = c.world.get(ownerId);
             if (owner == null || owner.held == null) { c.say("nothing to disarm"); return ExitCode.BLOCKED; }
-            CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice, c.world, owner);
-            if (disarm.success()) {
-                c.say("The " + disarm.weapon().name + " is knocked from " + owner.name + "'s grip.");
+            if (c.world.dice.chance(45)) {
+                c.world.tile(owner.pos).ground.add(owner.held);
+                c.say("The " + owner.held.name + " is knocked from " + owner.name + "'s grip.");
+                owner.held = null;
                 return ExitCode.SUCCESS;
             }
             c.say("The blow glances off " + owner.name + "'s weapon.");
@@ -82,21 +83,29 @@ public final class StrikeVerb implements Verb {
         Entity e = ((Resolved.OnEntity) r).entity();
         BodyPart part = VerbHelpers.aimPart(c.inv, targetArg);
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
-        boolean force = c.inv.hasFlag("force");
 
-        CombatEngine.MeleeHitResult result = CombatEngine.resolveMelee(
-                c.world.dice, c.world, c.thrall, e, part, power, force);
+        int hit = 70 + part.hitMod - e.evasion
+                + ("light".equals(power) ? 20 : "heavy".equals(power) ? -20 : 0);
+        if (e.guarded && !c.inv.hasFlag("force")) hit -= 25;
 
-        if (!result.hit()) {
+        if (!c.world.dice.chance(Math.max(5, Math.min(95, hit)))) {
             c.say("Strike at " + e.name + "'s " + part.path + " — MISS.");
             return ExitCode.MISS;
         }
 
-        c.say(String.format("%s strikes %s's %s. %d dmg.",
-                result.weapon() == null ? "Bare limb" : result.weapon().name, e.name, part.path, result.damage()));
+        Item w = c.thrall.mainHand();
+        int base = (w == null ? 3 : w.damage) + c.thrall.strength;
+        double mult = part.damageMult * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
+        int dmg = Math.max(1, (int) Math.round(base * mult) - e.armor);
+        e.hp -= dmg;
+        if (c.inv.hasFlag("force") && w != null) w.durability--;
 
-        if (result.killed()) {
+        c.say(String.format("%s strikes %s's %s. %d dmg.",
+                w == null ? "Bare limb" : w.name, e.name, part.path, dmg));
+
+        if (!e.alive()) {
             c.say(e.name + " falls.");
+            if (e.held != null) { c.world.tile(e.pos).ground.add(e.held); e.held = null; }
             return ExitCode.SUCCESS;
         }
         return ExitCode.PARTIAL;
