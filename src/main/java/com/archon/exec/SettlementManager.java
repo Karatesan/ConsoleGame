@@ -47,7 +47,7 @@ public final class SettlementManager {
             Entity late = world.pendingInterrupt();
             if (late != null) {
                 int dmg = world.resolveInterrupt(late);
-                bus.post(new GameEvent.InterruptFired(late.id, late.readied().description(), dmg));
+                bus.post(new GameEvent.InterruptFired(late.id, late.readied.description(), dmg));
             }
             bus.post(new GameEvent.LineComplete(trace.charged(), tax, allocation - trace.charged(), round.ap()));
         }
