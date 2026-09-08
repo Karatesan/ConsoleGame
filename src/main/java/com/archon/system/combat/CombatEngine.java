@@ -109,7 +109,7 @@ public final class CombatEngine {
         int dmg = Math.max(1, dice.between(5, 10) - target.armor);
         target.hp -= dmg;
         boolean killed = !target.alive();
-        if (killed && world != null && target.held != null) {
+        if (killed && target.held != null && world != null) {
             world.tile(target.pos).ground.add(target.held);
             target.held = null;
         }
