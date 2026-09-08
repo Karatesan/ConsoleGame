@@ -125,6 +125,6 @@ public final class CommandParser {
         return out;
     }
     private void flush(List<String> out, StringBuilder sb) {
-        if (sb.length() > 0) { out.add(sb.toString()); sb.setLength(0); }
+        if (!sb.isEmpty()) { out.add(sb.toString()); sb.setLength(0); }
     }
 }
