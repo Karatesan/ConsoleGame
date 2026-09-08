@@ -1,6 +1,8 @@
 package com.archon.model;
 
+import com.archon.system.combat.ReactionSystem;
 import com.archon.system.environment.SimulationSystem;
+import com.archon.system.spatial.SpatialService;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -21,7 +23,7 @@ public final class World {
     }
 
     public final int w, h;
-    private final Tile[][] tiles;
+    public final GameMap map;
     public final Map<String, Entity> entities = new LinkedHashMap<>();
     public Thrall thrall;
     public Dice dice;
@@ -36,79 +38,43 @@ public final class World {
         this.w = w;
         this.h = h;
         this.dice = dice;
-        tiles = new Tile[h][w];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++) tiles[y][x] = new Tile();
+        this.map = new GameMap(w, h);
     }
 
-    public boolean inBounds(Vec2 p) {return p.x() >= 0 && p.y() >= 0 && p.x() < w && p.y() < h;}
+    public boolean inBounds(Vec2 p) { return map.inBounds(p); }
 
-    public Tile tile(Vec2 p) {return inBounds(p) ? tiles[p.y()][p.x()] : null;}
+    public Tile tile(Vec2 p) { return map.tile(p); }
 
-    public void wall(int x, int y) {tiles[y][x].wall = true;}
+    public void wall(int x, int y) { map.wall(x, y); }
 
-    public void add(Entity e) {entities.put(e.id, e);}
+    public void add(Entity e) { entities.put(e.id, e); }
 
-    public Entity get(String id) {return id.equals("self") ? thrall : entities.get(id);}
+    public Entity get(String id) { return id.equals("self") ? thrall : entities.get(id); }
 
     public Entity entityAt(Vec2 p) {
-        if (thrall != null && thrall.pos.equals(p)) return thrall;
-        return entities.values().stream().filter(e -> e.alive() && e.pos.equals(p)).findFirst().orElse(null);
+        return SpatialService.entityAt(this, p);
     }
 
     public boolean passable(Vec2 p) {
-        Tile t = tile(p);
-        return t != null && !t.wall && entityAt(p) == null;
+        return SpatialService.passable(this, p);
     }
 
     public List<Entity> hostilesAdjacentTo(Vec2 p) {
-        return entities.values().stream().filter(e -> e.alive() && e.kind == Entity.Kind.CREATURE).filter(
-                e -> e.pos.chebyshev(p) <= 1).toList();
+        return SpatialService.hostilesAdjacentTo(this, p);
     }
 
     public boolean lineOfSight(Vec2 a, Vec2 b) {
-        int dx = Math.abs(b.x() - a.x()), dy = Math.abs(b.y() - a.y());
-        int sx = a.x() < b.x() ? 1 : -1, sy = a.y() < b.y() ? 1 : -1;
-        int err = dx - dy, x = a.x(), y = a.y();
-        while (x != b.x() || y != b.y()) {
-            int e2 = 2 * err;
-            if (e2 > -dy) {
-                err -= dy;
-                x += sx;
-            }
-            if (e2 < dx) {
-                err += dx;
-                y += sy;
-            }
-            if (x == b.x() && y == b.y()) break;
-            Tile t = tile(new Vec2(x, y));
-            if (t == null || t.wall) return false;
-        }
-        return true;
+        return SpatialService.lineOfSight(map, a, b);
     }
 
     // ---------- Deterministic interrupts ----------
 
     public Entity pendingInterrupt() {
-        for (Entity e : entities.values()) {
-            if (!e.alive() || e.readied == null || e.readiedSpent) continue;
-            switch (e.readied.trigger()) {
-                case ON_ADJACENCY -> {
-                    if (e.pos.chebyshev(thrall.pos) <= 1) return e;
-                }
-                case ON_MOVEMENT_IN_LOS -> {
-                    if (thrallMovedThisLine && lineOfSight(e.pos, thrall.pos)) return e;
-                }
-            }
-        }
-        return null;
+        return ReactionSystem.pendingInterrupt(this);
     }
 
     public int resolveInterrupt(Entity e) {
-        e.readiedSpent = true;
-        int dmg = e.readied.damage();
-        thrall.hp -= dmg;
-        return dmg;
+        return ReactionSystem.resolveInterrupt(this, e);
     }
 
     // ---------- World tick ----------
