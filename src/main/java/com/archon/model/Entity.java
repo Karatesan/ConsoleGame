@@ -37,5 +37,39 @@ public class Entity {
     public Entity ready(Trigger tr, String desc, int dmg) {
         this.readied = new Readied(tr, desc, dmg); return this;
     }
+
+    // ---------- Domain Methods (Phase 5) ----------
+
+    public int applyDamage(int amount) {
+        this.hp -= amount;
+        return this.hp;
+    }
+
+    public int takeDamage(int amount) {
+        return applyDamage(amount);
+    }
+
+    public void ignite() {
+        tags.add(Tag.BURNING);
+    }
+
+    public void extinguish() {
+        tags.remove(Tag.BURNING);
+    }
+
+    public Item disarm() {
+        Item prev = this.held;
+        this.held = null;
+        return prev;
+    }
+
+    public void applyTag(Tag t) {
+        tags.add(t);
+    }
+
+    public void removeTag(Tag t) {
+        tags.remove(t);
+    }
+
     @Override public String toString() { return id; }
 }
