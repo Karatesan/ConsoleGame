@@ -27,7 +27,7 @@ public final class SimulationSystem {
         if (substance == Tag.OIL) t.tags.add(Tag.FLAMMABLE);
         if (substance == Tag.WATER) t.tags.add(Tag.CONDUCTIVE);
         Entity occ = world.entityAt(at);
-        if (occ != null && substance == Tag.OIL) occ.tags.add(Tag.FLAMMABLE);
+        if (occ != null && substance == Tag.OIL) occ.applyTag(Tag.FLAMMABLE);
     }
 
     /**
@@ -43,7 +43,7 @@ public final class SimulationSystem {
 
         for (Entity e : new ArrayList<>(world.entities.values())) {
             if (e.alive() && e.has(Tag.BURNING)) {
-                e.hp -= 3;
+                e.applyDamage(3);
                 log.add(e.name + " burns for 3.");
                 if (!e.alive()) log.add(e.name + " is consumed.");
             }
@@ -51,7 +51,7 @@ public final class SimulationSystem {
             e.guarded = false;
         }
         if (world.thrall.has(Tag.BURNING)) {
-            world.thrall.hp -= 3;
+            world.thrall.applyDamage(3);
             log.add("Thrall burns for 3.");
         }
 

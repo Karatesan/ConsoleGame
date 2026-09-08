@@ -60,7 +60,7 @@ public final class CombatEngine {
         int base = (w == null ? 3 : w.damage) + attacker.strength;
         double mult = part.damageMult * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
         int dmg = Math.max(1, (int) Math.round(base * mult) - target.armor);
-        target.hp -= dmg;
+        target.applyDamage(dmg);
 
         boolean degraded = false;
         if (force && w != null) {
@@ -70,8 +70,10 @@ public final class CombatEngine {
 
         boolean killed = !target.alive();
         if (killed && target.held != null) {
-            world.tile(target.pos).ground.add(target.held);
-            target.held = null;
+            Item dropped = target.disarm();
+            if (dropped != null && world != null) {
+                world.tile(target.pos).ground.add(dropped);
+            }
         }
 
         return new MeleeHitResult(true, clampedHit, dmg, part, w, killed, degraded);
@@ -82,9 +84,10 @@ public final class CombatEngine {
             return new DisarmResult(false, null);
         }
         if (dice.chance(45)) {
-            Item dropped = owner.held;
-            world.tile(owner.pos).ground.add(dropped);
-            owner.held = null;
+            Item dropped = owner.disarm();
+            if (dropped != null && world != null) {
+                world.tile(owner.pos).ground.add(dropped);
+            }
             return new DisarmResult(true, dropped);
         }
         return new DisarmResult(false, owner.held);
@@ -107,11 +110,13 @@ public final class CombatEngine {
         }
 
         int dmg = Math.max(1, dice.between(5, 10) - target.armor);
-        target.hp -= dmg;
+        target.applyDamage(dmg);
         boolean killed = !target.alive();
         if (killed && target.held != null && world != null) {
-            world.tile(target.pos).ground.add(target.held);
-            target.held = null;
+            Item dropped = target.disarm();
+            if (dropped != null) {
+                world.tile(target.pos).ground.add(dropped);
+            }
         }
         return new RangedHitResult(true, clampedHit, dmg, part, killed);
     }

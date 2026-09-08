@@ -33,7 +33,7 @@ public final class IgniteVerb implements Verb {
         if (r instanceof Resolved.OnEntity oe) {
             Entity e = oe.entity();
             if (!e.has(Tag.FLAMMABLE)) { c.say(e.name + " will not catch."); return ExitCode.MISS; }
-            e.tags.add(Tag.BURNING);
+            e.ignite();
             c.say(e.name + " catches fire.");
             return ExitCode.SUCCESS;
         }
@@ -42,7 +42,7 @@ public final class IgniteVerb implements Verb {
         if (!t.has(Tag.OIL) && !t.has(Tag.FLAMMABLE)) { c.say("nothing to burn at " + at); return ExitCode.MISS; }
         t.tags.add(Tag.BURNING);
         Entity occupant = c.world.entityAt(at);
-        if (occupant != null && occupant.has(Tag.FLAMMABLE)) occupant.tags.add(Tag.BURNING);
+        if (occupant != null && occupant.has(Tag.FLAMMABLE)) occupant.ignite();
         c.say("Fire takes hold at " + at + ".");
         return ExitCode.SUCCESS;
     }
