@@ -31,7 +31,7 @@ public final class VerbContext {
         String a = inv.arg(argIndex);
         if (a == null) return null;
         String name = a.startsWith("/") ? a.substring(a.lastIndexOf('/') + 1) : a;
-        Item i = thrall.findInPack(name);
+        Item i = thrall.inventory().findInPack(name);
         if (i != null) return i;
         return thrall.inventory().equipment().values().stream()
                 .filter(x -> x != null && (x.id.equalsIgnoreCase(name) || x.name.equalsIgnoreCase(name)))
