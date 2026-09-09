@@ -20,14 +20,14 @@ public final class WieldVerb implements Verb {
     public ExitCode execute(VerbContext c) {
         Item item = c.itemFromMaterialOrArg(0);
         if (item == null) { c.say("no such item"); return ExitCode.BLOCKED; }
-        EquipmentSlot slot = c.thrall.getSlot(EquipmentSlot.HAND_RIGHT) == null
+        EquipmentSlot slot = c.thrall.inventory().getSlot(EquipmentSlot.HAND_RIGHT) == null
                 ? EquipmentSlot.HAND_RIGHT
                 : EquipmentSlot.HAND_LEFT;
-        if (c.thrall.getSlot(slot) != null) { c.say("both hands full"); return ExitCode.BLOCKED; }
+        if (c.thrall.inventory().getSlot(slot) != null) { c.say("both hands full"); return ExitCode.BLOCKED; }
         if (c.thrall.inventory().pack().contains(item)) {
             c.thrall.inventory().equipFromPack(item, slot);
         } else {
-            c.thrall.setSlot(slot, item);
+            c.thrall.inventory().setSlot(slot, item);
         }
         c.say("Thrall grips " + item.name + " (" + slot.path + ").");
         return ExitCode.SUCCESS;

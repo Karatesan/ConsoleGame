@@ -78,7 +78,11 @@ public final class Inventory {
 
         Item currentlyEquipped = equipment.get(slot);
 
-        // Removing the item first ensures space for swap even if pack was full
+        // Can't swap if slot is occupied and pack has no room for the swapped item
+        if (currentlyEquipped != null && isPackFull()) {
+            return false;
+        }
+
         pack.remove(item);
         equipment.put(slot, item);
 

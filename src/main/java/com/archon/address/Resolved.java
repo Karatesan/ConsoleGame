@@ -20,7 +20,7 @@ public sealed interface Resolved {
                 if (path.startsWith("pack")) {
                     String rest = path.length() > 4 ? path.substring(5) : "";
                     if (rest.isBlank()) yield new OnItem(null, "pack");
-                    Item it = w.thrall.findInPack(rest);
+                    Item it = w.thrall.inventory().findInPack(rest);
                     yield it == null ? null : new OnItem(it, "pack");
                 }
                 if (EquipmentSlot.parse(path).isPresent())

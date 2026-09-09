@@ -1,8 +1,5 @@
 package com.archon.model;
 
-import java.util.List;
-import java.util.Map;
-
 public final class Thrall extends Entity {
     private final Inventory inventory = new Inventory();
     public boolean nocked;
