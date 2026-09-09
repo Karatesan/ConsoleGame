@@ -70,15 +70,19 @@ public final class Inventory {
 
     /**
      * Equips an item from the pack into the designated slot.
-     * If an item is already in that slot, it swaps it back into the pack.
-     * Returns false if pack doesn't contain the item.
+     * If a weapon/armor is already in that slot, it swaps it back into the pack.
+     * Returns false if pack doesn't contain the item, or if the swap fails.
      */
     public boolean equipFromPack(Item item, EquipmentSlot slot) {
         if (!pack.contains(item)) return false;
 
         Item currentlyEquipped = equipment.get(slot);
 
-        // Removing the item first ensures space for swap even if pack was full
+        // Can't swap if slot is occupied and pack has no room for the swapped item
+        if (currentlyEquipped != null && isPackFull()) {
+            return false;
+        }
+
         pack.remove(item);
         equipment.put(slot, item);
 
