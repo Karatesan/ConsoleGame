@@ -18,7 +18,7 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (c.thrall.packFull()) return Check.blocked("pack full (" + Inventory.PACK_MAX + ")", "drop something");
+        if (c.thrall.inventory().isPackFull()) return Check.blocked("pack full (" + Inventory.PACK_MAX + ")", "drop something");
         return Check.ok();
     }
 
@@ -49,7 +49,7 @@ public final class TakeVerb implements Verb {
         }
 
         if (item == null) { c.say("cannot take " + a); return ExitCode.BLOCKED; }
-        if (c.thrall.packFull()) { c.say("pack full"); return ExitCode.BLOCKED; }
+        if (c.thrall.inventory().isPackFull()) { c.say("pack full"); return ExitCode.BLOCKED; }
         c.thrall.inventory().addToPack(item);
         c.materialOut = new Material.OfItem(item);
         c.say("Thrall takes " + item.name + ".");
