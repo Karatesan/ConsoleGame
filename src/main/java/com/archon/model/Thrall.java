@@ -17,6 +17,38 @@ public final class Thrall extends Entity {
         return inventory;
     }
 
+    public Item getSlot(EquipmentSlot slot) {
+        return inventory.getSlot(slot);
+    }
+
+    public Item getSlot(String path) {
+        return inventory.getSlot(path);
+    }
+
+    public void setSlot(EquipmentSlot slot, Item item) {
+        inventory.setSlot(slot, item);
+    }
+
+    public boolean setSlot(String path, Item item) {
+        return inventory.setSlot(path, item);
+    }
+
+    public boolean packFull() {
+        return inventory.isPackFull();
+    }
+
+    public Item findInPack(String idOrName) {
+        return inventory.findInPack(idOrName);
+    }
+
+    public List<Item> pack() {
+        return inventory.pack();
+    }
+
+    public Map<EquipmentSlot, Item> equipment() {
+        return inventory.equipment();
+    }
+
     /**
      * Creature combat behavior: attempts right hand first, falls back to left hand.
      */

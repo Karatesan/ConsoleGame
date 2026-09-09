@@ -70,8 +70,8 @@ public final class Inventory {
 
     /**
      * Equips an item from the pack into the designated slot.
-     * If a weapon/armor is already in that slot, it swaps it back into the pack.
-     * Returns false if pack doesn't contain the item, or if the swap fails.
+     * If an item is already in that slot, it swaps it back into the pack.
+     * Returns false if pack doesn't contain the item.
      */
     public boolean equipFromPack(Item item, EquipmentSlot slot) {
         if (!pack.contains(item)) return false;
