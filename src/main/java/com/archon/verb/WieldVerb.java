@@ -1,6 +1,7 @@
 package com.archon.verb;
 
 import com.archon.command.Ast;
+import com.archon.model.EquipmentSlot;
 import com.archon.model.Item;
 
 public final class WieldVerb implements Verb {
@@ -19,11 +20,16 @@ public final class WieldVerb implements Verb {
     public ExitCode execute(VerbContext c) {
         Item item = c.itemFromMaterialOrArg(0);
         if (item == null) { c.say("no such item"); return ExitCode.BLOCKED; }
-        String slot = c.thrall.slots().get("hand/right") == null ? "hand/right" : "hand/left";
-        if (c.thrall.slots().get(slot) != null) { c.say("both hands full"); return ExitCode.BLOCKED; }
-        c.thrall.inventory().removeFromPack(item);
-        c.thrall.slots().put(slot, item);
-        c.say("Thrall grips " + item.name + " (" + slot + ").");
+        EquipmentSlot slot = c.thrall.getSlot(EquipmentSlot.HAND_RIGHT) == null
+                ? EquipmentSlot.HAND_RIGHT
+                : EquipmentSlot.HAND_LEFT;
+        if (c.thrall.getSlot(slot) != null) { c.say("both hands full"); return ExitCode.BLOCKED; }
+        if (c.thrall.inventory().pack().contains(item)) {
+            c.thrall.inventory().equipFromPack(item, slot);
+        } else {
+            c.thrall.setSlot(slot, item);
+        }
+        c.say("Thrall grips " + item.name + " (" + slot.path + ").");
         return ExitCode.SUCCESS;
     }
 }

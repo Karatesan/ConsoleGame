@@ -48,6 +48,6 @@ public final class IgniteVerb implements Verb {
     }
 
     private static boolean hasFlame(VerbContext c) {
-        return c.thrall.slots().values().stream().anyMatch(i -> i != null && i.has(Tag.LIT));
+        return c.thrall.inventory().equipment().values().stream().anyMatch(i -> i != null && i.has(Tag.LIT));
     }
 }
