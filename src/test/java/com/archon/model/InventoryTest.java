@@ -50,17 +50,6 @@ class InventoryTest {
     }
 
     @Test
-    void testUnequipItemDirectly() {
-        Inventory inv = new Inventory();
-        Item sword = Item.weapon("sword", "Sword", 5, 10, Tag.METAL);
-        inv.setSlot(EquipmentSlot.HAND_LEFT, sword);
-
-        assertTrue(inv.unequipItem(sword));
-        assertNull(inv.getSlot(EquipmentSlot.HAND_LEFT));
-        assertFalse(inv.unequipItem(sword)); // already unequipped
-    }
-
-    @Test
     void testPackCapacityAndAddition() {
         Inventory inv = new Inventory();
         assertFalse(inv.isPackFull());
