@@ -20,7 +20,7 @@ public final class DropVerb implements Verb {
         Item item = c.itemFromMaterialOrArg(0);
         if (item == null) { c.say("not carrying that"); return ExitCode.BLOCKED; }
         c.thrall.inventory().removeFromPack(item);
-        c.thrall.slots().replaceAll((k, v) -> v == item ? null : v);
+        c.thrall.inventory().unequipItem(item);
         c.world.tile(c.thrall.pos).ground.add(item);
         c.say("Thrall drops " + item.name + ".");
         return ExitCode.SUCCESS;
