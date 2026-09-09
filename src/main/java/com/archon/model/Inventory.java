@@ -29,6 +29,10 @@ public final class Inventory {
         return pack.isEmpty();
     }
 
+    public boolean isEmpty() {
+        return isPackEmpty();
+    }
+
     /** Unmodifiable view for CLI display/directory listings (e.g., "ls thrall/") */
     public Map<EquipmentSlot, Item> equipment() {
         return Collections.unmodifiableMap(equipment);
