@@ -27,13 +27,13 @@ public final class VerbContext {
     public boolean acceptsPipedMaterial() { return materialIn != null; }
 
     public Item itemFromMaterialOrArg(int argIndex) {
-        if (materialIn instanceof Material.OfItem oi) return oi.item();
+        if (materialIn instanceof Material.OfItem(Item item)) return item;
         String a = inv.arg(argIndex);
         if (a == null) return null;
         String name = a.startsWith("/") ? a.substring(a.lastIndexOf('/') + 1) : a;
         Item i = thrall.findInPack(name);
         if (i != null) return i;
-        return thrall.slots.values().stream()
+        return thrall.slots().values().stream()
                 .filter(x -> x != null && (x.id.equalsIgnoreCase(name) || x.name.equalsIgnoreCase(name)))
                 .findFirst().orElse(null);
     }

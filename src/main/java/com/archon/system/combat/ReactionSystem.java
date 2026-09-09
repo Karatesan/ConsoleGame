@@ -46,7 +46,7 @@ public final class ReactionSystem {
     public static int resolveInterrupt(World world, Entity e) {
         e.readiedSpent = true;
         int dmg = e.readied.damage();
-        world.thrall.applyDamage(dmg);
+        world.thrall.takeDamage(dmg);
         return dmg;
     }
 }

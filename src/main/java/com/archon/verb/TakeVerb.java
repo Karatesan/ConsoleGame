@@ -2,10 +2,7 @@ package com.archon.verb;
 
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
-import com.archon.model.Entity;
-import com.archon.model.Item;
-import com.archon.model.Thrall;
-import com.archon.model.World;
+import com.archon.model.*;
 
 public final class TakeVerb implements Verb {
     @Override public String name() { return "take"; }
@@ -21,7 +18,7 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (c.thrall.packFull()) return Check.blocked("pack full (" + Thrall.PACK_MAX + ")", "drop something");
+        if (c.thrall.packFull()) return Check.blocked("pack full (" + Inventory.PACK_MAX + ")", "drop something");
         return Check.ok();
     }
 
@@ -53,7 +50,7 @@ public final class TakeVerb implements Verb {
 
         if (item == null) { c.say("cannot take " + a); return ExitCode.BLOCKED; }
         if (c.thrall.packFull()) { c.say("pack full"); return ExitCode.BLOCKED; }
-        c.thrall.pack.add(item);
+        c.thrall.inventory().addToPack(item);
         c.materialOut = new Material.OfItem(item);
         c.say("Thrall takes " + item.name + ".");
         return ExitCode.SUCCESS;

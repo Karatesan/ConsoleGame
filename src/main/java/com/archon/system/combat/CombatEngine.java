@@ -60,7 +60,7 @@ public final class CombatEngine {
         int base = (w == null ? 3 : w.damage) + attacker.strength;
         double mult = part.damageMult * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
         int dmg = Math.max(1, (int) Math.round(base * mult) - target.armor);
-        target.applyDamage(dmg);
+        target.takeDamage(dmg);
 
         boolean degraded = false;
         if (force && w != null) {
@@ -110,7 +110,7 @@ public final class CombatEngine {
         }
 
         int dmg = Math.max(1, dice.between(5, 10) - target.armor);
-        target.applyDamage(dmg);
+        target.takeDamage(dmg);
         boolean killed = !target.alive();
         if (killed && target.held != null && world != null) {
             Item dropped = target.disarm();

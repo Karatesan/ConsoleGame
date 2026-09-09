@@ -11,8 +11,8 @@ public final class LsVerb extends FreeVerb {
         String a = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
         Resolved r = VerbHelpers.resolve(c, a);
         if (r instanceof Resolved.OnItem oi && "pack".equals(oi.container())) {
-            c.say(c.thrall.pack.isEmpty() ? "(empty)" :
-                    String.join("\n", c.thrall.pack.stream()
+            c.say(c.thrall.inventory().isEmpty() ? "(empty)" :
+                    String.join("\n", c.thrall.inventory().pack().stream()
                             .map(i -> "  " + i.id + "  " + i.tags).toList()));
             return ExitCode.SUCCESS;
         }

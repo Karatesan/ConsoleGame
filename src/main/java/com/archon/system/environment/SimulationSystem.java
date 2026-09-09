@@ -43,7 +43,7 @@ public final class SimulationSystem {
 
         for (Entity e : new ArrayList<>(world.entities.values())) {
             if (e.alive() && e.has(Tag.BURNING)) {
-                e.applyDamage(3);
+                e.takeDamage(3);
                 log.add(e.name + " burns for 3.");
                 if (!e.alive()) log.add(e.name + " is consumed.");
             }
@@ -51,7 +51,7 @@ public final class SimulationSystem {
             e.guarded = false;
         }
         if (world.thrall.has(Tag.BURNING)) {
-            world.thrall.applyDamage(3);
+            world.thrall.takeDamage(3);
             log.add("Thrall burns for 3.");
         }
 

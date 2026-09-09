@@ -35,7 +35,7 @@ public final class ThrowVerb implements Verb {
             case Resolved.OnTile ot -> ot.pos();
             case Resolved.OnItem ignored -> c.thrall.pos;
         };
-        c.thrall.pack.remove(item);
+        c.thrall.inventory().removeFromPack(item);
         c.say("Flask arcs toward " + at + " and shatters.");
         if (item.substance != null) VerbHelpers.spill(c, at, item.substance);
         return ExitCode.SUCCESS;

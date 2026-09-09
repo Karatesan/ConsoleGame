@@ -13,7 +13,7 @@ class EntityTest {
         Entity entity = new Entity("test", "Test Dummy", 'D', Entity.Kind.CREATURE, new Vec2(0, 0), 20);
         assertTrue(entity.alive());
 
-        int remaining = entity.applyDamage(5);
+        int remaining = entity.takeDamage(5);
         assertEquals(15, remaining);
         assertEquals(15, entity.hp);
         assertTrue(entity.alive());

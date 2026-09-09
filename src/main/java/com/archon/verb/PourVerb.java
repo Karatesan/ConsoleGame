@@ -36,7 +36,7 @@ public final class PourVerb implements Verb {
             if (it == null || it.substance == null) { c.say("nothing pourable"); return ExitCode.BLOCKED; }
             substance = it.substance;
             targetArg = c.inv.arg(1);
-            c.thrall.pack.remove(it);
+            c.thrall.inventory().removeFromPack(it);
         }
         if (substance == null) { c.say("nothing pourable"); return ExitCode.BLOCKED; }
         Resolved r = VerbHelpers.resolve(c, targetArg);

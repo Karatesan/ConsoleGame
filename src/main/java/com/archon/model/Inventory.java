@@ -10,44 +10,108 @@ import java.util.Optional;
 /**
  * Domain model encapsulating equipment slots and carried pack inventory.
  */
+import java.util.*;
+
 public final class Inventory {
     public static final int PACK_MAX = 8;
-    public static final List<String> SLOTS =
-            List.of("head", "torso", "legs", "hand/left", "hand/right");
 
-    private final Map<String, Item> equipment = new LinkedHashMap<>();
+    private final Map<EquipmentSlot, Item> equipment = new EnumMap<>(EquipmentSlot.class);
     private final List<Item> pack = new ArrayList<>();
 
     public Inventory() {
-        SLOTS.forEach(s -> equipment.put(s, null));
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            equipment.put(slot, null);
+        }
     }
 
-    public Map<String, Item> equipment() {
-        return equipment;
-    }
+    // --- State Queries ---
 
-    public List<Item> pack() {
-        return pack;
-    }
-
-    public boolean isFull() {
+    public boolean isPackFull() {
         return pack.size() >= PACK_MAX;
     }
 
-    public boolean packFull() {
-        return isFull();
+    public boolean isPackEmpty() {
+        return pack.isEmpty();
     }
 
-    public Item getSlot(String slot) {
+    /** Unmodifiable view for CLI display/directory listings (e.g., "ls thrall/") */
+    public Map<EquipmentSlot, Item> equipment() {
+        return Collections.unmodifiableMap(equipment);
+    }
+
+    /** Unmodifiable view so external code cannot bypass PACK_MAX */
+    public List<Item> pack() {
+        return Collections.unmodifiableList(pack);
+    }
+
+    // --- Slot Access (Typed + String Overloads) ---
+
+    public Item getSlot(EquipmentSlot slot) {
         return equipment.get(slot);
     }
 
-    public void setSlot(String slot, Item item) {
+    /** CLI-friendly string lookup (e.g. from Address.java / Resolved.java) */
+    public Item getSlot(String path) {
+        return EquipmentSlot.parse(path)
+                .map(equipment::get)
+                .orElse(null);
+    }
+
+    public void setSlot(EquipmentSlot slot, Item item) {
         equipment.put(slot, item);
     }
 
+    public boolean setSlot(String path, Item item) {
+        Optional<EquipmentSlot> slot = EquipmentSlot.parse(path);
+        slot.ifPresent(s -> equipment.put(s, item));
+        return slot.isPresent();
+    }
+
+    // --- High-Level Game Actions ---
+
+    /**
+     * Equips an item from the pack into the designated slot.
+     * If a weapon/armor is already in that slot, it swaps it back into the pack.
+     * Returns false if pack doesn't contain the item, or if the swap fails.
+     */
+    public boolean equipFromPack(Item item, EquipmentSlot slot) {
+        if (!pack.contains(item)) return false;
+
+        Item currentlyEquipped = equipment.get(slot);
+
+        //TODO might cause issues when we want to swap items - pack can be full during swaps this does not allow it
+        // Can't swap if slot is occupied and pack has no room for the swapped item
+        if (currentlyEquipped != null && isPackFull()) {
+            return false;
+        }
+
+        pack.remove(item);
+        equipment.put(slot, item);
+
+        if (currentlyEquipped != null) {
+            pack.add(currentlyEquipped);
+        }
+        return true;
+    }
+
+    /**
+     * Unequips an item from a slot and places it in the pack.
+     * Returns false if the pack is full.
+     */
+    public boolean unequipToPack(EquipmentSlot slot) {
+        Item item = equipment.get(slot);
+        if (item == null) return true; // Slot is already empty
+        if (isPackFull()) return false;
+
+        equipment.put(slot, null);
+        pack.add(item);
+        return true;
+    }
+
+    // --- Pack Operations ---
+
     public boolean addToPack(Item item) {
-        if (isFull()) return false;
+        if (isPackFull() || item == null) return false;
         return pack.add(item);
     }
 

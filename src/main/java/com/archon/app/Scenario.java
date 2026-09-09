@@ -15,10 +15,10 @@ public final class Scenario {
         w.wall(3, 3);   // pillar directly north of the thrall — used by the BLOCKED tests
 
         Thrall t = new Thrall(new Vec2(3, 4), 40);
-        t.slots.put("hand/right", Item.weapon("rusted_cleaver", "rusted cleaver", 6, 10, Tag.METAL));
-        t.slots.put("hand/left",  new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1));
-        t.pack.add(Item.flask("flask_oil", "oil flask", Tag.OIL));
-        t.pack.add(Item.flask("flask_water", "water flask", Tag.WATER));
+        t.setSlot("hand/right", Item.weapon("rusted_cleaver", "rusted cleaver", 6, 10, Tag.METAL));
+        t.setSlot("hand/left",  new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1));
+        t.inventory().addToPack(Item.flask("flask_oil", "oil flask", Tag.OIL));
+        t.inventory().addToPack(Item.flask("flask_water", "water flask", Tag.WATER));
         w.thrall = t;
 
         Entity orc = new Entity("o1", "Orc Guard", 'O', Entity.Kind.CREATURE, new Vec2(3, 5), 24);
