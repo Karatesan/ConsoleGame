@@ -23,7 +23,7 @@ public sealed interface Resolved {
                     Item it = w.thrall.findInPack(rest);
                     yield it == null ? null : new OnItem(it, "pack");
                 }
-                if (w.thrall.slots().containsKey(path))
+                if (EquipmentSlot.parse(path).isPresent())
                     yield new OnEntity(w.thrall, null, path);
                 yield null;
             }
