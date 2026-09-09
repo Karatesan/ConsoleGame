@@ -16,15 +16,15 @@ class ThrallTest {
         Item rightSword = Item.weapon("sword", "Sword", 5, 10, Tag.METAL);
 
         // Equip left hand only via inventory()
-        thrall.inventory().setSlot(EquipmentSlot.HAND_LEFT, leftDagger);
-        assertEquals(leftDagger, thrall.inventory().getSlot(EquipmentSlot.HAND_LEFT));
-        assertEquals(leftDagger, thrall.inventory().getSlot("hand/left"));
+        thrall.inventory().equip(EquipmentSlot.HAND_LEFT, leftDagger);
+        assertEquals(leftDagger, thrall.inventory().getEquipped(EquipmentSlot.HAND_LEFT));
+        assertEquals(leftDagger, thrall.inventory().getEquipped("hand/left"));
         assertEquals(leftDagger, thrall.mainHand());
 
         // Equip right hand, mainHand prefers right hand
-        thrall.inventory().setSlot(EquipmentSlot.HAND_RIGHT, rightSword);
-        assertEquals(rightSword, thrall.inventory().getSlot(EquipmentSlot.HAND_RIGHT));
-        assertEquals(rightSword, thrall.inventory().getSlot("hand/right"));
+        thrall.inventory().equip(EquipmentSlot.HAND_RIGHT, rightSword);
+        assertEquals(rightSword, thrall.inventory().getEquipped(EquipmentSlot.HAND_RIGHT));
+        assertEquals(rightSword, thrall.inventory().getEquipped("hand/right"));
         assertEquals(rightSword, thrall.mainHand());
     }
 

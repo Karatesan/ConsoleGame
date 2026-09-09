@@ -45,22 +45,22 @@ public final class Inventory {
 
     // --- Slot Access (Typed + String Overloads) ---
 
-    public Item getSlot(EquipmentSlot slot) {
+    public Item getEquipped(EquipmentSlot slot) {
         return equipment.get(slot);
     }
 
     /** CLI-friendly string lookup (e.g. from Address.java / Resolved.java) */
-    public Item getSlot(String path) {
+    public Item getEquipped(String path) {
         return EquipmentSlot.parse(path)
                 .map(equipment::get)
                 .orElse(null);
     }
 
-    public void setSlot(EquipmentSlot slot, Item item) {
+    public void equip(EquipmentSlot slot, Item item) {
         equipment.put(slot, item);
     }
 
-    public boolean setSlot(String path, Item item) {
+    public boolean equip(String path, Item item) {
         Optional<EquipmentSlot> slot = EquipmentSlot.parse(path);
         slot.ifPresent(s -> equipment.put(s, item));
         return slot.isPresent();

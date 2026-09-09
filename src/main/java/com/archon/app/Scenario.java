@@ -15,8 +15,8 @@ public final class Scenario {
         w.wall(3, 3);   // pillar directly north of the thrall — used by the BLOCKED tests
 
         Thrall t = new Thrall(new Vec2(3, 4), 40);
-        t.inventory().setSlot(EquipmentSlot.HAND_RIGHT, Item.weapon("rusted_cleaver", "rusted cleaver", 6, 10, Tag.METAL));
-        t.inventory().setSlot(EquipmentSlot.HAND_LEFT,  new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1));
+        t.inventory().equip(EquipmentSlot.HAND_RIGHT, Item.weapon("rusted_cleaver", "rusted cleaver", 6, 10, Tag.METAL));
+        t.inventory().equip(EquipmentSlot.HAND_LEFT,  new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1));
         t.inventory().addToPack(Item.flask("flask_oil", "oil flask", Tag.OIL));
         t.inventory().addToPack(Item.flask("flask_water", "water flask", Tag.WATER));
         w.thrall = t;

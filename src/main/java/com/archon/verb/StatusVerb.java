@@ -21,7 +21,7 @@ public final class StatusVerb extends FreeVerb {
     }
 
     private String slot(Thrall t, EquipmentSlot s) {
-        Item i = t.inventory().getSlot(s);
+        Item i = t.inventory().getEquipped(s);
         return i == null ? "empty" : i.name;
     }
 }

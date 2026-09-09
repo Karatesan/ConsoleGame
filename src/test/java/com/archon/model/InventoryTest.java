@@ -13,14 +13,14 @@ class InventoryTest {
         Inventory inv = new Inventory();
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             assertTrue(inv.equipment().containsKey(slot));
-            assertNull(inv.getSlot(slot));
-            assertNull(inv.getSlot(slot.path));
+            assertNull(inv.getEquipped(slot));
+            assertNull(inv.getEquipped(slot.path));
         }
 
         Item dagger = Item.weapon("dagger", "Iron Dagger", 4, 10, Tag.METAL);
-        inv.setSlot(EquipmentSlot.HAND_RIGHT, dagger);
-        assertEquals(dagger, inv.getSlot(EquipmentSlot.HAND_RIGHT));
-        assertEquals(dagger, inv.getSlot("hand/right"));
+        inv.equip(EquipmentSlot.HAND_RIGHT, dagger);
+        assertEquals(dagger, inv.getEquipped(EquipmentSlot.HAND_RIGHT));
+        assertEquals(dagger, inv.getEquipped("hand/right"));
     }
 
     @Test
@@ -34,18 +34,18 @@ class InventoryTest {
 
         // Equip sword to right hand
         assertTrue(inv.equipFromPack(sword, EquipmentSlot.HAND_RIGHT));
-        assertEquals(sword, inv.getSlot(EquipmentSlot.HAND_RIGHT));
+        assertEquals(sword, inv.getEquipped(EquipmentSlot.HAND_RIGHT));
         assertFalse(inv.pack().contains(sword));
 
         // Swap sword with shield
         assertTrue(inv.equipFromPack(shield, EquipmentSlot.HAND_RIGHT));
-        assertEquals(shield, inv.getSlot(EquipmentSlot.HAND_RIGHT));
+        assertEquals(shield, inv.getEquipped(EquipmentSlot.HAND_RIGHT));
         assertFalse(inv.pack().contains(shield));
         assertTrue(inv.pack().contains(sword));
 
         // Unequip shield to pack
         assertTrue(inv.unequipToPack(EquipmentSlot.HAND_RIGHT));
-        assertNull(inv.getSlot(EquipmentSlot.HAND_RIGHT));
+        assertNull(inv.getEquipped(EquipmentSlot.HAND_RIGHT));
         assertTrue(inv.pack().contains(shield));
     }
 

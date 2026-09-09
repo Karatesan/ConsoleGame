@@ -22,8 +22,8 @@ public final class DropVerb implements Verb {
         if (item == null) { c.say("not carrying that"); return ExitCode.BLOCKED; }
         c.thrall.inventory().removeFromPack(item);
         for (EquipmentSlot slot : EquipmentSlot.values()) {
-            if (c.thrall.inventory().getSlot(slot) == item) {
-                c.thrall.inventory().setSlot(slot, null);
+            if (c.thrall.inventory().getEquipped(slot) == item) {
+                c.thrall.inventory().equip(slot, null);
             }
         }
         c.world.tile(c.thrall.pos).ground.add(item);
