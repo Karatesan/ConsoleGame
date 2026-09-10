@@ -2,7 +2,7 @@ package com.archon.verb;
 
 public final class HelpVerb extends FreeVerb {
     @Override public String name() { return "help"; }
-    @Override public String help() { return "help [verb] — syntax. 0 AP."; }
+    @Override public String help() { return "help [verb | topic] — command manual and reference guides. 0 AP."; }
 
     @Override
     public ExitCode execute(VerbContext c) {
