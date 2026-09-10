@@ -2,7 +2,7 @@ package com.archon.command;
 
 import java.util.List;
 import java.util.Map;
-
+//TODO refactor it into sealed interface or separate classes
 public final class Ast {
     private Ast() {}
 
