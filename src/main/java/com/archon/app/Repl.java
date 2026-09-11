@@ -56,11 +56,10 @@ public final class Repl {
                 break;
             }
 
-            view.frame(world, round);          // show the exhausted round + settlement
             if (o.roundOver()) {
                 exec.endRound();               // world tick + AP reset happen here
-                view.frame(world, round);      // then the fresh round
             }
+            view.frame(world, round);
         }
     }
 
