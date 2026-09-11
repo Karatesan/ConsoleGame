@@ -98,17 +98,33 @@ public final class ConsoleView implements View {
                 mapWidth = line.length();
             }
         }
+        mapWidth = Math.max(mapWidth, "=== MAP ===".length());
+
+        int telemetryWidth = 0;
+        for (String line : telemetryLines) {
+            if (line.length() > telemetryWidth) {
+                telemetryWidth = line.length();
+            }
+        }
+        telemetryWidth = Math.max(telemetryWidth, "=== TELEMETRY ===".length());
+
+        int totalWidth = mapWidth + 3 + telemetryWidth;
+
+        sb.append(Ansi.padRight("=== MAP ===", mapWidth)).append(" | ").append("=== TELEMETRY ===").append('\n');
+        sb.append("-".repeat(mapWidth)).append("-+-").append("-".repeat(telemetryWidth)).append('\n');
 
         int splitRows = Math.max(mapLines.size(), telemetryLines.size());
         for (int i = 0; i < splitRows; i++) {
             String left = i < mapLines.size() ? mapLines.get(i) : "";
             String right = i < telemetryLines.size() ? telemetryLines.get(i) : "";
-            sb.append(left);
-            if (!right.isEmpty() && left.length() < mapWidth) {
-                sb.append(" ".repeat(mapWidth - left.length()));
-            }
+            sb.append(Ansi.padRight(left, mapWidth));
+            sb.append(" | ");
             sb.append(right).append('\n');
         }
+
+        sb.append("-".repeat(totalWidth)).append('\n');
+        sb.append("=== LOG ===").append('\n');
+        sb.append("-".repeat(totalWidth)).append('\n');
 
         int logCount = 0;
         for (String line : log) {
