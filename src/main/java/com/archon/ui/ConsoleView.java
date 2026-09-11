@@ -6,21 +6,21 @@ import com.archon.model.World;
 
 import java.io.PrintStream;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.util.Objects;
-import java.util.regex.Pattern;
 
 public final class ConsoleView implements View {
 
-    private static final int LOG_LINES = 14;
-    private static final String HEADER = "===================== ARCHON — Action Economy Prototype =====================";
-    private static final String SEPARATOR = "-----------------------------------------------------------------------------";
-    private static final Pattern ANSI_PATTERN = Pattern.compile("\u001B\\[[0-9;]*[a-zA-Z]");
+    public static final int MAP_WIDTH = 34;
+    public static final int TELEMETRY_WIDTH = 52;
+    public static final int LOG_LINES = 10;
+    private static final int INNER_TOTAL_WIDTH = MAP_WIDTH + 2 + 1 + TELEMETRY_WIDTH + 2; // 91
+    private static final int LOG_CONTENT_WIDTH = INNER_TOTAL_WIDTH - 2;                   // 89
 
     private final PrintStream out;
-    private final MapPaneRenderer mapPaneRenderer;
-    private final TelemetryPaneRenderer telemetryPaneRenderer;
+    private final MapPaneRenderer mapPane;
+    private final TelemetryPaneRenderer telemetryPane;
     private final Deque<String> log = new ArrayDeque<>();
 
     public ConsoleView() {
@@ -28,17 +28,12 @@ public final class ConsoleView implements View {
     }
 
     public ConsoleView(PrintStream out) {
-        this(out, new MapPaneRenderer(), new TelemetryPaneRenderer());
-    }
-
-    public ConsoleView(PrintStream out, MapPaneRenderer mapPaneRenderer, TelemetryPaneRenderer telemetryPaneRenderer) {
-        this.out = Objects.requireNonNull(out, "out must not be null");
-        this.mapPaneRenderer = Objects.requireNonNull(mapPaneRenderer, "mapPaneRenderer must not be null");
-        this.telemetryPaneRenderer = Objects.requireNonNull(telemetryPaneRenderer, "telemetryPaneRenderer must not be null");
+        this.out = out;
+        this.mapPane = new MapPaneRenderer();
+        this.telemetryPane = new TelemetryPaneRenderer();
     }
 
     private void emit(String text) {
-        if (text == null) return;
         for (String line : text.split("\n")) {
             log.addLast(line);
             while (log.size() > LOG_LINES) {
@@ -51,115 +46,123 @@ public final class ConsoleView implements View {
     public void handle(GameEvent e) {
         switch (e) {
             case GameEvent.Narrative n -> emit(n.text());
-            case GameEvent.Audit a -> emit(a.text());
-            case GameEvent.Redraw ignored -> {}
+            case GameEvent.Audit a -> emit(Ansi.style("[AUDIT] ", Ansi.BRIGHT_CYAN) + a.text());
+            case GameEvent.Redraw r -> {}
 
             case GameEvent.Rejected r -> {
-                emit("✗ " + r.code() + " — " + r.reason());
-                if (r.hint() != null) emit("    " + r.hint());
+                emit(Ansi.style("✗ " + r.code(), Ansi.BRIGHT_RED) + " — " + r.reason());
+                if (r.hint() != null) emit("    " + Ansi.style(r.hint(), Ansi.DIM));
                 emit("    0 AP spent. Line not counted.");
             }
             case GameEvent.LineStart s ->
-                    emit("> " + s.raw() + "   [alloc " + s.allocation() + " AP, tax " + s.tax() + ", " + (s.chain() ? "CHAIN" : "SINGLE") + "]");
+                    emit(Ansi.style("> ", Ansi.BRIGHT_WHITE, Ansi.BOLD) + s.raw() + "  "
+                            + Ansi.style("[alloc " + s.allocation() + " AP, tax " + s.tax() + ", "
+                            + (s.chain() ? "CHAIN" : "SINGLE") + "]", Ansi.DIM));
 
             case GameEvent.StageResult s ->
-                    emit(String.format("  ✓ [%d/%d] %-36s %-12s (%d AP)  AP %d", s.index(), s.total(), s.render(),
-                            s.code(), s.charged(), Math.max(0, s.apLeft())));
+                    emit(String.format("  [%d/%d] %-30s %-10s (%d AP)  AP %d",
+                            s.index(), s.total(), s.render(), s.code(), s.charged(), Math.max(0, s.apLeft())));
 
             case GameEvent.StageSkipped s ->
-                    emit(String.format("  ⚠ [%d]   %-36s SKIPPED      (%s)", s.index(), s.render(), s.why()));
+                    emit(String.format("  [%d]   %-30s SKIPPED     (%s)",
+                            s.index(), s.render(), s.why()));
 
             case GameEvent.LineComplete c ->
-                    emit(String.format("✓ LINE COMPLETE — %d AP charged, %d tax, %d returned unused. AP %d.", c.charged(),
-                            c.tax(), c.returnedUnused(), c.apLeft()));
+                    emit(Ansi.style("✓ LINE COMPLETE", Ansi.BRIGHT_GREEN)
+                            + String.format(" — %d AP charged, %d tax, %d returned unused. AP %d.",
+                            c.charged(), c.tax(), c.returnedUnused(), c.apLeft()));
 
             case GameEvent.LineBroke b -> {
-                emit("✗ BREAK — " + b.reason());
-                emit(String.format("    Forfeited: %d AP allocation + %d AP penalty = %d AP.", b.allocation(),
-                        b.penalty(), b.forfeited()));
+                emit(Ansi.style("✗ BREAK", Ansi.BRIGHT_RED, Ansi.BOLD) + " — " + b.reason());
+                emit(String.format("    Forfeited: %d AP allocation + %d AP penalty = %d AP.",
+                        b.allocation(), b.penalty(), b.forfeited()));
                 if (b.hint() != null) emit("    Tip: " + b.hint());
             }
             case GameEvent.InterruptFired i ->
-                    emit("⚠ INTERRUPT — " + i.source() + " (" + i.description() + "). " + i.damage() + " dmg.");
+                    emit(Ansi.style("⚠ INTERRUPT", Ansi.BRIGHT_RED, Ansi.BOLD)
+                            + " — " + i.source() + " (" + i.description() + "). " + i.damage() + " dmg.");
 
             case GameEvent.RoundEnd r -> {
-                emit(r.wasted() > 0 ? "-- round ends. " + r.wasted() + " AP destroyed unspent." : "-- round ends. All AP spent.");
+                emit(Ansi.style("── ROUND SETTLED ── "
+                        + (r.wasted() > 0 ? r.wasted() + " AP destroyed unspent." : "All AP spent."), Ansi.DIM));
                 r.worldLog().forEach(this::emit);
             }
             case GameEvent.RoundStart s ->
-                    emit("== ROUND " + s.round() + " — AP " + s.ap() + "/" + s.ap());
+                    emit(Ansi.style("── ROUND " + s.round() + " ── AP " + s.ap() + "/" + s.ap(), Ansi.BRIGHT_CYAN));
 
             case GameEvent.ThrallDied d ->
-                    emit("☠ *** THE THRALL COLLAPSES. THE LINK GOES DARK. ***");
+                    emit(Ansi.style("*** THE THRALL COLLAPSES. THE LINK GOES DARK. ***", Ansi.BRIGHT_RED, Ansi.BOLD));
         }
     }
 
     @Override
     public void frame(World w, RoundState round) {
-        out.print("\033[H\033[2J");
-        out.flush();
+        out.print(Ansi.CLEAR_SCREEN);
         out.print(renderFrameToString(w, round));
         out.flush();
     }
 
     public String renderFrameToString(World w, RoundState round) {
         StringBuilder sb = new StringBuilder();
-        sb.append(HEADER).append('\n');
 
-        List<String> mapLines = mapPaneRenderer.render(w);
-        List<String> telemetryLines = telemetryPaneRenderer.render(w, round);
+        // 1. Top border
+        String topTitleLeft = " MAP VIEWPORT ";
+        String topTitleRight = " THRALL TELEMETRY ";
+        String borderTopLeft = "──" + topTitleLeft + "─".repeat(Math.max(0, MAP_WIDTH + 2 - 2 - topTitleLeft.length()));
+        String borderTopRight = "──" + topTitleRight + "─".repeat(Math.max(0, TELEMETRY_WIDTH + 2 - 2 - topTitleRight.length()));
 
-        int mapWidth = 0;
-        for (String line : mapLines) {
-            int len = stripAnsi(line).length();
-            if (len > mapWidth) {
-                mapWidth = len;
-            }
+        sb.append(Ansi.style("┌" + borderTopLeft + "┬" + borderTopRight + "┐", Ansi.DIM)).append('\n');
+
+        // 2. Dual Pane content
+        List<String> mapLines = mapPane.render(w, MAP_WIDTH);
+        List<String> telemetryLines = telemetryPane.render(w, round, TELEMETRY_WIDTH);
+        int maxRows = Math.max(mapLines.size(), telemetryLines.size());
+
+        for (int i = 0; i < maxRows; i++) {
+            String left = i < mapLines.size() ? mapLines.get(i) : Ansi.padRight("", MAP_WIDTH);
+            String right = i < telemetryLines.size() ? telemetryLines.get(i) : Ansi.padRight("", TELEMETRY_WIDTH);
+
+            sb.append(Ansi.style("│ ", Ansi.DIM))
+              .append(left)
+              .append(Ansi.style(" │ ", Ansi.DIM))
+              .append(right)
+              .append(Ansi.style(" │", Ansi.DIM))
+              .append('\n');
         }
 
-        int rows = Math.max(mapLines.size(), telemetryLines.size());
-        for (int i = 0; i < rows; i++) {
-            String left = i < mapLines.size() ? mapLines.get(i) : "";
-            String right = i < telemetryLines.size() ? telemetryLines.get(i) : "";
-            int visibleLeft = stripAnsi(left).length();
-            int pad = Math.max(0, mapWidth - visibleLeft);
+        // 3. Middle split-bottom border
+        sb.append(Ansi.style("├" + "─".repeat(MAP_WIDTH + 2) + "┴" + "─".repeat(TELEMETRY_WIDTH + 2) + "┤", Ansi.DIM)).append('\n');
 
-            String strippedLeft = stripAnsi(left);
-            String strippedRight = stripAnsi(right);
-            if (hasRightBorder(strippedLeft) || hasLeftBorder(strippedRight)) {
-                sb.append(left).append(" ".repeat(pad)).append("  ").append(right).append('\n');
-            } else {
-                sb.append(left).append(" ".repeat(pad)).append(" │ ").append(right).append('\n');
-            }
+        // 4. Log buffer rows
+        List<String> logSnapshot = new ArrayList<>(log);
+        for (int i = 0; i < LOG_LINES; i++) {
+            String entry = i < logSnapshot.size() ? logSnapshot.get(i) : "";
+            sb.append(Ansi.style("│ ", Ansi.DIM))
+              .append(Ansi.padRight(entry, LOG_CONTENT_WIDTH))
+              .append(Ansi.style(" │", Ansi.DIM))
+              .append('\n');
         }
 
-        sb.append(SEPARATOR).append('\n');
-        for (String line : log) {
-            sb.append("  ").append(line).append('\n');
-        }
-        sb.append(SEPARATOR).append('\n');
+        // 5. Hint footer separator & content
+        sb.append(Ansi.style("├" + "─".repeat(INNER_TOTAL_WIDTH) + "┤", Ansi.DIM)).append('\n');
+
+        String hints = Ansi.style("[help]", Ansi.BRIGHT_WHITE) + " manual | "
+                + Ansi.style("[scan]", Ansi.BRIGHT_WHITE) + " targets | "
+                + Ansi.style("[inspect <id>]", Ansi.BRIGHT_WHITE) + " detail | "
+                + Ansi.style("[pass]", Ansi.BRIGHT_WHITE) + " end turn | "
+                + Ansi.style("[quit]", Ansi.BRIGHT_WHITE) + " exit";
+
+        sb.append(Ansi.style("│ ", Ansi.DIM))
+          .append(Ansi.padRight(hints, LOG_CONTENT_WIDTH))
+          .append(Ansi.style(" │", Ansi.DIM))
+          .append('\n');
+
+        sb.append(Ansi.style("└" + "─".repeat(INNER_TOTAL_WIDTH) + "┘", Ansi.DIM)).append('\n');
 
         return sb.toString();
     }
 
     public List<String> logEntries() {
         return List.copyOf(log);
-    }
-
-    private static String stripAnsi(String s) {
-        if (s == null) return "";
-        return ANSI_PATTERN.matcher(s).replaceAll("");
-    }
-
-    private static boolean hasRightBorder(String s) {
-        if (s.isEmpty()) return false;
-        char c = s.charAt(s.length() - 1);
-        return c == '│' || c == '|' || c == '║' || c == '┐' || c == '┘' || c == '┤' || c == '╗' || c == '╝' || c == '╣';
-    }
-
-    private static boolean hasLeftBorder(String s) {
-        if (s.isEmpty()) return false;
-        char c = s.charAt(0);
-        return c == '│' || c == '|' || c == '║' || c == '┌' || c == '└' || c == '├' || c == '╔' || c == '╚' || c == '╠';
     }
 }
