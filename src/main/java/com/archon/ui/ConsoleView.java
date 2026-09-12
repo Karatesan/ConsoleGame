@@ -150,7 +150,7 @@ public final class ConsoleView implements View {
         return String.format("""
                         ROUND %d   HP %d/%d   AP [%s] %d/%d   LINE %d (next tax: +%d AP)
                         hand/right: %-18s hand/left: %-18s pack %d/%d
-                        """, r.roundNo(), t.hp, t.maxHp, pips.toString().trim(), r.ap(), RoundState.BASE_AP, r.linesUsed(),
+                        """, r.roundNo(), t.hp(), t.maxHp(), pips.toString().trim(), r.ap(), RoundState.BASE_AP, r.linesUsed(),
                 r.taxForNextLine(), name(t.inventory().getEquipped(EquipmentSlot.HAND_RIGHT)), name(t.inventory().getEquipped(EquipmentSlot.HAND_LEFT)), t.inventory().pack().size(),
                 Inventory.PACK_MAX);
     }
