@@ -79,7 +79,6 @@ public final class MapPaneRenderer {
                 }
                 case DOOR -> Ansi.style(String.valueOf(entity.glyph), Ansi.BRIGHT_YELLOW, Ansi.BOLD);
                 case PROP -> Ansi.style(String.valueOf(entity.glyph), Ansi.YELLOW);
-                case ITEM -> Ansi.style(String.valueOf(entity.glyph), Ansi.BRIGHT_CYAN);
             };
         }
         if (tile.has(Tag.BURNING)) {
