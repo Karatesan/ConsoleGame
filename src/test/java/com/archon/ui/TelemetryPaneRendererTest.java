@@ -32,7 +32,7 @@ class TelemetryPaneRendererTest {
         assertTrue(fullOutput.contains("Line 0"));
 
         // Gear checks
-        assertTrue(fullOutput.contains("R-HAND: rusted cleaver (6-10 dmg)"));
+        assertTrue(fullOutput.contains("R-HAND: rusted cleaver (6 dmg)"));
         assertTrue(fullOutput.contains("L-HAND: torch"));
 
         // Radar section
