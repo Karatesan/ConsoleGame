@@ -2,6 +2,7 @@ package com.archon.verb;
 
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
+import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
@@ -18,7 +19,7 @@ public final class StrikeVerb implements Verb {
     public Check validateStructural(VerbContext c) {
         String t = c.inv.arg(0);
         if (t == null) {
-            List<Entity> adj = c.world.hostilesAdjacentTo(c.thrall.pos);
+            List<Entity> adj = c.world.hostilesAdjacentTo(c.thrall.pos());
             if (adj.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
             if (adj.size() > 1) return Check.invalid("ambiguous target: "
                     + adj.stream().map(e -> e.id).toList(), "name one explicitly");
@@ -52,7 +53,7 @@ public final class StrikeVerb implements Verb {
             return Check.blocked("target not present", null);
         }
         int reach = c.thrall.mainHand() != null && c.thrall.mainHand().has(Tag.HEAVY) ? 1 : 1;
-        if (e.pos.chebyshev(c.thrall.pos) > reach)
+        if (e.pos().chebyshev(c.thrall.pos()) > reach)
             return Check.blocked(e.id + " out of reach", "step closer first");
         return Check.ok();
     }
@@ -68,8 +69,8 @@ public final class StrikeVerb implements Verb {
         // Striking a held item = disarm attempt.
         if (r instanceof Resolved.OnItem oi && oi.container() != null && oi.container().contains("hand")) {
             String ownerId = oi.container().split("/")[0];
-            Entity owner = c.world.get(ownerId);
-            if (owner == null || owner.held == null) { c.say("nothing to disarm"); return ExitCode.BLOCKED; }
+            Actor owner = c.world.actor(ownerId);
+            if (owner == null || owner.mainHand() == null) { c.say("nothing to disarm"); return ExitCode.BLOCKED; }
             CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice, c.world, owner);
             if (disarm.success()) {
                 c.say("The " + disarm.weapon().name + " is knocked from " + owner.name + "'s grip.");
