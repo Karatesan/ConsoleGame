@@ -3,7 +3,7 @@ package com.archon.exec;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
-import com.archon.model.Entity;
+import com.archon.model.Actor;
 import com.archon.model.World;
 import com.archon.verb.ExitCode;
 
@@ -70,10 +70,10 @@ public final class StageRunner {
                 }
 
                 // 7b. interrupt check at the stage boundary
-                Entity source = world.pendingInterrupt();
+                Actor source = world.pendingInterrupt();
                 if (source != null) {
                     int dmg = world.resolveInterrupt(source);
-                    bus.post(new GameEvent.InterruptFired(source.id, source.readied.description(), dmg));
+                    bus.post(new GameEvent.InterruptFired(source.id, source.readied().description(), dmg));
                     charged += cost / 2;
                     breakStage = i + 1;
                     breakReason = source.name + " (READIED) interrupted the sequence";
