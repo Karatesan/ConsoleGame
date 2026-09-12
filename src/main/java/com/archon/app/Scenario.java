@@ -21,28 +21,26 @@ public final class Scenario {
         t.inventory().addToPack(Item.flask("flask_water", "water flask", Tag.WATER));
         w.thrall = t;
 
-        Entity orc = new Entity("o1", "Orc Guard", 'O', Entity.Kind.CREATURE, new Vec2(3, 5), 24);
-        orc.armor = 3; orc.evasion = 5;
+        Actor orc = new Actor("o1", "Orc Guard", 'O', new Vec2(3, 5), new CreatureStats(24, 3, 5));
         orc.held = Item.weapon("iron_sword", "iron sword", 7, 12, Tag.METAL);
         orc.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
         w.add(orc);
 
-        Entity archer = new Entity("g1", "Goblin Archer", 'G', Entity.Kind.CREATURE, new Vec2(8, 4), 12);
-        archer.evasion = 10;
+        Actor archer = new Actor("g1", "Goblin Archer", 'G', new Vec2(8, 4), new CreatureStats(12, 0, 10));
         archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE)
                 .ready(Entity.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement in line of sight", 6);
         w.add(archer);
 
-        Entity barrel = new Entity("b1", "Oil Barrel", 'B', Entity.Kind.PROP, new Vec2(2, 5), 8);
+        Prop barrel = new Prop("b1", "Oil Barrel", 'B', new Vec2(2, 5), 8);
         barrel.with(Tag.WOOD, Tag.CONTAINER, Tag.FLAMMABLE, Tag.BREAKABLE);
         barrel.held = new Item("oil", "oil", Set.of(Tag.LIQUID, Tag.OIL, Tag.FLAMMABLE), Tag.OIL, 1, 0);
         w.add(barrel);
 
-        Entity brazier = new Entity("br1", "Brazier", 'i', Entity.Kind.PROP, new Vec2(4, 5), 10);
+        Prop brazier = new Prop("br1", "Brazier", 'i', new Vec2(4, 5), 10);
         brazier.with(Tag.METAL, Tag.LIT);
         w.add(brazier);
 
-        Entity door = new Entity("d1", "Oak Door", '+', Entity.Kind.DOOR, new Vec2(2, 3), 30);
+        Door door = new Door("d1", "Oak Door", '+', new Vec2(2, 3), 30);
         door.armor = 2;
         door.with(Tag.WOOD, Tag.BREAKABLE, Tag.SOLID, Tag.FLAMMABLE);
         w.add(door);
