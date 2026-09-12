@@ -59,7 +59,7 @@ public final class World {
         return SpatialService.passable(this, p);
     }
 
-    public List<Entity> hostilesAdjacentTo(Vec2 p) {
+    public List<Actor> hostilesAdjacentTo(Vec2 p) {
         return SpatialService.hostilesAdjacentTo(this, p);
     }
 
@@ -69,12 +69,12 @@ public final class World {
 
     // ---------- Deterministic interrupts ----------
 
-    public Entity pendingInterrupt() {
+    public Actor pendingInterrupt() {
         return ReactionSystem.pendingInterrupt(this);
     }
 
-    public int resolveInterrupt(Entity e) {
-        return ReactionSystem.resolveInterrupt(this, e);
+    public int resolveInterrupt(Actor a) {
+        return ReactionSystem.resolveInterrupt(this, a);
     }
 
     // ---------- World tick ----------
