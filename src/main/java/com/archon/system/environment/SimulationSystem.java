@@ -47,8 +47,7 @@ public final class SimulationSystem {
                 log.add(e.name + " burns for 3.");
                 if (!e.alive()) log.add(e.name + " is consumed.");
             }
-            e.readiedSpent = false;
-            e.guarded = false;
+            e.resetRoundState();
         }
         if (world.thrall.has(Tag.BURNING)) {
             world.thrall.takeDamage(3);
