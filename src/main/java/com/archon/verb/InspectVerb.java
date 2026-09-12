@@ -1,8 +1,9 @@
 package com.archon.verb;
 
 import com.archon.address.Resolved;
+import com.archon.model.Actor;
 import com.archon.model.BodyPart;
-import com.archon.model.Entity;
+import com.archon.model.Prop;
 import com.archon.model.World;
 
 public final class InspectVerb extends FreeVerb {
@@ -16,23 +17,30 @@ public final class InspectVerb extends FreeVerb {
         Resolved r = VerbHelpers.resolve(c, a);
         if (r == null) { c.say("cannot perceive " + a); return ExitCode.INVALID; }
         switch (r) {
-            case Resolved.OnEntity oe -> {
-                Entity e = oe.entity();
+            case Resolved.OnActor oa -> {
+                Actor actor = oa.actor();
                 StringBuilder sb = new StringBuilder(
-                        e.name + " \"" + e.id + "\" — HP " + e.hp + "/" + e.maxHp + ", Armor " + e.armor);
-                sb.append("\n  Tags: ").append(e.tags);
-                if (e.held != null) sb.append("\n  Holding: ").append(e.held.name);
-                if (e.readied != null && !e.readiedSpent)
-                    sb.append("\n  READIED: ").append(e.readied.description())
-                            .append(" (").append(e.readied.damage()).append(" dmg)");
+                        actor.getName() + " \"" + actor.getId() + "\" — HP " + actor.getHp() + "/" + actor.getMaxHp() + ", Armor " + actor.getArmor());
+                sb.append("\n  Tags: ").append(actor.getTags());
+                if (actor.getHeld() != null) sb.append("\n  Holding: ").append(actor.getHeld().getName());
+                if (actor.getReadied() != null && !actor.isReadiedSpent())
+                    sb.append("\n  READIED: ").append(actor.getReadied().description())
+                            .append(" (").append(actor.getReadied().damage()).append(" dmg)");
                 for (BodyPart p : BodyPart.values())
                     sb.append(String.format("%n  %-6s %3d%%  x%.1f", p.path,
-                            Math.max(5, 70 + p.hitMod - e.evasion), p.damageMult));
+                            Math.max(5, 70 + p.hitMod - actor.getEvasion()), p.damageMult));
+                c.say(sb.toString());
+            }
+            case Resolved.OnProp op -> {
+                Prop prop = op.prop();
+                StringBuilder sb = new StringBuilder(
+                        prop.getName() + " \"" + prop.getId() + "\" — HP " + prop.getHp() + "/" + prop.getMaxHp() + ", Armor " + prop.getArmor());
+                sb.append("\n  Tags: ").append(prop.getTags());
                 c.say(sb.toString());
             }
             case Resolved.OnItem oi -> c.say(oi.item() == null ? "nothing there"
-                    : oi.item().name + " — tags " + oi.item().tags
-                    + (oi.item().substance != null ? ", contains " + oi.item().substance : ""));
+                    : oi.item().getName() + " — tags " + oi.item().getTags()
+                    + (oi.item().getSubstance() != null ? ", contains " + oi.item().getSubstance() : ""));
             case Resolved.OnTile ot -> {
                 World.Tile t = c.world.tile(ot.pos());
                 c.say(ot.pos() + " " + (t.wall ? "WALL" : "floor") + " — tags " + t.tags
