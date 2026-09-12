@@ -38,9 +38,16 @@ public final class TakeVerb implements Verb {
             }
             String owner = oi.container().split("/")[0];
             Entity oe = c.world.get(owner);
-            if (oe != null && oe.held == item) {
-                if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
-                oe.held = null;
+            if (oe != null) {
+                if (oe.held == item) {
+                    if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
+                    oe.held = null;
+                } else if (oe instanceof Actor oa) {
+                    if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
+                    oa.inventory().removeFromPack(item);
+                } else if (oe instanceof Prop op) {
+                    op.contents.remove(item);
+                }
             }
         } else if (r instanceof Resolved.OnTile ot) {
             World.Tile t = c.world.tile(ot.pos());
