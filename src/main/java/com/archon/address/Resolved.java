@@ -31,10 +31,17 @@ public sealed interface Resolved {
                 Entity ent = w.get(e.id());
                 if (ent == null || !ent.alive()) yield null;
                 if (e.path() == null) yield new OnEntity(ent, null, null);
-                if (e.path().equals("contents")) yield new OnItem(ent.held, ent.id + "/contents");
-                if (e.path().startsWith("hand/")) {
-                    if (ent == w.thrall) yield new OnEntity(ent, null, e.path());
-                    yield ent.held == null ? null : new OnItem(ent.held, ent.id + "/" + e.path());
+                if (ent instanceof Prop prop && e.path().equals("contents"))
+                    yield new OnItem(prop.contents(), ent.id + "/contents");
+                if (ent instanceof Actor actor) {
+                    if (e.path().startsWith("pack")) {
+                        String rest = e.path().length() > 4 ? e.path().substring(5) : "";
+                        if (rest.isBlank()) yield new OnItem(null, ent.id + "/pack");
+                        Item it = actor.inventory().findInPack(rest);
+                        yield it == null ? null : new OnItem(it, ent.id + "/pack");
+                    }
+                    if (e.path().startsWith("hand/") || EquipmentSlot.parse(e.path()).isPresent())
+                        yield new OnEntity(actor, null, e.path());
                 }
                 BodyPart bp = BodyPart.parse(e.path());
                 yield bp == null ? null : new OnEntity(ent, bp, null);
