@@ -31,9 +31,9 @@ public final class ThrowVerb implements Verb {
         Resolved r = VerbHelpers.resolve(c, targetArg);
         if (r == null) { c.say("cannot resolve " + targetArg); return ExitCode.BLOCKED; }
         Vec2 at = switch (r) {
-            case Resolved.OnEntity oe -> oe.entity().pos;
+            case Resolved.OnEntity oe -> oe.entity().pos();
             case Resolved.OnTile ot -> ot.pos();
-            case Resolved.OnItem ignored -> c.thrall.pos;
+            case Resolved.OnItem ignored -> c.thrall.pos();
         };
         c.thrall.inventory().removeFromPack(item);
         c.say("Flask arcs toward " + at + " and shatters.");
