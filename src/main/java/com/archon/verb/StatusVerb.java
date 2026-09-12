@@ -12,11 +12,11 @@ public final class StatusVerb extends FreeVerb {
     @Override
     public ExitCode execute(VerbContext c) {
         Thrall t = c.thrall;
-        c.say("HP " + t.hp + "/" + t.maxHp + "  tags " + t.tags
+        c.say("HP " + t.hp() + "/" + t.maxHp() + "  tags " + t.tags()
                 + "\n  hand/right: " + slot(t, EquipmentSlot.HAND_RIGHT)
                 + "\n  hand/left : " + slot(t, EquipmentSlot.HAND_LEFT)
                 + "\n  pack (" + t.inventory().pack().size() + "/" + Inventory.PACK_MAX + "): " + t.inventory().pack()
-                + "\n  nocked: " + t.nocked);
+                + "\n  weaponState: " + t.weaponState());
         return ExitCode.SUCCESS;
     }
 
