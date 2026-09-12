@@ -26,7 +26,7 @@ public final class DropVerb implements Verb {
                 c.thrall.inventory().equip(slot, null);
             }
         }
-        c.world.tile(c.thrall.pos).ground.add(item);
+        c.world.tile(c.thrall.pos()).ground.add(item);
         c.say("Thrall drops " + item.name + ".");
         return ExitCode.SUCCESS;
     }
