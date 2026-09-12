@@ -17,7 +17,7 @@ public final class ReactionSystem {
     public static Entity pendingInterrupt(World world, boolean thrallMoved) {
         if (world.thrall == null) return null;
         for (Entity e : world.entities.values()) {
-            if (!e.alive() || e.readied == null || e.readiedSpent) continue;
+            if (!e.canReact()) continue;
             switch (e.readied.trigger()) {
                 case ON_ADJACENCY -> {
                     if (e.pos.chebyshev(world.thrall.pos) <= 1) return e;
@@ -44,7 +44,7 @@ public final class ReactionSystem {
      * Marks reaction as spent, damages the thrall, and returns damage dealt.
      */
     public static int resolveInterrupt(World world, Entity e) {
-        e.readiedSpent = true;
+        e.spendReaction();
         int dmg = e.readied.damage();
         world.thrall.takeDamage(dmg);
         return dmg;
