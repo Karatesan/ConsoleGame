@@ -3,7 +3,9 @@ package com.archon.verb;
 import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
+import com.archon.model.Actor;
 import com.archon.model.Entity;
+import com.archon.model.Prop;
 import com.archon.model.Tag;
 import com.archon.model.World;
 
@@ -24,7 +26,7 @@ public final class SiphonVerb implements Verb {
         Tag s = sourceSubstance(c, c.inv.arg(0));
         if (s == null) return Check.blocked("nothing to siphon from " + c.inv.arg(0), "try: inspect " + c.inv.arg(0));
         Entity holder = holderOf(c, c.inv.arg(0));
-        if (holder != null && holder.pos.chebyshev(c.thrall.pos) > 1)
+        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1)
             return Check.blocked(holder.id + " out of reach", "step closer");
         return Check.ok();
     }
@@ -41,7 +43,10 @@ public final class SiphonVerb implements Verb {
     private static Tag sourceSubstance(VerbContext c, String arg) {
         Resolved r = VerbHelpers.resolve(c, arg);
         if (r instanceof Resolved.OnItem oi && oi.item() != null) return oi.item().substance;
-        if (r instanceof Resolved.OnEntity oe && oe.entity().held != null) return oe.entity().held.substance;
+        if (r instanceof Resolved.OnEntity oe) {
+            if (oe.entity() instanceof Actor actor && actor.mainHand() != null) return actor.mainHand().substance;
+            if (oe.entity() instanceof Prop prop && prop.contents() != null) return prop.contents().substance;
+        }
         if (r instanceof Resolved.OnTile ot) {
             World.Tile t = c.world.tile(ot.pos());
             if (t.has(Tag.OIL)) return Tag.OIL;
