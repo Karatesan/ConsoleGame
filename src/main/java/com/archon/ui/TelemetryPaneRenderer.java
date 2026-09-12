@@ -94,8 +94,8 @@ public final class TelemetryPaneRenderer {
     private String formatItem(Item item) {
         if (item == null) return Ansi.style("empty", Ansi.BRIGHT_BLACK);
         StringBuilder sb = new StringBuilder(item.name);
-        if (item.weaponDmgMax > 0) {
-            sb.append(String.format(" (%d-%d dmg)", item.weaponDmgMin, item.weaponDmgMax));
+        if (item.damage > 0) {
+            sb.append(String.format(" (%d dmg)", item.damage));
         }
         if (!item.tags.isEmpty()) {
             sb.append(" ").append(Ansi.style(item.tags.toString(), Ansi.DIM));
@@ -108,8 +108,8 @@ public final class TelemetryPaneRenderer {
         if (t.guarded) {
             statuses.add(Ansi.style("[GUARDED]", Ansi.BRIGHT_YELLOW, Ansi.BOLD));
         }
-        if (t.nocked != null) {
-            statuses.add(Ansi.style("[NOCKED: " + t.nocked.name + "]", Ansi.BRIGHT_CYAN));
+        if (t.nocked) {
+            statuses.add(Ansi.style("[NOCKED]", Ansi.BRIGHT_CYAN));
         }
         for (Tag tag : t.tags) {
             if (tag == Tag.BURNING) {
