@@ -4,50 +4,69 @@ import com.archon.model.*;
 
 public sealed interface Resolved {
 
-    record OnEntity(Entity entity, BodyPart part, String slot) implements Resolved {}
-    record OnItem(Item item, String container) implements Resolved {}
-    record OnTile(Vec2 pos, String layer) implements Resolved {}
+    final record OnEntity(Entity entity, BodyPart part) implements Resolved {}
+    final record OnItem(Item item, String container) implements Resolved {}
+    final record OnTile(Vec2 pos, String layer) implements Resolved {}
 
     /** Returns null when the address cannot currently be resolved. */
-    static Resolved resolve(Address a, World w) {
-        return switch (a) {
-            case Address.TileAddr t -> {
-                Vec2 p = Address.resolveTileSpec(t.spec(), w);
-                yield w.inBounds(p) ? new OnTile(p, t.layer()) : null;
+    static Resolved resolve(Address address, World world) {
+        return switch (address) {
+            case Address.TileAddr tile -> {
+                Vec2 pos = Address.resolveTileSpec(tile.spec(), world);
+                yield world.inBounds(pos) ? new OnTile(pos, tile.layer()) : null;
             }
-            case Address.InventoryAddr inv -> {
-                String path = inv.path();
-                if (path.startsWith("pack")) {
-                    String rest = path.length() > 4 ? path.substring(5) : "";
-                    if (rest.isBlank()) yield new OnItem(null, "pack");
-                    Item it = w.thrall.inventory().findInPack(rest);
-                    yield it == null ? null : new OnItem(it, "pack");
+            case Address.InventoryAddr inventory -> resolveInventory(world.thrall, inventory.path(), null);
+            case Address.EntityAddr entityAddress -> {
+                Entity entity = world.get(entityAddress.id());
+                if (entity == null || !entity.alive()) {
+                    yield null;
                 }
-                if (EquipmentSlot.parse(path).isPresent())
-                    yield new OnEntity(w.thrall, null, path);
-                yield null;
-            }
-            case Address.EntityAddr e -> {
-                Entity ent = w.get(e.id());
-                if (ent == null || !ent.alive()) yield null;
-                if (e.path() == null) yield new OnEntity(ent, null, null);
-                if (ent instanceof Prop prop) {
-                    if (e.path().equals("contents")) yield new OnItem(prop.contents(), ent.getId() + "/contents");
+
+                String path = entityAddress.path();
+                if (path == null) {
+                    yield new OnEntity(entity, null);
                 }
-                if (ent instanceof Actor actor) {
-                    if (e.path().startsWith("pack")) {
-                        String rest = e.path().length() > 4 ? e.path().substring(5) : "";
-                        if (rest.isBlank()) yield new OnItem(null, ent.getId() + "/pack");
-                        Item it = actor.inventory().findInPack(rest);
-                        yield it == null ? null : new OnItem(it, ent.getId() + "/pack");
-                    }
-                    if (EquipmentSlot.parse(e.path()).isPresent() || e.path().startsWith("hand/")) {
-                        yield new OnEntity(actor, null, e.path());
+
+                if (entity instanceof Prop prop && path.equals("contents")) {
+                    yield new OnItem(prop.contents(), entity.id() + "/contents");
+                }
+
+                if (entity instanceof Actor actor) {
+                    Resolved inventoryResolution = resolveInventory(actor, path, entity.id());
+                    if (inventoryResolution != null) {
+                        yield inventoryResolution;
                     }
                 }
-                BodyPart bp = BodyPart.parse(e.path());
-                yield bp == null ? null : new OnEntity(ent, bp, null);
+
+                BodyPart part = BodyPart.parse(path);
+                yield part == null ? null : new OnEntity(entity, part);
             }
         };
+    }
+
+    private static Resolved resolveInventory(Actor actor, String path, String ownerId) {
+        if (path == null) {
+            return null;
+        }
+
+        if (path.equals("pack") || path.startsWith("pack/")) {
+            String itemPath = path.equals("pack") ? "" : path.substring("pack/".length());
+            String container = ownerId == null ? "pack" : ownerId + "/pack";
+
+            if (itemPath.isBlank()) {
+                return new OnItem(null, container);
+            }
+
+            Item item = actor.inventory().find(itemPath);
+            return item == null ? null : new OnItem(item, container);
+        }
+
+        var slot = EquipmentSlot.parse(path);
+        if (slot.isEmpty()) {
+            return null;
+        }
+
+        String container = ownerId == null ? path : ownerId + "/" + path;
+        return new OnItem(actor.inventory().equipped(slot.get()), container);
     }
 }
