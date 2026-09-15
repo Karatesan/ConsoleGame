@@ -21,7 +21,7 @@ public final class ReactionSystem {
         }
 
         for (Entity entity : world.entities.values()) {
-            if (!entity.canReact() || entity.isReadiedSpent()) {
+            if (!entity.alive() || entity.readied() == null || entity.isReadiedSpent()) {
                 continue;
             }
 
