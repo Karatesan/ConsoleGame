@@ -68,21 +68,26 @@ public final class IgniteVerb implements Verb {
             return ExitCode.SUCCESS;
         }
 
-        final Vec2 at = ((Resolved.OnTile) resolved).pos();
-        final World.Tile tile = c.world.tile(at);
-        if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
-            c.say("nothing to burn at " + at);
-            return ExitCode.MISS;
+        if (resolved instanceof final Resolved.OnTile onTile) {
+            final Vec2 at = onTile.pos();
+            final World.Tile tile = c.world.tile(at);
+            if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
+                c.say("nothing to burn at " + at);
+                return ExitCode.MISS;
+            }
+
+            tile.apply(Tag.BURNING);
+            final Entity occupant = c.world.entityAt(at);
+            if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
+                occupant.ignite();
+            }
+
+            c.say("Fire takes hold at " + at + ".");
+            return ExitCode.SUCCESS;
         }
 
-        tile.tags.add(Tag.BURNING);
-        final Entity occupant = c.world.entityAt(at);
-        if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
-            occupant.ignite();
-        }
-
-        c.say("Fire takes hold at " + at + ".");
-        return ExitCode.SUCCESS;
+        c.say("cannot ignite " + c.inv.arg(0));
+        return ExitCode.BLOCKED;
     }
 
     private static boolean hasFlame(VerbContext c) {
