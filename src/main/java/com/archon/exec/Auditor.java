@@ -16,7 +16,9 @@ public final class Auditor {
     private final Validator validator;
 
     public Auditor(World world, EventBus bus, RoundState round) {
-        this.world = world; this.bus = bus; this.round = round;
+        this.world = world;
+        this.bus = bus;
+        this.round = round;
         this.validator = new Validator(world, bus);
     }
 
@@ -35,22 +37,26 @@ public final class Auditor {
 
         Check v = validator.validate(line);
         sb.append("\n  VALIDITY: ").append(v.valid() ? "OK as of now" : "REJECT — " + v.reason()).append('\n');
-        for (int i = 0; i < line.stages().size(); i++)
+        for (int i = 0; i < line.stages().size(); i++) {
             sb.append(String.format("    [%d] %s%n", i + 1, line.stages().get(i).render()));
+        }
 
         sb.append("\n  BREAK EXPOSURE:\n");
         boolean any = false;
         for (Entity e : world.entities.values()) {
-            if (e instanceof Actor a && a.alive() && a.readied != null && !a.readiedSpent) {
+            if (e instanceof Actor a && a.alive() && e.readied() != null && !e.isReadiedSpent()) {
                 any = true;
                 sb.append(String.format("    • %s is READIED (%s, %d dmg) → interrupt at a stage boundary%n",
-                        a.id, a.readied.description(), a.readied.damage()));
+                        e.id(), e.readied().description(), e.readied().damage()));
             }
         }
-        if (line.stages().size() > 1)
+        if (line.stages().size() > 1) {
             sb.append("    • ").append(line.stages().size() - 1)
                     .append(" stage boundary/boundaries exposed to interrupts\n");
-        if (!any) sb.append("    • no readied reactions visible\n");
+        }
+        if (!any) {
+            sb.append("    • no readied reactions visible\n");
+        }
 
         sb.append(String.format("%n  IF BROKEN: forfeit %d AP allocation + %d AP penalty = %d AP.%n",
                 allocation, RoundState.BREAK_PENALTY,

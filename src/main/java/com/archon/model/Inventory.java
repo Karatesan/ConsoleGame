@@ -1,25 +1,26 @@
 package com.archon.model;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Domain model encapsulating equipment slots and carried pack inventory.
  */
 public final class Inventory {
     public static final int PACK_MAX = 8;
-    public static final List<String> SLOTS =
-            Arrays.stream(EquipmentSlot.values()).map(s -> s.path).toList();
 
-    private final Map<EquipmentSlot, Item> equipment = new EnumMap<>(EquipmentSlot.class);
-    private final List<Item> pack = new ArrayList<>();
+    private final EnumMap<EquipmentSlot, Item> equipment = new EnumMap<>(EquipmentSlot.class);
+    private final ArrayList<Item> pack = new ArrayList<>();
 
     public Inventory() {
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             equipment.put(slot, null);
         }
     }
-
-    // --- State Queries ---
 
     public boolean isPackFull() {
         return pack.size() >= PACK_MAX;
@@ -29,77 +30,92 @@ public final class Inventory {
         return pack.isEmpty();
     }
 
-    public boolean isEmpty() {
-        return isPackEmpty();
-    }
-
-    /** Unmodifiable view for CLI display/directory listings (e.g., "ls thrall/") */
     public Map<EquipmentSlot, Item> equipment() {
         return Collections.unmodifiableMap(equipment);
     }
 
-    /** Unmodifiable view so external code cannot bypass PACK_MAX */
     public List<Item> pack() {
         return Collections.unmodifiableList(pack);
     }
 
-    // --- Slot Access (Typed + String Overloads) ---
-
-    public Item getEquipped(EquipmentSlot slot) {
-        return equipment.get(slot);
+    public Item equipped(EquipmentSlot slot) {
+        return slot == null ? null : equipment.get(slot);
     }
-
-    /** CLI-friendly string lookup (e.g. from Address.java / Resolved.java) */
-    public Item getEquipped(String path) {
-        return EquipmentSlot.parse(path)
-                .map(equipment::get)
-                .orElse(null);
-    }
-
-    public void equip(EquipmentSlot slot, Item item) {
-        equipment.put(slot, item);
-    }
-
-    public boolean equip(String path, Item item) {
-        Optional<EquipmentSlot> slot = EquipmentSlot.parse(path);
-        slot.ifPresent(s -> equipment.put(s, item));
-        return slot.isPresent();
-    }
-
-    // --- High-Level Game Actions ---
 
     /**
-     * Equips an item from the pack into the designated slot.
-     * If an item is already in that slot, it swaps it back into the pack.
-     * Returns false if pack doesn't contain the item.
+     * Places an item directly into an equipment slot during setup.
+     * The item must not already exist elsewhere in this inventory.
      */
-    public boolean equipFromPack(Item item, EquipmentSlot slot) {
-        if (!pack.contains(item)) return false;
-
-        Item currentlyEquipped = equipment.get(slot);
-
-        // Can't swap if slot is occupied and pack has no room for the swapped item
-        if (currentlyEquipped != null && isPackFull()) {
+    public boolean placeInSlotForSetup(EquipmentSlot slot, Item item) {
+        if (slot == null || item == null) {
             return false;
         }
 
-        pack.remove(item);
-        equipment.put(slot, item);
-
-        if (currentlyEquipped != null) {
-            pack.add(currentlyEquipped);
+        Item current = equipment.get(slot);
+        if (current == item) {
+            return true;
         }
+
+        if (containsIdentityInPack(item) || containsIdentityInEquipmentExcept(item, slot)) {
+            return false;
+        }
+
+        equipment.put(slot, item);
+        return true;
+    }
+
+    public boolean addToPack(Item item) {
+        if (item == null || isPackFull() || containsIdentity(item)) {
+            return false;
+        }
+
+        pack.add(item);
         return true;
     }
 
     /**
-     * Unequips an item from a slot and places it in the pack.
-     * Returns false if the pack is full.
+     * Equips a packed item into the specified slot. Any displaced item is returned
+     * to the pack after the incoming item is removed, allowing full-pack swaps.
+     */
+    public boolean equipFromPack(Item item, EquipmentSlot slot) {
+        if (item == null || slot == null) {
+            return false;
+        }
+
+        int packIndex = indexOfIdentityInPack(item);
+        if (packIndex < 0) {
+            return false;
+        }
+
+        Item displaced = equipment.get(slot);
+        pack.remove(packIndex);
+        equipment.put(slot, item);
+
+        if (displaced != null) {
+            pack.add(displaced);
+        }
+
+        return true;
+    }
+
+    /**
+     * Unequips an item into the pack.
+     *
+     * @return {@code false} when the slot contains an item and the pack is full
      */
     public boolean unequipToPack(EquipmentSlot slot) {
+        if (slot == null) {
+            return false;
+        }
+
         Item item = equipment.get(slot);
-        if (item == null) return true; // Slot is already empty
-        if (isPackFull()) return false;
+        if (item == null) {
+            return true;
+        }
+
+        if (isPackFull()) {
+            return false;
+        }
 
         equipment.put(slot, null);
         pack.add(item);
@@ -107,39 +123,75 @@ public final class Inventory {
     }
 
     /**
-     * Unequips an item from whatever slot it is equipped in without placing in pack.
+     * Removes and returns the item equipped in the specified slot.
      */
-    public boolean unequipItem(Item item) {
-        if (item == null) return false;
-        boolean found = false;
-        for (Map.Entry<EquipmentSlot, Item> e : equipment.entrySet()) {
-            if (e.getValue() == item) {
-                e.setValue(null);
-                found = true;
+    public Item removeEquipped(EquipmentSlot slot) {
+        if (slot == null) {
+            return null;
+        }
+
+        return equipment.put(slot, null);
+    }
+
+    /**
+     * Removes a single item by identity from the pack or equipment.
+     */
+    public boolean remove(Item item) {
+        if (item == null) {
+            return false;
+        }
+
+        int packIndex = indexOfIdentityInPack(item);
+        if (packIndex >= 0) {
+            pack.remove(packIndex);
+            return true;
+        }
+
+        for (Map.Entry<EquipmentSlot, Item> entry : equipment.entrySet()) {
+            if (entry.getValue() == item) {
+                entry.setValue(null);
+                return true;
             }
         }
-        return found;
-    }
 
-    // --- Pack Operations ---
-
-    public boolean addToPack(Item item) {
-        if (isPackFull() || item == null) return false;
-        return pack.add(item);
-    }
-
-    public boolean removeFromPack(Item item) {
-        return pack.remove(item);
+        return false;
     }
 
     public Optional<Item> find(String query) {
-        if (query == null || query.isBlank()) return Optional.empty();
+        if (query == null || query.isBlank()) {
+            return Optional.empty();
+        }
+
         return pack.stream()
-                .filter(i -> i.id.equalsIgnoreCase(query) || i.name.equalsIgnoreCase(query))
+                .filter(item -> item.id().equalsIgnoreCase(query) || item.name().equalsIgnoreCase(query))
                 .findFirst();
     }
 
-    public Item findInPack(String idOrName) {
-        return find(idOrName).orElse(null);
+    private boolean containsIdentity(Item item) {
+        return containsIdentityInPack(item) || containsIdentityInEquipmentExcept(item, null);
+    }
+
+    private boolean containsIdentityInPack(Item item) {
+        return indexOfIdentityInPack(item) >= 0;
+    }
+
+    private boolean containsIdentityInEquipmentExcept(Item item, EquipmentSlot excludedSlot) {
+        for (Map.Entry<EquipmentSlot, Item> entry : equipment.entrySet()) {
+            if (entry.getKey() != excludedSlot && entry.getValue() == item) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int indexOfIdentityInPack(Item item) {
+        for (int index = 0; index < pack.size(); index++) {
+            if (pack.get(index) == item) {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }

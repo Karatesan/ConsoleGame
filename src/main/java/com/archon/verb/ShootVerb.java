@@ -6,47 +6,82 @@ import com.archon.model.Entity;
 import com.archon.system.combat.CombatEngine;
 
 public final class ShootVerb implements Verb {
-    @Override public String name() { return "shoot"; }
-    @Override public String help() { return "shoot <target> [-a part] — 2 AP. Requires nocked."; }
-    @Override public int apCost(Ast.Invocation inv) { return 2; }
+    @Override
+    public String name() {
+        return "shoot";
+    }
+
+    @Override
+    public String help() {
+        return "shoot <target> [-a part] — 2 AP. Requires nocked.";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return 2;
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        if (c.inv.arg(0) == null) return Check.invalid("shoot needs a target", "try: scan");
+        if (c.inv.arg(0) == null) {
+            return Check.invalid("shoot needs a target", "try: scan");
+        }
         return Check.ok();
     }
 
     @Override
     public Check validateState(VerbContext c) {
-        if (!c.thrall.nocked) return Check.blocked("nothing nocked", "try: nock | shoot <target>");
-        Entity e = VerbHelpers.targetEntity(c, c.inv.arg(0));
-        if (e == null) return Check.blocked("unknown target", null);
-        if (!c.world.lineOfSight(c.thrall.pos, e.pos)) return Check.blocked("no line of fire", null);
+        if (!c.thrall.isNocked()) {
+            return Check.blocked("nothing nocked", "try: nock | shoot <target>");
+        }
+
+        Entity target = VerbHelpers.targetEntity(c, c.inv.arg(0));
+        if (target == null) {
+            return Check.blocked("unknown target", null);
+        }
+
+        if (!c.world.lineOfSight(c.thrall.pos(), target.pos())) {
+            return Check.blocked("no line of fire", null);
+        }
+
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        if (!c.thrall.nocked) { c.say("nothing nocked"); return ExitCode.BLOCKED; }
-        Entity e = VerbHelpers.targetEntity(c, c.inv.arg(0));
-        if (e == null) { c.say("target gone"); return ExitCode.BLOCKED; }
-        c.thrall.nocked = false;
+        if (!c.thrall.isNocked()) {
+            c.say("nothing nocked");
+            return ExitCode.BLOCKED;
+        }
+
+        Entity target = VerbHelpers.targetEntity(c, c.inv.arg(0));
+        if (target == null) {
+            c.say("target gone");
+            return ExitCode.BLOCKED;
+        }
+
+        c.thrall.fireNocked();
 
         BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
         CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
                 c.world.dice,
                 c.world,
                 c.thrall,
-                e,
+                target,
                 part
         );
 
         if (!result.hit()) {
-            c.say("Arrow flies wide of " + e.name + ".");
+            c.say("Arrow flies wide of " + target.name() + ".");
             return ExitCode.MISS;
         }
-        c.say("Arrow strikes " + e.name + "'s " + part.path + ". " + result.damage() + " dmg.");
-        if (result.killed()) { c.say(e.name + " falls."); return ExitCode.SUCCESS; }
+
+        c.say("Arrow strikes " + target.name() + "'s " + part.path + ". " + result.damage() + " dmg.");
+        if (result.killed()) {
+            c.say(target.name() + " falls.");
+            return ExitCode.SUCCESS;
+        }
+
         return ExitCode.PARTIAL;
     }
 }

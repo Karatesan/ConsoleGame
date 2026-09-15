@@ -1,11 +1,6 @@
 package com.archon.system.combat;
 
-import com.archon.model.BodyPart;
-import com.archon.model.Dice;
-import com.archon.model.Entity;
-import com.archon.model.Item;
-import com.archon.model.Thrall;
-import com.archon.model.World;
+import com.archon.model.*;
 
 /**
  * Domain service encapsulating combat calculations and state mutations
@@ -47,50 +42,73 @@ public final class CombatEngine {
             String power,
             boolean force
     ) {
-        int hit = 70 + part.hitMod - target.evasion()
-                + ("light".equals(power) ? 20 : "heavy".equals(power) ? -20 : 0);
-        if (target.guarded && !force) hit -= 25;
-        int clampedHit = Math.max(5, Math.min(95, hit));
+        int hit = 70 + part.hitMod() - target.evasion()
+                + ("light".equals(power) ? 20
+                : "heavy".equals(power) ? -20 : 0);
 
-        if (!dice.chance(clampedHit)) {
-            return new MeleeHitResult(false, clampedHit, 0, part, attacker.mainHand(), false, false);
+        if (target.isGuarded() && !force) {
+            hit -= 25;
         }
 
-        Item w = attacker.mainHand();
-        int base = (w == null ? 3 : w.damage) + attacker.strength();
-        double mult = part.damageMult * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
-        int dmg = Math.max(1, (int) Math.round(base * mult) - target.armor());
-        target.takeDamage(dmg);
+        int clampedHit = Math.max(5, Math.min(95, hit));
+        Item weapon = attacker.mainHand();
+
+        if (!dice.chance(clampedHit)) {
+            return new MeleeHitResult(
+                    false, clampedHit, 0, part, weapon, false, false
+            );
+        }
+
+        int base = (weapon == null ? 3 : weapon.damage())
+                + attacker.strength();
+
+        double multiplier = part.damageMult()
+                * ("light".equals(power) ? 0.6
+                : "heavy".equals(power) ? 1.6 : 1.0);
+
+        int damage = Math.max(
+                1,
+                (int) Math.round(base * multiplier) - target.armor()
+        );
+
+        target.takeDamage(damage);
 
         boolean degraded = false;
-        if (force && w != null) {
-            w.durability--;
+        if (force && weapon != null) {
+            weapon.wear(1);
             degraded = true;
         }
 
         boolean killed = !target.alive();
-        if (killed && target.held != null) {
-            Item dropped = target.disarm();
-            if (dropped != null && world != null) {
-                world.tile(target.pos()).ground.add(dropped);
-            }
+        if (killed) {
+            dropEquipment(world, target);
         }
 
-        return new MeleeHitResult(true, clampedHit, dmg, part, w, killed, degraded);
+        return new MeleeHitResult(
+                true, clampedHit, damage, part, weapon, killed, degraded
+        );
     }
 
-    public static DisarmResult attemptDisarm(Dice dice, World world, Entity owner) {
-        if (owner == null || owner.held == null) {
+    public static DisarmResult attemptDisarm(
+            Dice dice,
+            World world,
+            Actor owner
+    ) {
+        if (owner == null) {
             return new DisarmResult(false, null);
         }
-        if (dice.chance(45)) {
-            Item dropped = owner.disarm();
-            if (dropped != null && world != null) {
-                world.tile(owner.pos()).ground.add(dropped);
-            }
-            return new DisarmResult(true, dropped);
+
+        Item weapon = owner.mainHand();
+        if (weapon == null) {
+            return new DisarmResult(false, null);
         }
-        return new DisarmResult(false, owner.held);
+
+        if (!dice.chance(45)) {
+            return new DisarmResult(false, weapon);
+        }
+
+        Item dropped = disarmMainHandAndDrop(world, owner);
+        return new DisarmResult(dropped != null, dropped);
     }
 
     public static RangedHitResult resolveRanged(
@@ -100,25 +118,36 @@ public final class CombatEngine {
             Entity target,
             BodyPart part
     ) {
-        int dist = target.pos().chebyshev(attacker.pos());
-        int band = dist <= 1 ? -20 : dist <= 4 ? 0 : dist <= 8 ? -10 : -25;
-        int hit = 70 + part.hitMod + band - target.evasion();
+        int distance = target.pos().chebyshev(attacker.pos());
+
+        int band = distance <= 1 ? -20
+                : distance <= 4 ? 0
+                : distance <= 8 ? -10 : -25;
+
+        int hit = 70 + part.hitMod() + band - target.evasion();
         int clampedHit = Math.max(5, Math.min(95, hit));
 
         if (!dice.chance(clampedHit)) {
-            return new RangedHitResult(false, clampedHit, 0, part, false);
+            return new RangedHitResult(
+                    false, clampedHit, 0, part, false
+            );
         }
 
-        int dmg = Math.max(1, dice.between(5, 10) - target.armor());
-        target.takeDamage(dmg);
+        int damage = Math.max(
+                1,
+                dice.between(5, 10) - target.armor()
+        );
+
+        target.takeDamage(damage);
+
         boolean killed = !target.alive();
-        if (killed && target.held != null && world != null) {
-            Item dropped = target.disarm();
-            if (dropped != null) {
-                world.tile(target.pos()).ground.add(dropped);
-            }
+        if (killed) {
+            dropEquipment(world, target);
         }
-        return new RangedHitResult(true, clampedHit, dmg, part, killed);
+
+        return new RangedHitResult(
+                true, clampedHit, damage, part, killed
+        );
     }
 
     public static RangedHitResult resolveRanged(
@@ -128,5 +157,30 @@ public final class CombatEngine {
             BodyPart part
     ) {
         return resolveRanged(dice, null, attacker, target, part);
+    }
+
+    private static Item disarmMainHandAndDrop(World world, Actor actor) {
+        Item dropped = actor.disarm(EquipmentSlot.HAND_RIGHT);
+        if (dropped == null) {
+            dropped = actor.disarm(EquipmentSlot.HAND_LEFT);
+        }
+
+        drop(world, actor, dropped);
+        return dropped;
+    }
+
+    private static void dropEquipment(World world, Entity entity) {
+        if (!(entity instanceof Actor actor)) {
+            return;
+        }
+
+        drop(world, actor, actor.disarm(EquipmentSlot.HAND_RIGHT));
+        drop(world, actor, actor.disarm(EquipmentSlot.HAND_LEFT));
+    }
+
+    private static void drop(World world, Actor actor, Item item) {
+        if (world != null && item != null) {
+            world.tile(actor.pos()).ground.add(item);
+        }
     }
 }

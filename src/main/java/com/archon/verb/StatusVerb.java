@@ -6,22 +6,32 @@ import com.archon.model.Item;
 import com.archon.model.Thrall;
 
 public final class StatusVerb extends FreeVerb {
-    @Override public String name() { return "status"; }
-    @Override public String help() { return "status — thrall state. 0 AP."; }
+    @Override
+    public String name() {
+        return "status";
+    }
+
+    @Override
+    public String help() {
+        return "status — thrall state. 0 AP.";
+    }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Thrall t = c.thrall;
-        c.say("HP " + t.hp + "/" + t.maxHp + "  tags " + t.tags
-                + "\n  hand/right: " + slot(t, EquipmentSlot.HAND_RIGHT)
-                + "\n  hand/left : " + slot(t, EquipmentSlot.HAND_LEFT)
-                + "\n  pack (" + t.inventory().pack().size() + "/" + Inventory.PACK_MAX + "): " + t.inventory().pack()
-                + "\n  nocked: " + t.nocked);
+        Thrall thrall = c.thrall;
+        Inventory inventory = thrall.inventory();
+
+        c.say("HP " + thrall.hp() + "/" + thrall.maxHp() + "  tags " + thrall.tags()
+                + "\n  hand/right: " + slot(inventory, EquipmentSlot.HAND_RIGHT)
+                + "\n  hand/left : " + slot(inventory, EquipmentSlot.HAND_LEFT)
+                + "\n  pack (" + inventory.pack().size() + "/" + Inventory.PACK_MAX + "): " + inventory.pack()
+                + "\n  nocked: " + (thrall.isNocked() ? "NOCKED" : "READY"));
+
         return ExitCode.SUCCESS;
     }
 
-    private String slot(Thrall t, EquipmentSlot s) {
-        Item i = t.inventory().getEquipped(s);
-        return i == null ? "empty" : i.name;
+    private String slot(Inventory inventory, EquipmentSlot slot) {
+        Item item = inventory.equipped(slot);
+        return item == null ? "empty" : item.name();
     }
 }
