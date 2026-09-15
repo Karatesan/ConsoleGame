@@ -51,7 +51,8 @@ public final class WieldVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        if (!c.thrall.inventory().isInPack(item) && !c.thrall.inventory().addToPack(item)) {
+        boolean packed = c.thrall.inventory().pack().stream().anyMatch(candidate -> candidate == item);
+        if (!packed && !c.thrall.inventory().addToPack(item)) {
             c.say("cannot carry " + item.name());
             return ExitCode.BLOCKED;
         }
