@@ -28,7 +28,7 @@ public final class ThrowVerb implements Verb {
         boolean piped = c.materialIn instanceof Material.OfItem;
         Item item = piped
                 ? ((Material.OfItem) c.materialIn).item()
-                : c.thrall.inventory().find(c.inv.arg(0));
+                : c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
         String targetArg = piped ? c.inv.arg(0) : c.inv.arg(1);
 
         if (item == null) {
@@ -36,25 +36,27 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved r = VerbHelpers.resolve(c, targetArg);
-        if (r == null) {
+        Resolved resolved = VerbHelpers.resolve(c, targetArg);
+        if (resolved == null) {
             c.say("cannot resolve " + targetArg);
             return ExitCode.BLOCKED;
         }
 
-        Vec2 at = switch (r) {
-            case Resolved.OnEntity oe -> oe.entity().pos();
-            case Resolved.OnTile ot -> ot.pos();
+        Vec2 at = switch (resolved) {
+            case Resolved.OnEntity entity -> entity.entity().pos();
+            case Resolved.OnTile tile -> tile.pos();
             case Resolved.OnItem ignored -> c.thrall.pos();
         };
 
-        if (!piped || c.thrall.inventory().find(item) != null) {
-            c.thrall.inventory().remove(item);
+        if (!piped && !c.thrall.inventory().remove(item)) {
+            c.say("no such item to throw");
+            return ExitCode.BLOCKED;
         }
 
         c.say("Flask arcs toward " + at + " and shatters.");
-        if (item.substance() != null) {
-            VerbHelpers.spill(c, at, item.consumeSubstance());
+        var substance = item.consumeSubstance();
+        if (substance != null) {
+            VerbHelpers.spill(c, at, substance);
         }
         return ExitCode.SUCCESS;
     }
