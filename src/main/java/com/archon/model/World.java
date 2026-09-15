@@ -47,9 +47,14 @@ public final class World {
 
     public void wall(int x, int y) { map.wall(x, y); }
 
-    public void add(Entity e) { entities.put(e.id, e); }
+    public void add(Entity e) { entities.put(e.id(), e); }
 
     public Entity get(String id) { return id.equals("self") ? thrall : entities.get(id); }
+
+    public Actor actor(String id) {
+        Entity entity = get(id);
+        return entity instanceof Actor ? (Actor) entity : null;
+    }
 
     public Entity entityAt(Vec2 p) {
         return SpatialService.entityAt(this, p);
