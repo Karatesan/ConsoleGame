@@ -50,9 +50,9 @@ public final class SimulationSystem {
      */
     public static List<String> tick(World world) {
         List<String> log = new ArrayList<>();
-        world.incrementRound();
+        world.roundNumber++;
 
-        for (Entity e : new ArrayList<>(world.entities().values())) {
+        for (Entity e : new ArrayList<>(world.entities.values())) {
             if (e.alive() && e.has(Tag.BURNING)) {
                 e.takeDamage(3);
                 log.add(e.name() + " burns for 3.");
@@ -63,15 +63,15 @@ public final class SimulationSystem {
             e.resetRoundState();
         }
 
-        Entity thrall = world.thrall();
+        Entity thrall = world.thrall;
         if (thrall.has(Tag.BURNING)) {
             thrall.takeDamage(3);
             log.add("Thrall burns for 3.");
         }
 
         List<Vec2> ignite = new ArrayList<>();
-        for (int y = 0; y < world.height(); y++) {
-            for (int x = 0; x < world.width(); x++) {
+        for (int y = 0; y < world.h; y++) {
+            for (int x = 0; x < world.w; x++) {
                 Vec2 position = new Vec2(x, y);
                 World.Tile tile = world.tile(position);
                 if (!tile.has(Tag.BURNING)) {
