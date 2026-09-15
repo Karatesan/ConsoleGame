@@ -18,23 +18,43 @@ public final class VerbContext {
 
     public VerbContext(World world, Ast.Invocation inv, EventBus bus,
                        Material materialIn, boolean firstStage) {
-        this.world = world; this.thrall = world.thrall; this.inv = inv;
-        this.bus = bus; this.materialIn = materialIn; this.firstStage = firstStage;
+        this.world = world;
+        this.thrall = world.thrall;
+        this.inv = inv;
+        this.bus = bus;
+        this.materialIn = materialIn;
+        this.firstStage = firstStage;
     }
 
-    public void say(String text) { bus.narrate(text); }
+    public void say(String text) {
+        bus.narrate(text);
+    }
 
-    public boolean acceptsPipedMaterial() { return materialIn != null; }
+    public boolean acceptsPipedMaterial() {
+        return materialIn != null;
+    }
 
     public Item itemFromMaterialOrArg(int argIndex) {
-        if (materialIn instanceof Material.OfItem(Item item)) return item;
-        String a = inv.arg(argIndex);
-        if (a == null) return null;
-        String name = a.startsWith("/") ? a.substring(a.lastIndexOf('/') + 1) : a;
-        Item i = thrall.inventory().findInPack(name);
-        if (i != null) return i;
+        if (materialIn instanceof Material.OfItem(Item item)) {
+            return item;
+        }
+
+        String arg = inv.arg(argIndex);
+        if (arg == null) {
+            return null;
+        }
+
+        String query = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
+        Item item = thrall.inventory().find(query);
+        if (item != null) {
+            return item;
+        }
+
         return thrall.inventory().equipment().values().stream()
-                .filter(x -> x != null && (x.id.equalsIgnoreCase(name) || x.name.equalsIgnoreCase(name)))
-                .findFirst().orElse(null);
+                .filter(candidate -> candidate != null
+                        && (candidate.id().equalsIgnoreCase(query)
+                        || candidate.name().equalsIgnoreCase(query)))
+                .findFirst()
+                .orElse(null);
     }
 }
