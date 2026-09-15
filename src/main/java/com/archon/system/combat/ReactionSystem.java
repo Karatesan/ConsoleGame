@@ -21,21 +21,21 @@ public final class ReactionSystem {
         }
 
         for (Entity entity : world.entities.values()) {
-            if (!entity.canReact()) {
+            if (!entity.canReact() || entity.isReadiedSpent()) {
                 continue;
             }
 
-            Entity.Readied reaction = entity.getReadied();
+            Entity.Readied reaction = entity.readied();
 
             switch (reaction.trigger()) {
                 case ON_ADJACENCY -> {
-                    if (entity.getPos().chebyshev(world.thrall.getPos()) <= 1) {
+                    if (entity.pos().chebyshev(world.thrall.pos()) <= 1) {
                         return entity;
                     }
                 }
 
                 case ON_MOVEMENT_IN_LOS -> {
-                    if (thrallMoved && SpatialService.lineOfSight(world.map, entity.getPos(), world.thrall.getPos())) {
+                    if (thrallMoved && SpatialService.lineOfSight(world.map, entity.pos(), world.thrall.pos())) {
                         return entity;
                     }
                 }
@@ -57,8 +57,8 @@ public final class ReactionSystem {
      * Marks the reaction as spent and applies its damage to the thrall.
      */
     public static int resolveInterrupt(World world, Entity entity) {
-        int damage = entity.getReadied().damage();
-        entity.spendReaction();
+        int damage = entity.readied().damage();
+        entity.spendReadied();
         world.thrall.takeDamage(damage);
         return damage;
     }
