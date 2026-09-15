@@ -25,24 +25,44 @@ public final class PourVerb implements Verb {
     public ExitCode execute(VerbContext c) {
         Tag substance;
         String targetArg;
+
         if (c.materialIn instanceof Material.OfSubstance os) {
             substance = os.substance();
             targetArg = c.inv.arg(0);
         } else if (c.materialIn instanceof Material.OfItem oi) {
-            substance = oi.item().substance;
+            Item item = oi.item();
+            substance = item.substance();
+            item.consumeSubstance();
             targetArg = c.inv.arg(0);
         } else {
-            Item it = c.thrall.findInPack(c.inv.arg(0));
-            if (it == null || it.substance == null) { c.say("nothing pourable"); return ExitCode.BLOCKED; }
-            substance = it.substance;
+            Item item = c.thrall.inventory().find(c.inv.arg(0));
+            if (item == null || item.substance() == null) {
+                c.say("nothing pourable");
+                return ExitCode.BLOCKED;
+            }
+            substance = item.substance();
+            item.consumeSubstance();
+            c.thrall.inventory().remove(item);
             targetArg = c.inv.arg(1);
-            c.thrall.inventory().removeFromPack(it);
         }
-        if (substance == null) { c.say("nothing pourable"); return ExitCode.BLOCKED; }
-        Resolved r = VerbHelpers.resolve(c, targetArg);
-        if (r == null) { c.say("cannot resolve " + targetArg); return ExitCode.BLOCKED; }
-        Vec2 at = (r instanceof Resolved.OnEntity oe) ? oe.entity().pos()
-                : (r instanceof Resolved.OnTile ot) ? ot.pos() : c.thrall.pos();
+
+        if (substance == null) {
+            c.say("nothing pourable");
+            return ExitCode.BLOCKED;
+        }
+
+        Resolved resolved = VerbHelpers.resolve(c, targetArg);
+        if (resolved == null) {
+            c.say("cannot resolve " + targetArg);
+            return ExitCode.BLOCKED;
+        }
+
+        Vec2 at = resolved instanceof Resolved.OnEntity onEntity
+                ? onEntity.entity().pos()
+                : resolved instanceof Resolved.OnTile onTile
+                        ? onTile.pos()
+                        : c.thrall.pos();
+
         VerbHelpers.spill(c, at, substance);
         c.materialOut = new Material.OfSubstance(substance);
         return ExitCode.SUCCESS;
