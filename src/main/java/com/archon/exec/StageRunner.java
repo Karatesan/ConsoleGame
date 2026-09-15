@@ -73,10 +73,10 @@ public final class StageRunner {
                 Entity source = world.pendingInterrupt();
                 if (source != null) {
                     int dmg = world.resolveInterrupt(source);
-                    bus.post(new GameEvent.InterruptFired(source.id, source.readied.description(), dmg));
+                    bus.post(new GameEvent.InterruptFired(source.id(), source.readied().description(), dmg));
                     charged += cost / 2;
                     breakStage = i + 1;
-                    breakReason = source.name + " (READIED) interrupted the sequence";
+                    breakReason = source.name() + " (READIED) interrupted the sequence";
                     breakHint = "it was flagged READIED in your last scan";
                     broke = true;
                     break;
