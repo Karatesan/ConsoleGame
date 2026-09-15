@@ -97,17 +97,20 @@ public final class TakeVerb implements Verb {
 
             actor.inventory().remove(item);
         } else if (isContentsContainer(container)) {
-            Prop prop = c.world.prop(owner);
+            Entity ownerEntity = c.world.get(owner);
+            Prop prop = ownerEntity instanceof Prop candidate ? candidate : null;
             if (prop == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
 
-            item = prop.removeContents();
-            if (item == null) {
+            Item removed = prop.removeContents();
+            if (removed == null || removed != item) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
+
+            item = removed;
         } else {
             c.say("cannot take " + address);
             return ExitCode.BLOCKED;
