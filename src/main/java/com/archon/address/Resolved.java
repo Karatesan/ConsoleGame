@@ -71,7 +71,7 @@ public sealed interface Resolved {
         return EquipmentSlot.parse(path)
                 .map(slot -> new OnItem(
                         actor.inventory().equipped(slot),
-                        ownerId == null ? "self/" + slot.path() : ownerId + "/" + slot.path()
+                        ownerId == null ? "self/" + slot.path : ownerId + "/" + slot.path
                 ))
                 .orElse(null);
     }

@@ -77,9 +77,9 @@ public final class InspectVerb extends FreeVerb {
         for (BodyPart part : BodyPart.values()) {
             output.append(String.format(
                     "%n  %-6s %3d%%  x%.1f",
-                    part.path(),
-                    Math.max(5, 70 + part.hitMod() - entity.evasion()),
-                    part.damageMult()));
+                    part.path,
+                    Math.max(5, 70 + part.hitMod - entity.evasion()),
+                    part.damageMult));
         }
 
         c.say(output.toString());
