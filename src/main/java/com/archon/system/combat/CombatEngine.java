@@ -42,7 +42,7 @@ public final class CombatEngine {
             String power,
             boolean force
     ) {
-        int hit = 70 + part.hitMod - target.evasion()
+        int hit = 70 + part.hitMod() - target.evasion()
                 + ("light".equals(power) ? 20
                 : "heavy".equals(power) ? -20 : 0);
 
@@ -62,7 +62,7 @@ public final class CombatEngine {
         int base = (weapon == null ? 3 : weapon.damage())
                 + attacker.strength();
 
-        double multiplier = part.damageMult
+        double multiplier = part.damageMult()
                 * ("light".equals(power) ? 0.6
                 : "heavy".equals(power) ? 1.6 : 1.0);
 
@@ -124,7 +124,7 @@ public final class CombatEngine {
                 : distance <= 4 ? 0
                 : distance <= 8 ? -10 : -25;
 
-        int hit = 70 + part.hitMod + band - target.evasion();
+        int hit = 70 + part.hitMod() + band - target.evasion();
         int clampedHit = Math.max(5, Math.min(95, hit));
 
         if (!dice.chance(clampedHit)) {
@@ -141,7 +141,7 @@ public final class CombatEngine {
         target.takeDamage(damage);
 
         boolean killed = !target.alive();
-        if (killed && world != null) {
+        if (killed) {
             dropEquipment(world, target);
         }
 
@@ -179,8 +179,8 @@ public final class CombatEngine {
     }
 
     private static void drop(World world, Actor actor, Item item) {
-        if (item != null && world != null) {
-            world.tile(actor.pos()).ground.add(item);
+        if (world != null && item != null) {
+            world.tile(actor.pos()).ground().add(item);
         }
     }
 }
