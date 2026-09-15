@@ -6,18 +6,27 @@ import com.archon.model.Item;
 import com.archon.model.Thrall;
 
 public final class StatusVerb extends FreeVerb {
-    @Override public String name() { return "status"; }
-    @Override public String help() { return "status — thrall state. 0 AP."; }
+    @Override
+    public String name() {
+        return "status";
+    }
+
+    @Override
+    public String help() {
+        return "status — thrall state. 0 AP.";
+    }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Thrall t = c.thrall;
-        Inventory inventory = t.inventory();
-        c.say("HP " + t.getHp() + "/" + t.getMaxHp() + "  tags " + t.getTags()
+        Thrall thrall = c.thrall;
+        Inventory inventory = thrall.inventory();
+
+        c.say("HP " + thrall.getHp() + "/" + thrall.getMaxHp() + "  tags " + thrall.getTags()
                 + "\n  hand/right: " + slot(inventory, EquipmentSlot.HAND_RIGHT)
                 + "\n  hand/left : " + slot(inventory, EquipmentSlot.HAND_LEFT)
                 + "\n  pack (" + inventory.pack().size() + "/" + Inventory.PACK_MAX + "): " + inventory.pack()
-                + "\n  nocked: " + (t.isNocked() ? "NOCKED" : "READY"));
+                + "\n  nocked: " + (thrall.isNocked() ? "NOCKED" : "READY"));
+
         return ExitCode.SUCCESS;
     }
 
