@@ -18,15 +18,12 @@ public final class StatusVerb extends FreeVerb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Thrall thrall = c.thrall;
-        Inventory inventory = thrall.inventory();
-
-        c.say("HP " + thrall.hp() + "/" + thrall.maxHp() + "  tags " + thrall.tags()
-                + "\n  hand/right: " + slot(inventory, EquipmentSlot.HAND_RIGHT)
-                + "\n  hand/left : " + slot(inventory, EquipmentSlot.HAND_LEFT)
-                + "\n  pack (" + inventory.pack().size() + "/" + Inventory.PACK_MAX + "): " + inventory.pack()
-                + "\n  nocked: " + (thrall.isNocked() ? "NOCKED" : "READY"));
-
+        Thrall t = c.thrall;
+        c.say("HP " + t.hp() + "/" + t.maxHp() + "  tags " + t.tags()
+                + "\n  hand/right: " + slot(t, EquipmentSlot.HAND_RIGHT)
+                + "\n  hand/left : " + slot(t, EquipmentSlot.HAND_LEFT)
+                + "\n  pack (" + t.inventory().pack().size() + "/" + Inventory.PACK_MAX + "): " + t.inventory().pack()
+                + "\n  weaponState: " + t.weaponState());
         return ExitCode.SUCCESS;
     }
 

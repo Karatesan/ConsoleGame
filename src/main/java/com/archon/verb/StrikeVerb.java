@@ -28,41 +28,19 @@ public final class StrikeVerb implements Verb {
 
     @Override
     public Check validateStructural(VerbContext c) {
-        String target = c.inv.arg(0);
-
-        if (target == null) {
-            List<Entity> adjacent = c.world.hostilesAdjacentTo(c.thrall.pos());
-
-            if (adjacent.isEmpty()) {
-                return Check.blocked("nothing adjacent to strike", null);
-            }
-
-            if (adjacent.size() > 1) {
-                return Check.invalid(
-                        "ambiguous target: "
-                                + adjacent.stream().map(Entity::id).toList(),
-                        "name one explicitly"
-                );
-            }
-
-            target = adjacent.get(0).id();
+        String t = c.inv.arg(0);
+        if (t == null) {
+            List<Entity> adj = c.world.hostilesAdjacentTo(c.thrall.pos());
+            if (adj.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
+            if (adj.size() > 1) return Check.invalid("ambiguous target: "
+                    + adj.stream().map(e -> e.id).toList(), "name one explicitly");
+            return Check.ok();
         }
-
-        if (aimPartInvalid(c, target)) {
-            return Check.invalid(
-                    "no such hit location on " + target,
-                    "valid: head, torso, arm.l, arm.r, legs"
-            );
-        }
-
-        Resolved resolved = VerbHelpers.resolve(c, target);
-        if (resolved == null) {
-            return Check.invalid(
-                    "unknown target \"" + target + "\"",
-                    "try: scan"
-            );
-        }
-
+        if (aimPartInvalid(c, t)) return Check.invalid(
+                "no such hit location on " + t,
+                "valid: head, torso, arm.l, arm.r, legs");
+        Resolved r = VerbHelpers.resolve(c, t);
+        if (r == null) return Check.invalid("unknown target \"" + t + "\"", "try: scan");
         return Check.ok();
     }
 
@@ -104,49 +82,26 @@ public final class StrikeVerb implements Verb {
         } else {
             return Check.blocked("target not present", null);
         }
-
-        if (entity.pos().chebyshev(c.thrall.pos()) > 1) {
-            return Check.blocked(
-                    entity.id() + " out of reach",
-                    "step closer first"
-            );
-        }
-
+        int reach = c.thrall.mainHand() != null && c.thrall.mainHand().has(Tag.HEAVY) ? 1 : 1;
+        if (e.pos().chebyshev(c.thrall.pos()) > reach)
+            return Check.blocked(e.id + " out of reach", "step closer first");
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String targetArg = targetArgument(c);
-        if (targetArg == null) {
-            c.say("nothing to strike");
-            return ExitCode.BLOCKED;
-        }
+        String targetArg = c.inv.arg(0) == null ? VerbHelpers.soleAdjacentHostile(c) : c.inv.arg(0);
+        if (targetArg == null) { c.say("nothing to strike"); return ExitCode.BLOCKED; }
 
-        Resolved resolved = VerbHelpers.resolve(c, targetArg);
-        if (resolved == null) {
-            c.say(targetArg + " is no longer there");
-            return ExitCode.BLOCKED;
-        }
+        Resolved r = VerbHelpers.resolve(c, targetArg);
+        if (r == null) { c.say(targetArg + " is no longer there"); return ExitCode.BLOCKED; }
 
-        if (resolved instanceof Resolved.OnItem onItem) {
-            Actor owner = handContainerOwner(c, onItem);
-            if (owner == null) {
-                c.say("target is not a held item");
-                return ExitCode.BLOCKED;
-            }
-
-            CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(
-                    c.world.dice,
-                    c.world,
-                    owner
-            );
-
-            if (disarm.weapon() == null) {
-                c.say("nothing to disarm");
-                return ExitCode.BLOCKED;
-            }
-
+        // Striking a held item = disarm attempt.
+        if (r instanceof Resolved.OnItem oi && oi.container() != null && oi.container().contains("hand")) {
+            String ownerId = oi.container().split("/")[0];
+            Actor owner = c.world.actor(ownerId);
+            if (owner == null || owner.mainHand() == null) { c.say("nothing to disarm"); return ExitCode.BLOCKED; }
+            CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice, c.world, owner);
             if (disarm.success()) {
                 c.say(
                         "The " + disarm.weapon().name()

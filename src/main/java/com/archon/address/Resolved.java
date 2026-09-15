@@ -31,21 +31,25 @@ public sealed interface Resolved {
                 if (entity == null || !entity.alive()) {
                     yield null;
                 }
-
-                String path = entityAddress.path();
-                if (path == null) {
-                    yield new OnEntity(entity, null);
-                }
-
-                if (entity instanceof Prop prop && path.equals("contents")) {
-                    yield new OnItem(prop.contents(), entity.id() + "/contents");
-                }
-
-                if (entity instanceof Actor actor) {
-                    Resolved inventoryResolution = resolveInventory(actor, path, entity.id());
-                    if (inventoryResolution != null) {
-                        yield inventoryResolution;
+                if (EquipmentSlot.parse(path).isPresent())
+                    yield new OnEntity(w.thrall, null, path);
+                yield null;
+            }
+            case Address.EntityAddr e -> {
+                Entity ent = w.get(e.id());
+                if (ent == null || !ent.alive()) yield null;
+                if (e.path() == null) yield new OnEntity(ent, null, null);
+                if (ent instanceof Prop prop && e.path().equals("contents"))
+                    yield new OnItem(prop.contents(), ent.id + "/contents");
+                if (ent instanceof Actor actor) {
+                    if (e.path().startsWith("pack")) {
+                        String rest = e.path().length() > 4 ? e.path().substring(5) : "";
+                        if (rest.isBlank()) yield new OnItem(null, ent.id + "/pack");
+                        Item it = actor.inventory().findInPack(rest);
+                        yield it == null ? null : new OnItem(it, ent.id + "/pack");
                     }
+                    if (e.path().startsWith("hand/") || EquipmentSlot.parse(e.path()).isPresent())
+                        yield new OnEntity(actor, null, e.path());
                 }
 
                 BodyPart part = BodyPart.parse(path);

@@ -72,13 +72,11 @@ public final class PourVerb implements Verb {
             c.say("nothing pourable");
             return ExitCode.BLOCKED;
         }
-
-        Vec2 at = resolved instanceof Resolved.OnEntity entity
-                ? entity.entity().pos()
-                : resolved instanceof Resolved.OnTile tile
-                        ? tile.pos()
-                        : c.thrall.pos();
-
+        if (substance == null) { c.say("nothing pourable"); return ExitCode.BLOCKED; }
+        Resolved r = VerbHelpers.resolve(c, targetArg);
+        if (r == null) { c.say("cannot resolve " + targetArg); return ExitCode.BLOCKED; }
+        Vec2 at = (r instanceof Resolved.OnEntity oe) ? oe.entity().pos()
+                : (r instanceof Resolved.OnTile ot) ? ot.pos() : c.thrall.pos();
         VerbHelpers.spill(c, at, substance);
         c.materialOut = new Material.OfSubstance(substance);
         return ExitCode.SUCCESS;

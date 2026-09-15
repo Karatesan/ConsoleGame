@@ -22,9 +22,8 @@ public final class DropVerb implements Verb {
             c.say("not carrying that");
             return ExitCode.BLOCKED;
         }
-
         c.world.tile(c.thrall.pos()).ground.add(item);
-        c.say("Thrall drops " + item.name() + ".");
+        c.say("Thrall drops " + item.name + ".");
         return ExitCode.SUCCESS;
     }
 }

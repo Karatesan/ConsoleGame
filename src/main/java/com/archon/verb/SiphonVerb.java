@@ -49,10 +49,8 @@ public final class SiphonVerb implements Verb {
         }
 
         Entity holder = holderOf(c, c.inv.arg(0));
-        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
-            return Check.blocked(holder.id() + " out of reach", "step closer");
-        }
-
+        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1)
+            return Check.blocked(holder.id + " out of reach", "step closer");
         return Check.ok();
     }
 
@@ -70,10 +68,16 @@ public final class SiphonVerb implements Verb {
     }
 
     private static Tag sourceSubstance(VerbContext c, String arg) {
-        Resolved resolved = VerbHelpers.resolve(c, arg);
-
-        if (resolved instanceof Resolved.OnItem onItem && onItem.item() != null) {
-            return onItem.item().substance();
+        Resolved r = VerbHelpers.resolve(c, arg);
+        if (r instanceof Resolved.OnItem oi && oi.item() != null) return oi.item().substance;
+        if (r instanceof Resolved.OnEntity oe) {
+            if (oe.entity() instanceof Actor actor && actor.mainHand() != null) return actor.mainHand().substance;
+            if (oe.entity() instanceof Prop prop && prop.contents() != null) return prop.contents().substance;
+        }
+        if (r instanceof Resolved.OnTile ot) {
+            World.Tile t = c.world.tile(ot.pos());
+            if (t.has(Tag.OIL)) return Tag.OIL;
+            if (t.has(Tag.WATER)) return Tag.WATER;
         }
 
         if (resolved instanceof Resolved.OnEntity onEntity) {

@@ -23,105 +23,40 @@ public final class TakeVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String address = c.inv.arg(0);
-        Resolved resolved = VerbHelpers.resolve(c, address);
+        String a = c.inv.arg(0);
+        Resolved r = VerbHelpers.resolve(c, a);
+        Item item = null;
 
-        if (resolved instanceof Resolved.OnItem onItem && onItem.item() != null) {
-            return takeItem(c, address, onItem);
+        if (r instanceof Resolved.OnItem oi && oi.item() != null) {
+            item = oi.item();
+            if ("pack".equals(oi.container())) {
+                // already carried: taking it out is a valid pipeline source
+                c.materialOut = new Material.OfItem(item);
+                c.say("Thrall draws " + item.name + ".");
+                return ExitCode.SUCCESS;
+            }
+            String owner = oi.container().split("/")[0];
+            Entity oe = c.world.get(owner);
+            if (oe != null) {
+                if (oe.held == item) {
+                    if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
+                    oe.held = null;
+                } else if (oe instanceof Actor oa) {
+                    if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
+                    oa.inventory().removeFromPack(item);
+                } else if (oe instanceof Prop op) {
+                    op.contents.remove(item);
+                }
+            }
+        } else if (r instanceof Resolved.OnTile ot) {
+            World.Tile t = c.world.tile(ot.pos());
+            if (t.ground.isEmpty()) { c.say("nothing on the ground there"); return ExitCode.BLOCKED; }
+            item = t.ground.remove(0);
         }
 
-        if (resolved instanceof Resolved.OnTile onTile) {
-            if (c.thrall.inventory().isPackFull()) {
-                c.say("pack full");
-                return ExitCode.BLOCKED;
-            }
-
-            World.Tile tile = c.world.tile(onTile.pos());
-            if (tile.ground.isEmpty()) {
-                c.say("nothing on the ground there");
-                return ExitCode.BLOCKED;
-            }
-
-            Item item = tile.ground.remove(0);
-            if (!c.thrall.inventory().addToPack(item)) {
-                tile.ground.add(0, item);
-                c.say("pack full");
-                return ExitCode.BLOCKED;
-            }
-
-            c.materialOut = new Material.OfItem(item);
-            c.say("Thrall takes " + item.name() + ".");
-            return ExitCode.SUCCESS;
-        }
-
-        c.say("cannot take " + address);
-        return ExitCode.BLOCKED;
-    }
-
-    private ExitCode takeItem(VerbContext c, String address, Resolved.OnItem onItem) {
-        Item item = onItem.item();
-        String container = onItem.container();
-
-        if (isOwnPack(c, container)) {
-            c.materialOut = new Material.OfItem(item);
-            c.say("Thrall draws " + item.name() + ".");
-            return ExitCode.SUCCESS;
-        }
-
-        if (c.thrall.inventory().isPackFull()) {
-            c.say("pack full");
-            return ExitCode.BLOCKED;
-        }
-
-        String owner = ownerOf(container);
-
-        if (isHandContainer(container)) {
-            Actor sourceActor = c.world.actor(owner);
-            EquipmentSlot sourceSlot = slotOf(container);
-            if (sourceActor == null || sourceSlot == null) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-
-            if (!c.world.dice.chance(35)) {
-                c.say("Snatch fails.");
-                return ExitCode.MISS;
-            }
-
-            item = sourceActor.disarm(sourceSlot);
-            if (item == null) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-        } else if (isPackContainer(container)) {
-            Actor sourceActor = c.world.actor(owner);
-            if (sourceActor == null || !sourceActor.inventory().remove(item)) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-        } else if (isContentsContainer(container)) {
-            Entity ownerEntity = c.world.get(owner);
-            Prop sourceProp = ownerEntity instanceof Prop candidate ? candidate : null;
-            if (sourceProp == null) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-
-            item = sourceProp.removeContents();
-            if (item == null) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-        } else {
-            c.say("cannot take " + address);
-            return ExitCode.BLOCKED;
-        }
-
-        if (!c.thrall.inventory().addToPack(item)) {
-            c.say("pack full");
-            return ExitCode.BLOCKED;
-        }
-
+        if (item == null) { c.say("cannot take " + a); return ExitCode.BLOCKED; }
+        if (c.thrall.inventory().isPackFull()) { c.say("pack full"); return ExitCode.BLOCKED; }
+        c.thrall.inventory().addToPack(item);
         c.materialOut = new Material.OfItem(item);
         c.say("Thrall takes " + item.name() + ".");
         return ExitCode.SUCCESS;

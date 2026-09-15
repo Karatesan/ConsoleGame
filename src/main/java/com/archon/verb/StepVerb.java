@@ -30,10 +30,7 @@ public final class StepVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         Vec2 to = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!c.world.passable(to)) {
-            c.say("blocked at " + to);
-            return ExitCode.BLOCKED;
-        }
+        if (!c.world.passable(to)) { c.say("blocked at " + to); return ExitCode.BLOCKED; }
         c.thrall.moveTo(to);
         c.world.thrallMovedThisLine = true;
         c.say("Thrall advances to " + to + ".");

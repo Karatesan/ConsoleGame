@@ -3,6 +3,7 @@ package com.archon.verb;
 import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
+import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
@@ -59,8 +60,8 @@ public final class VerbHelpers {
     }
 
     public static String soleAdjacentHostile(VerbContext c) {
-        List<Entity> adjacentHostiles = c.world.hostilesAdjacentTo(c.thrall.pos());
-        return adjacentHostiles.size() == 1 ? adjacentHostiles.get(0).id() : null;
+        List<Actor> adj = c.world.hostilesAdjacentTo(c.thrall.pos());
+        return adj.size() == 1 ? adj.get(0).id : null;
     }
 
     public static void spill(VerbContext c, Vec2 at, Tag substance) {

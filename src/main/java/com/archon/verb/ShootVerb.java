@@ -31,36 +31,19 @@ public final class ShootVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (!c.thrall.isNocked()) {
-            return Check.blocked("nothing nocked", "try: nock | shoot <target>");
-        }
-
-        Entity target = VerbHelpers.targetEntity(c, c.inv.arg(0));
-        if (target == null) {
-            return Check.blocked("unknown target", null);
-        }
-
-        if (!c.world.lineOfSight(c.thrall.pos(), target.pos())) {
-            return Check.blocked("no line of fire", null);
-        }
-
+        if (!c.thrall.weaponState().nocked) return Check.blocked("nothing nocked", "try: nock | shoot <target>");
+        Entity e = VerbHelpers.targetEntity(c, c.inv.arg(0));
+        if (e == null) return Check.blocked("unknown target", null);
+        if (!c.world.lineOfSight(c.thrall.pos(), e.pos())) return Check.blocked("no line of fire", null);
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        if (!c.thrall.isNocked()) {
-            c.say("nothing nocked");
-            return ExitCode.BLOCKED;
-        }
-
-        Entity target = VerbHelpers.targetEntity(c, c.inv.arg(0));
-        if (target == null) {
-            c.say("target gone");
-            return ExitCode.BLOCKED;
-        }
-
-        c.thrall.fireNocked();
+        if (!c.thrall.weaponState().nocked) { c.say("nothing nocked"); return ExitCode.BLOCKED; }
+        Entity e = VerbHelpers.targetEntity(c, c.inv.arg(0));
+        if (e == null) { c.say("target gone"); return ExitCode.BLOCKED; }
+        c.thrall.weaponState().nocked = false;
 
         BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
         CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(

@@ -55,61 +55,27 @@ public final class Scenario {
 
         w.thrall = t;
 
-        Actor orc = new Actor(
-                "o1", "Orc Guard", 'O',
-                new Vec2(3, 5),
-                CreatureStats.of(24, 3, 5, 0)
-        );
-
-        orc.inventory().placeInSlotForSetup(
-                EquipmentSlot.HAND_RIGHT,
-                Item.weapon("iron_sword", "iron sword", 7, 12, Tag.METAL)
-        );
+        Actor orc = new Actor("o1", "Orc Guard", 'O', new Vec2(3, 5), new CreatureStats(24, 3, 5));
+        orc.held = Item.weapon("iron_sword", "iron sword", 7, 12, Tag.METAL);
         orc.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
         w.add(orc);
 
-        Actor archer = new Actor(
-                "g1", "Goblin Archer", 'G',
-                new Vec2(8, 4),
-                CreatureStats.of(12, 0, 10, 0)
-        );
-
-        archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
-        archer.ready(
-                Entity.Trigger.ON_MOVEMENT_IN_LOS,
-                "fires on movement in line of sight",
-                6
-        );
+        Actor archer = new Actor("g1", "Goblin Archer", 'G', new Vec2(8, 4), new CreatureStats(12, 0, 10));
+        archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE)
+                .ready(Entity.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement in line of sight", 6);
         w.add(archer);
 
-        Prop barrel = new Prop(
-                "b1", "Oil Barrel", 'B', new Vec2(2, 5), 8
-        );
-
-        barrel.with(
-                Tag.WOOD, Tag.CONTAINER, Tag.FLAMMABLE, Tag.BREAKABLE
-        );
-        barrel.setContents(
-                new Item(
-                        "oil", "oil",
-                        Set.of(Tag.LIQUID, Tag.OIL, Tag.FLAMMABLE),
-                        Tag.OIL, 1, 0
-                )
-        );
+        Prop barrel = new Prop("b1", "Oil Barrel", 'B', new Vec2(2, 5), 8);
+        barrel.with(Tag.WOOD, Tag.CONTAINER, Tag.FLAMMABLE, Tag.BREAKABLE);
+        barrel.held = new Item("oil", "oil", Set.of(Tag.LIQUID, Tag.OIL, Tag.FLAMMABLE), Tag.OIL, 1, 0);
         w.add(barrel);
 
-        Entity brazier = new Prop(
-                "br1", "Brazier", 'i', new Vec2(4, 5), 10
-        );
-
+        Prop brazier = new Prop("br1", "Brazier", 'i', new Vec2(4, 5), 10);
         brazier.with(Tag.METAL, Tag.LIT);
         w.add(brazier);
 
-        Door door = new Door(
-                "d1", "Oak Door", '+', new Vec2(2, 3), 30
-        );
-
-        door.setArmor(2);
+        Door door = new Door("d1", "Oak Door", '+', new Vec2(2, 3), 30);
+        door.armor = 2;
         door.with(Tag.WOOD, Tag.BREAKABLE, Tag.SOLID, Tag.FLAMMABLE);
         w.add(door);
 
