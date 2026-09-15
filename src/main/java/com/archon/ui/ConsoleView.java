@@ -193,13 +193,13 @@ public final class ConsoleView implements View {
                 RoundState.BASE_AP,
                 r.linesUsed(),
                 r.taxForNextLine(),
-                name(t.inventory().equipped().get(EquipmentSlot.HAND_RIGHT)),
-                name(t.inventory().equipped().get(EquipmentSlot.HAND_LEFT)),
+                name(t.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
+                name(t.inventory().equipped(EquipmentSlot.HAND_LEFT)),
                 t.inventory().pack().size(),
                 Inventory.PACK_MAX);
     }
 
-    private String name(Item i) {
-        return i == null ? "empty" : i.name();
+    private String name(Item item) {
+        return item == null ? "empty" : item.name();
     }
 }
