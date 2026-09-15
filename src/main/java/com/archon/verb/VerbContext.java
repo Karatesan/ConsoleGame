@@ -51,9 +51,9 @@ public final class VerbContext {
         }
 
         return thrall.inventory().equipment().values().stream()
-                .filter(equippedItem -> equippedItem != null
-                        && (equippedItem.id().equalsIgnoreCase(name)
-                        || equippedItem.name().equalsIgnoreCase(name)))
+                .filter(x -> x != null
+                        && (x.id().equalsIgnoreCase(name)
+                        || x.name().equalsIgnoreCase(name)))
                 .findFirst()
                 .orElse(null);
     }
