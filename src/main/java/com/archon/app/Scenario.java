@@ -82,7 +82,7 @@ public final class Scenario {
         );
         w.add(archer);
 
-        Entity barrel = new Prop(
+        Prop barrel = new Prop(
                 "b1", "Oil Barrel", 'B', new Vec2(2, 5), 8
         );
 
@@ -106,9 +106,10 @@ public final class Scenario {
         w.add(brazier);
 
         Door door = new Door(
-                "d1", "Oak Door", '+', new Vec2(2, 3), 30
+                "d1", "Oak Door", '+', new Vec2(2, 3)
         );
 
+        door.setMaxHp(30);
         door.setArmor(2);
         door.with(Tag.WOOD, Tag.BREAKABLE, Tag.SOLID, Tag.FLAMMABLE);
         w.add(door);
