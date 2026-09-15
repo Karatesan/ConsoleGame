@@ -4,8 +4,6 @@ import com.archon.model.*;
 
 import java.util.Set;
 
-import java.util.Set;
-
 /**
  * The single hand-built test chamber.
  * Layout is fixed so acceptance tests stay stable.
@@ -32,14 +30,14 @@ public final class Scenario {
 
         Thrall t = new Thrall(new Vec2(3, 4), 40);
 
-        t.inventory().equip(
+        t.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_RIGHT,
                 Item.weapon(
                         "rusted_cleaver", "rusted cleaver", 6, 10, Tag.METAL
                 )
         );
 
-        t.inventory().equip(
+        t.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_LEFT,
                 new Item(
                         "torch", "torch",
@@ -63,7 +61,7 @@ public final class Scenario {
                 CreatureStats.of(24, 3, 5, 0)
         );
 
-        orc.inventory().equip(
+        orc.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_RIGHT,
                 Item.weapon("iron_sword", "iron sword", 7, 12, Tag.METAL)
         );
@@ -91,7 +89,7 @@ public final class Scenario {
         barrel.with(
                 Tag.WOOD, Tag.CONTAINER, Tag.FLAMMABLE, Tag.BREAKABLE
         );
-        barrel.setHeld(
+        barrel.setContents(
                 new Item(
                         "oil", "oil",
                         Set.of(Tag.LIQUID, Tag.OIL, Tag.FLAMMABLE),
@@ -108,9 +106,10 @@ public final class Scenario {
         w.add(brazier);
 
         Door door = new Door(
-                "d1", "Oak Door", '+', new Vec2(2, 3), 30, 2
+                "d1", "Oak Door", '+', new Vec2(2, 3), 30
         );
 
+        door.setArmor(2);
         door.with(Tag.WOOD, Tag.BREAKABLE, Tag.SOLID, Tag.FLAMMABLE);
         w.add(door);
 
