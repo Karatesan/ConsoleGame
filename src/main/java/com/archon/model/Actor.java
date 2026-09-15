@@ -2,7 +2,7 @@ package com.archon.model;
 
 /** A creature with strength, equipment, carried items, and ranged-weapon state. */
 public class Actor extends Entity {
-    private final Inventory inventory = new Inventory();
+    private Inventory inventory = new Inventory();
     private final int strength;
     private boolean nocked;
 
@@ -11,12 +11,26 @@ public class Actor extends Entity {
         this.strength = stats.strength();
     }
 
-    public Inventory inventory() { return inventory; }
-    public int strength() { return strength; }
-    public boolean isNocked() { return nocked; }
-    public void nock() { nocked = true; }
+    public Inventory inventory() {
+        return inventory;
+    }
+
+    public int strength() {
+        return strength;
+    }
+
+    public boolean isNocked() {
+        return nocked;
+    }
+
+    public void nock() {
+        nocked = true;
+    }
+
     public boolean fireNocked() {
-        if (!nocked) return false;
+        if (!nocked) {
+            return false;
+        }
         nocked = false;
         return true;
     }
