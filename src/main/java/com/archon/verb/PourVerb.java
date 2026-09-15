@@ -35,14 +35,14 @@ public final class PourVerb implements Verb {
             item.consumeSubstance();
             targetArg = c.inv.arg(0);
         } else {
-            Item item = c.thrall.inventory().find(c.inv.arg(0));
+            Item item = c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
             if (item == null || item.substance() == null) {
                 c.say("nothing pourable");
                 return ExitCode.BLOCKED;
             }
             substance = item.substance();
-            item.consumeSubstance();
             c.thrall.inventory().remove(item);
+            item.consumeSubstance();
             targetArg = c.inv.arg(1);
         }
 
@@ -59,9 +59,7 @@ public final class PourVerb implements Verb {
 
         Vec2 at = resolved instanceof Resolved.OnEntity onEntity
                 ? onEntity.entity().pos()
-                : resolved instanceof Resolved.OnTile onTile
-                        ? onTile.pos()
-                        : c.thrall.pos();
+                : c.thrall.pos();
 
         VerbHelpers.spill(c, at, substance);
         c.materialOut = new Material.OfSubstance(substance);
