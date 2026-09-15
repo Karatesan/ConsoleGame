@@ -134,7 +134,7 @@ public final class Inventory {
     }
 
     /**
-     * Removes the item by identity from the pack or equipment exactly once.
+     * Removes a single item by identity from the pack or equipment.
      */
     public boolean remove(Item item) {
         if (item == null) {
@@ -181,6 +181,7 @@ public final class Inventory {
                 return true;
             }
         }
+
         return false;
     }
 
@@ -190,6 +191,7 @@ public final class Inventory {
                 return index;
             }
         }
+
         return -1;
     }
 }
