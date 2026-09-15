@@ -45,7 +45,7 @@ public final class VerbContext {
         }
 
         String name = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
-        Item item = thrall.inventory().find(name);
+        Item item = thrall.inventory().find(name).orElse(null);
         if (item != null) {
             return item;
         }
