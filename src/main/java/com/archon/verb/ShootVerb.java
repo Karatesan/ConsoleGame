@@ -18,7 +18,7 @@ public final class ShootVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (!c.thrall.weaponState().nocked) return Check.blocked("nothing nocked", "try: nock | shoot <target>");
+        if (!c.thrall.isNocked()) return Check.blocked("nothing nocked", "try: nock | shoot <target>");
         Entity e = VerbHelpers.targetEntity(c, c.inv.arg(0));
         if (e == null) return Check.blocked("unknown target", null);
         if (!c.world.lineOfSight(c.thrall.pos(), e.pos())) return Check.blocked("no line of fire", null);
@@ -27,10 +27,16 @@ public final class ShootVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        if (!c.thrall.weaponState().nocked) { c.say("nothing nocked"); return ExitCode.BLOCKED; }
+        if (!c.thrall.fireNocked()) {
+            c.say("nothing nocked");
+            return ExitCode.BLOCKED;
+        }
+
         Entity e = VerbHelpers.targetEntity(c, c.inv.arg(0));
-        if (e == null) { c.say("target gone"); return ExitCode.BLOCKED; }
-        c.thrall.weaponState().nocked = false;
+        if (e == null) {
+            c.say("target gone");
+            return ExitCode.BLOCKED;
+        }
 
         BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
         CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
@@ -42,11 +48,14 @@ public final class ShootVerb implements Verb {
         );
 
         if (!result.hit()) {
-            c.say("Arrow flies wide of " + e.name + ".");
+            c.say("Arrow flies wide of " + e.name() + ".");
             return ExitCode.MISS;
         }
-        c.say("Arrow strikes " + e.name + "'s " + part.path + ". " + result.damage() + " dmg.");
-        if (result.killed()) { c.say(e.name + " falls."); return ExitCode.SUCCESS; }
+        c.say("Arrow strikes " + e.name() + "'s " + part.path + ". " + result.damage() + " dmg.");
+        if (result.killed()) {
+            c.say(e.name() + " falls.");
+            return ExitCode.SUCCESS;
+        }
         return ExitCode.PARTIAL;
     }
 }
