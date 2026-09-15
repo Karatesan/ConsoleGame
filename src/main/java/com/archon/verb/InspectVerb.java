@@ -4,6 +4,8 @@ import com.archon.address.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.Item;
+import com.archon.model.Vec2;
 import com.archon.model.World;
 
 public final class InspectVerb extends FreeVerb {
@@ -40,7 +42,7 @@ public final class InspectVerb extends FreeVerb {
         return ExitCode.SUCCESS;
     }
 
-    private static void inspectItem(VerbContext c, Entity item) {
+    private static void inspectItem(VerbContext c, Item item) {
         if (item == null) {
             c.say("nothing there");
             return;
@@ -50,10 +52,10 @@ public final class InspectVerb extends FreeVerb {
                 + (item.substance() != null ? ", contains " + item.substance() : ""));
     }
 
-    private static void inspectTile(VerbContext c, World.Pos pos) {
+    private static void inspectTile(VerbContext c, Vec2 pos) {
         World.Tile tile = c.world.tile(pos);
-        c.say(pos + " " + (tile.wall() ? "WALL" : "floor") + " — tags " + tile.tags()
-                + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
+        c.say(pos + " " + (tile.wall ? "WALL" : "floor") + " — tags " + tile.tags
+                + (tile.ground.isEmpty() ? "" : ", ground " + tile.ground));
     }
 
     private static void inspectEntity(VerbContext c, Entity entity) {
