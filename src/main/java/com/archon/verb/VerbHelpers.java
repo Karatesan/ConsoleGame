@@ -49,7 +49,7 @@ public final class VerbHelpers {
     }
 
     public static String soleAdjacentHostile(VerbContext c) {
-        List<Entity> adjacentHostiles = c.world.hostilesAdjacentTo(c.thrall.getPos());
+        List<Entity> adjacentHostiles = c.world.hostilesAdjacentTo(c.thrall.pos());
         return adjacentHostiles.size() == 1 ? adjacentHostiles.get(0).id() : null;
     }
 
