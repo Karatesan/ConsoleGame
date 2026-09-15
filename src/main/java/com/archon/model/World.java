@@ -19,7 +19,9 @@ public final class World {
         public final Set<Tag> ceiling = EnumSet.noneOf(Tag.class);
         public final List<Item> ground = new ArrayList<>();
 
-        public boolean has(Tag t) {return tags.contains(t);}
+        public boolean has(Tag t) {
+            return tags.contains(t);
+        }
     }
 
     public final int w, h;
@@ -41,15 +43,30 @@ public final class World {
         this.map = new GameMap(w, h);
     }
 
-    public boolean inBounds(Vec2 p) { return map.inBounds(p); }
+    public boolean inBounds(Vec2 p) {
+        return map.inBounds(p);
+    }
 
-    public Tile tile(Vec2 p) { return map.tile(p); }
+    public Tile tile(Vec2 p) {
+        return map.tile(p);
+    }
 
-    public void wall(int x, int y) { map.wall(x, y); }
+    public void wall(int x, int y) {
+        map.wall(x, y);
+    }
 
-    public void add(Entity e) { entities.put(e.getId(), e); }
+    public void add(Entity e) {
+        entities.put(e.id(), e);
+    }
 
-    public Entity get(String id) { return id.equals("self") ? thrall : entities.get(id); }
+    public Entity get(String id) {
+        return id.equals("self") ? thrall : entities.get(id);
+    }
+
+    public Actor actor(String id) {
+        Entity entity = get(id);
+        return entity instanceof Actor ? (Actor) entity : null;
+    }
 
     public Entity entityAt(Vec2 p) {
         return SpatialService.entityAt(this, p);
