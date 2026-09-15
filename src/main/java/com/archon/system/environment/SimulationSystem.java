@@ -45,7 +45,7 @@ public final class SimulationSystem {
      * Advances world simulation by one tick:
      * - Increments round number
      * - Burns entities with BURNING tag (and thrall)
-     * - Resets per-round creature state (readiedSpent, guarded)
+     * - Resets per-round creature state
      * - Propagates fire to adjacent oil tiles
      */
     public static List<String> tick(World world) {
