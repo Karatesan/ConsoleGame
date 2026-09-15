@@ -1,7 +1,6 @@
 package com.archon.address;
 
 import com.archon.model.Actor;
-import com.archon.model.Address;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.EquipmentSlot;
