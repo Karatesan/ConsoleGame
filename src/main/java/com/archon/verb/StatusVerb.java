@@ -12,16 +12,17 @@ public final class StatusVerb extends FreeVerb {
     @Override
     public ExitCode execute(VerbContext c) {
         Thrall t = c.thrall;
+        Inventory inventory = t.inventory();
         c.say("HP " + t.getHp() + "/" + t.getMaxHp() + "  tags " + t.getTags()
-                + "\n  hand/right: " + slot(t, EquipmentSlot.HAND_RIGHT)
-                + "\n  hand/left : " + slot(t, EquipmentSlot.HAND_LEFT)
-                + "\n  pack (" + t.inventory().pack().size() + "/" + Inventory.PACK_MAX + "): " + t.inventory().pack()
-                + "\n  nocked: " + t.weaponState().isNocked());
+                + "\n  hand/right: " + slot(inventory, EquipmentSlot.HAND_RIGHT)
+                + "\n  hand/left : " + slot(inventory, EquipmentSlot.HAND_LEFT)
+                + "\n  pack (" + inventory.pack().size() + "/" + Inventory.PACK_MAX + "): " + inventory.pack()
+                + "\n  nocked: " + (t.isNocked() ? "NOCKED" : "READY"));
         return ExitCode.SUCCESS;
     }
 
-    private String slot(Thrall t, EquipmentSlot s) {
-        Item i = t.inventory().getEquipped(s);
-        return i == null ? "empty" : i.name;
+    private String slot(Inventory inventory, EquipmentSlot slot) {
+        Item item = inventory.equipped(slot);
+        return item == null ? "empty" : item.name();
     }
 }
