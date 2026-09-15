@@ -11,6 +11,6 @@ public final class Door extends Entity {
             char glyph,
             Vec2 pos
     ) {
-        super(id, name, glyph, Kind.DOOR, pos, 0);
+        super(id, name, glyph, Kind.DOOR, pos, 0, 0, 0);
     }
 }
