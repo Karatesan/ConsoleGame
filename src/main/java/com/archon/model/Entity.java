@@ -42,8 +42,7 @@ public abstract class Entity {
     private int evasion;
 
     private final EnumSet<Tag> tags = EnumSet.noneOf(Tag.class);
-    private final EnumMap<BodyPart, Boolean> crippled =
-            new EnumMap<>(BodyPart.class);
+    private final EnumMap<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
 
     private Readied readied;
     private boolean readiedSpent;
@@ -182,8 +181,10 @@ public abstract class Entity {
         if (maxHp < 0) {
             throw new IllegalArgumentException("max hp must not be negative");
         }
+        if (maxHp < this.maxHp) {
+            hp = Math.min(hp, maxHp);
+        }
         this.maxHp = maxHp;
-        this.hp = Math.min(this.hp, maxHp);
     }
 
     public void setArmor(int armor) {
