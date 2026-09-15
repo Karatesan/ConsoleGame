@@ -44,8 +44,8 @@ public final class TakeVerb implements Verb {
                 return ExitCode.SUCCESS;
             }
 
-            int slash = container.indexOf('/');
-            String owner = slash >= 0 ? container.substring(0, slash) : container;
+            int firstSlash = container.indexOf('/');
+            String owner = firstSlash >= 0 ? container.substring(0, firstSlash) : container;
 
             Actor actor = c.world.actor(owner);
             if (actor != null) {
@@ -55,8 +55,9 @@ public final class TakeVerb implements Verb {
                 }
 
                 if (container.startsWith(owner + "/hand/")) {
-                    EquipmentSlot slot = EquipmentSlot.parse(container.substring(slash + 1));
-                    actor.equipment().remove(slot);
+                    int lastSlash = container.lastIndexOf('/');
+                    EquipmentSlot slot = EquipmentSlot.parse(container.substring(lastSlash + 1));
+                    actor.removeEquipped(slot);
                 } else {
                     actor.inventory().remove(item);
                 }
