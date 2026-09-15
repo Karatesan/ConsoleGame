@@ -16,12 +16,12 @@ public final class StatusVerb extends FreeVerb {
                 + "\n  hand/right: " + slot(t, EquipmentSlot.HAND_RIGHT)
                 + "\n  hand/left : " + slot(t, EquipmentSlot.HAND_LEFT)
                 + "\n  pack (" + t.inventory().pack().size() + "/" + Inventory.PACK_MAX + "): " + t.inventory().pack()
-                + "\n  weaponState: " + t.weaponState());
+                + "\n  weaponStatus: " + (t.isNocked() ? "NOCKED" : "READY"));
         return ExitCode.SUCCESS;
     }
 
     private String slot(Thrall t, EquipmentSlot s) {
-        Item i = t.inventory().getEquipped(s);
-        return i == null ? "empty" : i.name;
+        Item i = t.inventory().equipped(s);
+        return i == null ? "empty" : i.name();
     }
 }
