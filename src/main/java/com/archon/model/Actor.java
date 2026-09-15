@@ -59,13 +59,12 @@ public class Actor extends Entity {
      * Attempts the right hand first, then falls back to the left hand.
      */
     public Item mainHand() {
-        Item right = inventory.getEquipped(EquipmentSlot.HAND_RIGHT);
+        Item right = inventory.equipped(EquipmentSlot.HAND_RIGHT);
         return right != null
                 ? right
-                : inventory.getEquipped(EquipmentSlot.HAND_LEFT);
+                : inventory.equipped(EquipmentSlot.HAND_LEFT);
     }
 
-    @Override
     public Item disarm(EquipmentSlot slot) {
         return inventory.removeEquipped(slot);
     }
