@@ -34,7 +34,7 @@ public final class SimulationSystem {
      * Advances world simulation by one tick:
      * - Increments round number
      * - Burns entities with BURNING tag (and thrall)
-     * - Resets per-round creature state (readiedSpent, guarded)
+     * - Resets per-round creature state
      * - Propagates fire to adjacent oil tiles
      */
     public static List<String> tick(World world) {
@@ -44,11 +44,10 @@ public final class SimulationSystem {
         for (Entity e : new ArrayList<>(world.entities.values())) {
             if (e.alive() && e.has(Tag.BURNING)) {
                 e.takeDamage(3);
-                log.add(e.name + " burns for 3.");
-                if (!e.alive()) log.add(e.name + " is consumed.");
+                log.add(e.name() + " burns for 3.");
+                if (!e.alive()) log.add(e.name() + " is consumed.");
             }
-            e.readiedSpent = false;
-            e.guarded = false;
+            e.resetRoundState();
         }
         if (world.thrall.has(Tag.BURNING)) {
             world.thrall.takeDamage(3);
