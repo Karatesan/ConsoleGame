@@ -44,16 +44,16 @@ public final class VerbContext {
             return null;
         }
 
-        String query = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
-        Item item = thrall.inventory().find(query);
+        String name = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
+        Item item = thrall.inventory().find(name);
         if (item != null) {
             return item;
         }
 
         return thrall.inventory().equipment().values().stream()
                 .filter(candidate -> candidate != null
-                        && (candidate.id().equalsIgnoreCase(query)
-                        || candidate.name().equalsIgnoreCase(query)))
+                        && (candidate.id().equalsIgnoreCase(name)
+                        || candidate.name().equalsIgnoreCase(name)))
                 .findFirst()
                 .orElse(null);
     }
