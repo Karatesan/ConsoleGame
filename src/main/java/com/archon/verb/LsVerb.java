@@ -13,7 +13,7 @@ public final class LsVerb extends FreeVerb {
         if (r instanceof Resolved.OnItem oi && "pack".equals(oi.container())) {
             c.say(c.thrall.inventory().isPackEmpty() ? "(empty)" :
                     String.join("\n", c.thrall.inventory().pack().stream()
-                            .map(i -> "  " + i.id + "  " + i.tags).toList()));
+                            .map(i -> "  " + i.id() + "  " + i.tags()).toList()));
             return ExitCode.SUCCESS;
         }
         if (r instanceof Resolved.OnTile ot) {
