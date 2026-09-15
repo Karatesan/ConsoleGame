@@ -120,7 +120,6 @@ public final class ConsoleView implements View {
             return;
         }
 
-        // streaming: only redraw the board when the world actually changed
         if (!dirty) {
             return;
         }
