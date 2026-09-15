@@ -1,34 +1,16 @@
 package com.archon.model;
 
 /**
- * Structural door entity with armor and open/closed state.
+ * Structural door entity with no default defenses.
  */
-public class Door extends Entity {
-
-    private boolean open;
+public final class Door extends Entity {
 
     public Door(
             String id,
             String name,
             char glyph,
-            Vec2 pos,
-            int hp,
-            int armor
+            Vec2 pos
     ) {
-        super(id, name, glyph, Kind.DOOR, pos, hp);
-        setArmor(armor);
-        this.open = false;
-    }
-
-    public boolean isOpen() {
-        return open;
-    }
-
-    public void open() {
-        this.open = true;
-    }
-
-    public void close() {
-        this.open = false;
+        super(id, name, glyph, Kind.DOOR, pos, 0);
     }
 }
