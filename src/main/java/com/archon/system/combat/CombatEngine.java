@@ -59,7 +59,7 @@ public final class CombatEngine {
             );
         }
 
-        int base = (weapon == null ? 3 : weapon.damage)
+        int base = (weapon == null ? 3 : weapon.damage())
                 + attacker.strength();
 
         double multiplier = part.damageMult
@@ -75,13 +75,13 @@ public final class CombatEngine {
 
         boolean degraded = false;
         if (force && weapon != null) {
-            weapon.durability--;
+            weapon.wear(1);
             degraded = true;
         }
 
         boolean killed = !target.alive();
         if (killed) {
-            disarmAndDrop(world, target);
+            dropEquipment(world, target);
         }
 
         return new MeleeHitResult(
@@ -92,13 +92,13 @@ public final class CombatEngine {
     public static DisarmResult attemptDisarm(
             Dice dice,
             World world,
-            Entity owner
+            Actor owner
     ) {
         if (owner == null) {
             return new DisarmResult(false, null);
         }
 
-        Item weapon = activeItem(owner);
+        Item weapon = owner.mainHand();
         if (weapon == null) {
             return new DisarmResult(false, null);
         }
@@ -107,7 +107,7 @@ public final class CombatEngine {
             return new DisarmResult(false, weapon);
         }
 
-        Item dropped = disarmAndDrop(world, owner);
+        Item dropped = disarmMainHandAndDrop(world, owner);
         return new DisarmResult(dropped != null, dropped);
     }
 
@@ -118,7 +118,7 @@ public final class CombatEngine {
             Entity target,
             BodyPart part
     ) {
-        int distance = target.getPos().chebyshev(attacker.getPos());
+        int distance = target.pos().chebyshev(attacker.pos());
 
         int band = distance <= 1 ? -20
                 : distance <= 4 ? 0
@@ -141,11 +141,8 @@ public final class CombatEngine {
         target.takeDamage(damage);
 
         boolean killed = !target.alive();
-
-        // Preserve the original ranged behavior:
-        // only disarm/drop on death when a world is supplied.
         if (killed && world != null) {
-            disarmAndDrop(world, target);
+            dropEquipment(world, target);
         }
 
         return new RangedHitResult(
@@ -162,27 +159,28 @@ public final class CombatEngine {
         return resolveRanged(dice, null, attacker, target, part);
     }
 
-    /**
-     * Actors use equipped hand items; other entities use their held item.
-     */
-    private static Item activeItem(Entity entity) {
-        if (entity instanceof Actor actor) {
-            return actor.mainHand();
+    private static Item disarmMainHandAndDrop(World world, Actor actor) {
+        Item dropped = actor.disarm(EquipmentSlot.RIGHT_HAND);
+        if (dropped == null) {
+            dropped = actor.disarm(EquipmentSlot.LEFT_HAND);
         }
-        return entity.getHeld();
+
+        drop(world, actor, dropped);
+        return dropped;
     }
 
-    /**
-     * Uses the entity's polymorphic disarm implementation, then places
-     * the returned item on the ground if a world is available.
-     */
-    private static Item disarmAndDrop(World world, Entity entity) {
-        Item dropped = entity.disarm();
-
-        if (dropped != null && world != null) {
-            world.tile(entity.getPos()).ground.add(dropped);
+    private static void dropEquipment(World world, Entity entity) {
+        if (!(entity instanceof Actor actor)) {
+            return;
         }
 
-        return dropped;
+        drop(world, actor, actor.disarm(EquipmentSlot.RIGHT_HAND));
+        drop(world, actor, actor.disarm(EquipmentSlot.LEFT_HAND));
+    }
+
+    private static void drop(World world, Actor actor, Item item) {
+        if (item != null && world != null) {
+            world.tile(actor.pos()).ground.add(item);
+        }
     }
 }
