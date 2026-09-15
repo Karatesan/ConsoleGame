@@ -1,7 +1,7 @@
 package com.archon.model;
 
 /**
- * Structural door entity with no default defenses.
+ * Structural door entity with configurable health and no default defenses.
  */
 public final class Door extends Entity {
 
@@ -9,8 +9,9 @@ public final class Door extends Entity {
             String id,
             String name,
             char glyph,
-            Vec2 pos
+            Vec2 pos,
+            int hp
     ) {
-        super(id, name, glyph, Kind.DOOR, pos, 0, 0, 0);
+        super(id, name, glyph, Kind.DOOR, pos, hp, 0, 0);
     }
 }
