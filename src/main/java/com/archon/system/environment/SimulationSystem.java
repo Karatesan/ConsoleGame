@@ -52,15 +52,15 @@ public final class SimulationSystem {
         List<String> log = new ArrayList<>();
         world.incrementRound();
 
-        for (Entity entity : new ArrayList<>(world.entities().values())) {
-            if (entity.alive() && entity.has(Tag.BURNING)) {
-                entity.takeDamage(3);
-                log.add(entity.name() + " burns for 3.");
-                if (!entity.alive()) {
-                    log.add(entity.name() + " is consumed.");
+        for (Entity e : new ArrayList<>(world.entities().values())) {
+            if (e.alive() && e.has(Tag.BURNING)) {
+                e.takeDamage(3);
+                log.add(e.name() + " burns for 3.");
+                if (!e.alive()) {
+                    log.add(e.name() + " is consumed.");
                 }
             }
-            entity.resetRoundState();
+            e.resetRoundState();
         }
 
         Entity thrall = world.thrall();
