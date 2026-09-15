@@ -16,9 +16,9 @@ public final class SpatialService {
     private SpatialService() {}
 
     public static Entity entityAt(World world, Vec2 p) {
-        if (world.thrall != null && world.thrall.pos.equals(p)) return world.thrall;
+        if (world.thrall != null && world.thrall.pos().equals(p)) return world.thrall;
         return world.entities.values().stream()
-                .filter(e -> e.alive() && e.pos.equals(p))
+                .filter(e -> e.alive() && e.pos().equals(p))
                 .findFirst().orElse(null);
     }
 
@@ -29,8 +29,8 @@ public final class SpatialService {
 
     public static List<Entity> hostilesAdjacentTo(World world, Vec2 p) {
         return world.entities.values().stream()
-                .filter(e -> e.alive() && e.kind == Entity.Kind.CREATURE)
-                .filter(e -> e.pos.chebyshev(p) <= 1)
+                .filter(e -> e.alive() && e.kind() == Entity.Kind.CREATURE)
+                .filter(e -> e.pos().chebyshev(p) <= 1)
                 .toList();
     }
 
