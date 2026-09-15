@@ -3,11 +3,11 @@ package com.archon.model;
 public final class Thrall extends Actor {
 
     public Thrall(Vec2 pos, int hp) {
-        super("self", "Thrall", 'T', Kind.CREATURE, pos, hp);
-        strength = 3;
-        tags.add(Tag.ORGANIC);
-        tags.add(Tag.FLESH);
-        tags.add(Tag.FLAMMABLE);
-        identified = true;
+        super("self", "Thrall", 'T', pos, CreatureStats.of(hp, 0, 0, 3));
+
+        applyTag(Tag.ORGANIC);
+        applyTag(Tag.FLESH);
+        applyTag(Tag.FLAMMABLE);
+        setIdentified(true);
     }
 }

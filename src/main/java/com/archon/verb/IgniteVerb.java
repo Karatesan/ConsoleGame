@@ -32,9 +32,9 @@ public final class IgniteVerb implements Verb {
         if (r == null) { c.say("cannot resolve " + c.inv.arg(0)); return ExitCode.BLOCKED; }
         if (r instanceof Resolved.OnEntity oe) {
             Entity e = oe.entity();
-            if (!e.has(Tag.FLAMMABLE)) { c.say(e.name + " will not catch."); return ExitCode.MISS; }
+            if (!e.has(Tag.FLAMMABLE)) { c.say(e.getName() + " will not catch."); return ExitCode.MISS; }
             e.ignite();
-            c.say(e.name + " catches fire.");
+            c.say(e.getName() + " catches fire.");
             return ExitCode.SUCCESS;
         }
         Vec2 at = ((Resolved.OnTile) r).pos();

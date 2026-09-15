@@ -32,14 +32,14 @@ public sealed interface Resolved {
                 if (ent == null || !ent.alive()) yield null;
                 if (e.path() == null) yield new OnEntity(ent, null, null);
                 if (ent instanceof Prop prop) {
-                    if (e.path().equals("contents")) yield new OnItem(prop.contents(), ent.id + "/contents");
+                    if (e.path().equals("contents")) yield new OnItem(prop.contents(), ent.getId() + "/contents");
                 }
                 if (ent instanceof Actor actor) {
                     if (e.path().startsWith("pack")) {
                         String rest = e.path().length() > 4 ? e.path().substring(5) : "";
-                        if (rest.isBlank()) yield new OnItem(null, ent.id + "/pack");
+                        if (rest.isBlank()) yield new OnItem(null, ent.getId() + "/pack");
                         Item it = actor.inventory().findInPack(rest);
-                        yield it == null ? null : new OnItem(it, ent.id + "/pack");
+                        yield it == null ? null : new OnItem(it, ent.getId() + "/pack");
                     }
                     if (EquipmentSlot.parse(e.path()).isPresent() || e.path().startsWith("hand/")) {
                         yield new OnEntity(actor, null, e.path());

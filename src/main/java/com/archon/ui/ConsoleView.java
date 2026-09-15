@@ -131,7 +131,7 @@ public final class ConsoleView implements View {
                 Entity e = w.entityAt(p);
                 char c;
                 if (t.wall) c = '#';
-                else if (e != null) c = e.glyph;
+                else if (e != null) c = e.getGlyph();
                 else if (t.has(Tag.BURNING)) c = '*';
                 else if (t.has(Tag.OIL)) c = '~';
                 else if (!t.ground.isEmpty()) c = '%';
@@ -150,7 +150,7 @@ public final class ConsoleView implements View {
         return String.format("""
                         ROUND %d   HP %d/%d   AP [%s] %d/%d   LINE %d (next tax: +%d AP)
                         hand/right: %-18s hand/left: %-18s pack %d/%d
-                        """, r.roundNo(), t.hp, t.maxHp, pips.toString().trim(), r.ap(), RoundState.BASE_AP, r.linesUsed(),
+                        """, r.roundNo(), t.getHp(), t.getMaxHp(), pips.toString().trim(), r.ap(), RoundState.BASE_AP, r.linesUsed(),
                 r.taxForNextLine(), name(t.inventory().getEquipped(EquipmentSlot.HAND_RIGHT)), name(t.inventory().getEquipped(EquipmentSlot.HAND_LEFT)), t.inventory().pack().size(),
                 Inventory.PACK_MAX);
     }

@@ -41,10 +41,10 @@ public final class Auditor {
         sb.append("\n  BREAK EXPOSURE:\n");
         boolean any = false;
         for (Entity e : world.entities.values()) {
-            if (e instanceof Actor a && a.alive() && a.readied != null && !a.readiedSpent) {
+            if (e instanceof Actor a && a.alive() && a.readied() != null && !a.isReadiedSpent()) {
                 any = true;
                 sb.append(String.format("    • %s is READIED (%s, %d dmg) → interrupt at a stage boundary%n",
-                        a.id, a.readied.description(), a.readied.damage()));
+                        a.getId(), a.readied().description(), a.readied().damage()));
             }
         }
         if (line.stages().size() > 1)

@@ -1,14 +1,20 @@
 package com.archon.model;
 
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 
 public abstract class Entity {
-    public enum Kind {CREATURE, PROP, DOOR}
 
-    public enum Trigger {ON_ADJACENCY, ON_MOVEMENT_IN_LOS}
+    public enum Kind {
+        CREATURE, PROP, DOOR
+    }
+
+    public enum Trigger {
+        ON_ADJACENCY, ON_MOVEMENT_IN_LOS
+    }
 
     /**
      * A deterministic, visible reaction. Fires at most once per round.
@@ -19,20 +25,31 @@ public abstract class Entity {
     private final String name;
     private final char glyph;
     private final Kind kind;
+
     private Vec2 pos;
     private int hp;
     private int maxHp;
     private int armor;
     private int evasion;
+
     private final Set<Tag> tags = EnumSet.noneOf(Tag.class);
-    private final Map<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
+    private final Map<BodyPart, Boolean> crippled =
+            new EnumMap<>(BodyPart.class);
+
     private Readied readied;
     private boolean readiedSpent;
     private boolean guarded;
     private Item held;
     private boolean identified;
 
-    protected Entity(String id, String name, char glyph, Kind kind, Vec2 pos, int hp) {
+    protected Entity(
+            String id,
+            String name,
+            char glyph,
+            Kind kind,
+            Vec2 pos,
+            int hp
+    ) {
         this.id = id;
         this.name = name;
         this.glyph = glyph;
@@ -43,27 +60,45 @@ public abstract class Entity {
     }
 
     // ---------- Domain Methods ----------
+
     public boolean alive() {
         return hp > 0;
     }
 
-    public boolean has(Tag t) {
-        return tags.contains(t);
+    public boolean has(Tag tag) {
+        return tags.contains(tag);
     }
 
-    public Entity with(Tag... t) {
-        tags.addAll(Set.of(t));
+    public Entity with(Tag... tags) {
+        Collections.addAll(this.tags, tags);
         return this;
     }
 
-    public Entity ready(Trigger tr, String desc, int dmg) {
-        this.readied = new Readied(tr, desc, dmg);
+    public Entity ready(Trigger trigger, String description, int damage) {
+        this.readied = new Readied(trigger, description, damage);
         this.readiedSpent = false;
         return this;
     }
 
     public void clearReadied() {
         this.readied = null;
+        this.readiedSpent = false;
+    }
+
+    public boolean canReact() {
+        return alive() && readied != null && !readiedSpent;
+    }
+
+    public void spendReaction() {
+        this.readiedSpent = true;
+    }
+
+    public void resetReaction() {
+        this.readiedSpent = false;
+    }
+
+    public void resetRoundState() {
+        this.guarded = false;
         this.readiedSpent = false;
     }
 
@@ -86,32 +121,55 @@ public abstract class Entity {
     }
 
     public Item disarm() {
-        Item prev = this.held;
+        Item previous = this.held;
         this.held = null;
-        return prev;
+        return previous;
     }
 
-    public void applyTag(Tag t) {
-        tags.add(t);
+    public void applyTag(Tag tag) {
+        tags.add(tag);
     }
 
-    public void removeTag(Tag t) {
-        tags.remove(t);
+    public void removeTag(Tag tag) {
+        tags.remove(tag);
     }
 
     public boolean isCrippled(BodyPart part) {
-        return crippled.getOrDefault(part, false);
+        return Boolean.TRUE.equals(crippled.get(part));
+    }
+
+    public void setCrippled(BodyPart part, boolean value) {
+        crippled.put(part, value);
     }
 
     public void cripple(BodyPart part) {
-        crippled.put(part, true);
+        setCrippled(part, true);
     }
 
     public void restoreBodyPart(BodyPart part) {
-        crippled.put(part, false);
+        setCrippled(part, false);
+    }
+
+    // ---------- Actor-style Accessors ----------
+
+    public int armor() {
+        return armor;
+    }
+
+    public int evasion() {
+        return evasion;
+    }
+
+    public Readied readied() {
+        return readied;
+    }
+
+    public Map<BodyPart, Boolean> crippled() {
+        return Collections.unmodifiableMap(crippled);
     }
 
     // ---------- Getters and Setters ----------
+
     public String getId() {
         return id;
     }
@@ -153,15 +211,12 @@ public abstract class Entity {
     }
 
     public int getArmor() {
-        return armor;
+        // Dispatches to Actor.armor() when this entity is an Actor.
+        return armor();
     }
 
     public void setArmor(int armor) {
         this.armor = armor;
-    }
-
-    public int getEvasion() {
-        return evasion;
     }
 
     public void setEvasion(int evasion) {
@@ -177,7 +232,7 @@ public abstract class Entity {
     }
 
     public Readied getReadied() {
-        return readied;
+        return readied();
     }
 
     public void setReadied(Readied readied) {

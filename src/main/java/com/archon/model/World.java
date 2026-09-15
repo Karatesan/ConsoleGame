@@ -47,7 +47,7 @@ public final class World {
 
     public void wall(int x, int y) { map.wall(x, y); }
 
-    public void add(Entity e) { entities.put(e.id, e); }
+    public void add(Entity e) { entities.put(e.getId(), e); }
 
     public Entity get(String id) { return id.equals("self") ? thrall : entities.get(id); }
 
@@ -59,7 +59,7 @@ public final class World {
         return SpatialService.passable(this, p);
     }
 
-    public List<Actor> hostilesAdjacentTo(Vec2 p) {
+    public List<Entity> hostilesAdjacentTo(Vec2 p) {
         return SpatialService.hostilesAdjacentTo(this, p);
     }
 
@@ -69,12 +69,12 @@ public final class World {
 
     // ---------- Deterministic interrupts ----------
 
-    public Actor pendingInterrupt() {
+    public Entity pendingInterrupt() {
         return ReactionSystem.pendingInterrupt(this);
     }
 
-    public int resolveInterrupt(Actor a) {
-        return ReactionSystem.resolveInterrupt(this, a);
+    public int resolveInterrupt(Entity entity) {
+        return ReactionSystem.resolveInterrupt(this, entity);
     }
 
     // ---------- World tick ----------

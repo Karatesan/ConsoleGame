@@ -19,15 +19,15 @@ public final class InspectVerb extends FreeVerb {
             case Resolved.OnEntity oe -> {
                 Entity e = oe.entity();
                 StringBuilder sb = new StringBuilder(
-                        e.name + " \"" + e.id + "\" — HP " + e.hp + "/" + e.maxHp + ", Armor " + e.armor);
-                sb.append("\n  Tags: ").append(e.tags);
-                if (e.held != null) sb.append("\n  Holding: ").append(e.held.name);
-                if (e.readied != null && !e.readiedSpent)
-                    sb.append("\n  READIED: ").append(e.readied.description())
-                            .append(" (").append(e.readied.damage()).append(" dmg)");
+                        e.getName() + " \"" + e.getId() + "\" — HP " + e.getHp() + "/" + e.getMaxHp() + ", Armor " + e.armor());
+                sb.append("\n  Tags: ").append(e.getTags());
+                if (e.getHeld() != null) sb.append("\n  Holding: ").append(e.getHeld().name);
+                if (e.readied() != null && !e.isReadiedSpent())
+                    sb.append("\n  READIED: ").append(e.readied().description())
+                            .append(" (").append(e.readied().damage()).append(" dmg)");
                 for (BodyPart p : BodyPart.values())
                     sb.append(String.format("%n  %-6s %3d%%  x%.1f", p.path,
-                            Math.max(5, 70 + p.hitMod - e.evasion), p.damageMult));
+                            Math.max(5, 70 + p.hitMod - e.evasion()), p.damageMult));
                 c.say(sb.toString());
             }
             case Resolved.OnItem oi -> c.say(oi.item() == null ? "nothing there"

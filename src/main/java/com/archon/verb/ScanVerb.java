@@ -13,10 +13,10 @@ public final class ScanVerb extends FreeVerb {
         for (Entity e : c.world.entities.values()) {
             if (!e.alive()) continue;
             sb.append(String.format("  %-5s %-16s %-7s HP %2d/%-2d %s%s%s%n",
-                    e.id, e.name, e.pos.toString(), e.hp, e.maxHp,
-                    e.tags.contains(Tag.BURNING) ? "[BURNING] " : "",
-                    e.readied != null && !e.readiedSpent ? "[READIED: " + e.readied.description() + "] " : "",
-                    e.pos.chebyshev(c.thrall.pos) <= 1 ? "adjacent" : "range " + e.pos.chebyshev(c.thrall.pos)));
+                    e.getId(), e.getName(), e.getPos().toString(), e.getHp(), e.getMaxHp(),
+                    e.getTags().contains(Tag.BURNING) ? "[BURNING] " : "",
+                    e.readied() != null && !e.isReadiedSpent() ? "[READIED: " + e.readied().description() + "] " : "",
+                    e.getPos().chebyshev(c.thrall.getPos()) <= 1 ? "adjacent" : "range " + e.getPos().chebyshev(c.thrall.getPos())));
         }
         c.say(sb.toString().stripTrailing());
         return ExitCode.SUCCESS;

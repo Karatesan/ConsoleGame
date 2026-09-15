@@ -44,8 +44,8 @@ public final class SimulationSystem {
         for (Entity e : new ArrayList<>(world.entities.values())) {
             if (e.alive() && e.has(Tag.BURNING)) {
                 e.takeDamage(3);
-                log.add(e.name + " burns for 3.");
-                if (!e.alive()) log.add(e.name + " is consumed.");
+                log.add(e.getName() + " burns for 3.");
+                if (!e.alive()) log.add(e.getName() + " is consumed.");
             }
             e.resetRoundState();
         }
