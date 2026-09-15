@@ -10,14 +10,17 @@ public final class NockVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (c.thrall.weaponState().isNocked()) return Check.blocked("already nocked", null);
+        if (c.thrall.isNocked()) return Check.blocked("already nocked", null);
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        if (c.thrall.weaponState().isNocked()) { c.say("already nocked"); return ExitCode.BLOCKED; }
-        c.thrall.weaponState().nock();
+        if (c.thrall.isNocked()) {
+            c.say("already nocked");
+            return ExitCode.BLOCKED;
+        }
+        c.thrall.nock();
         c.say("Arrow nocked.");
         return ExitCode.SUCCESS;
     }
