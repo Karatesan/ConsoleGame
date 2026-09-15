@@ -1,17 +1,13 @@
 package com.archon.model;
 
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.Map;
-
 /**
- * Living or active combat creature with inventory, stats, and reactive capabilities.
+ * Living combat creature with inventory and physical attributes.
  */
 public class Actor extends Entity {
 
-    private final CreatureStats stats;
     private final Inventory inventory;
-    private final WeaponState weaponState;
+    private final int strength;
+    private boolean nocked;
 
     public Actor(
             String id,
@@ -20,50 +16,43 @@ public class Actor extends Entity {
             Vec2 pos,
             CreatureStats stats
     ) {
-        super(id, name, glyph, Kind.CREATURE, pos, stats.maxHp());
-        this.stats = stats;
+        super(
+                id,
+                name,
+                glyph,
+                Kind.CREATURE,
+                pos,
+                stats.maxHp(),
+                stats.armor(),
+                stats.evasion()
+        );
         this.inventory = new Inventory();
-        this.weaponState = new WeaponState();
-    }
-
-    public CreatureStats stats() {
-        return stats;
+        this.strength = stats.strength();
     }
 
     public Inventory inventory() {
         return inventory;
     }
 
-    public WeaponState weaponState() {
-        return weaponState;
-    }
-
-    @Override
-    public Actor ready(Trigger trigger, String description, int damage) {
-        super.ready(trigger, description, damage);
-        return this;
-    }
-
-    @Override
-    public int armor() {
-        int armor = stats.armor();
-        if (isGuarded()) {
-            armor += (int) Math.round(armor * 0.3);
-        }
-        return armor;
-    }
-
-    @Override
-    public int evasion() {
-        int evasion = stats.evasion();
-        if (isCrippled(BodyPart.LEGS)) {
-            evasion -= 10;
-        }
-        return Math.max(0, evasion);
-    }
-
     public int strength() {
-        return stats.strength();
+        return strength;
+    }
+
+    public boolean isNocked() {
+        return nocked;
+    }
+
+    public void nock() {
+        nocked = true;
+    }
+
+    public boolean fireNocked() {
+        if (!nocked) {
+            return false;
+        }
+
+        nocked = false;
+        return true;
     }
 
     /**
@@ -76,27 +65,8 @@ public class Actor extends Entity {
                 : inventory.getEquipped(EquipmentSlot.HAND_LEFT);
     }
 
-    /**
-     * Unequips and returns the active hand item.
-     */
     @Override
-    public Item disarm() {
-        Item right = inventory.getEquipped(EquipmentSlot.HAND_RIGHT);
-        if (right != null) {
-            inventory.equip(EquipmentSlot.HAND_RIGHT, null);
-            return right;
-        }
-
-        Item left = inventory.getEquipped(EquipmentSlot.HAND_LEFT);
-        if (left != null) {
-            inventory.equip(EquipmentSlot.HAND_LEFT, null);
-            return left;
-        }
-
-        return null;
-    }
-
-    public Item findInPack(String idOrName) {
-        return inventory.findInPack(idOrName);
+    public Item disarm(EquipmentSlot slot) {
+        return inventory.removeEquipped(slot);
     }
 }
