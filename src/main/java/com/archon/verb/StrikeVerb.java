@@ -2,12 +2,10 @@ package com.archon.verb;
 
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
+import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
-import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
-
-import java.util.List;
 
 import java.util.List;
 
@@ -33,8 +31,7 @@ public final class StrikeVerb implements Verb {
         String target = c.inv.arg(0);
 
         if (target == null) {
-            List<Entity> adjacent =
-                    c.world.hostilesAdjacentTo(c.thrall.getPos());
+            List<Entity> adjacent = c.world.hostilesAdjacentTo(c.thrall.pos());
 
             if (adjacent.isEmpty()) {
                 return Check.blocked("nothing adjacent to strike", null);
@@ -43,12 +40,12 @@ public final class StrikeVerb implements Verb {
             if (adjacent.size() > 1) {
                 return Check.invalid(
                         "ambiguous target: "
-                                + adjacent.stream().map(Entity::getId).toList(),
+                                + adjacent.stream().map(Entity::id).toList(),
                         "name one explicitly"
                 );
             }
 
-            target = adjacent.get(0).getId();
+            target = adjacent.get(0).id();
         }
 
         if (aimPartInvalid(c, target)) {
@@ -111,11 +108,9 @@ public final class StrikeVerb implements Verb {
             return Check.blocked("target not present", null);
         }
 
-        // Both branches of the original reach expression returned 1.
-        int reach = 1;
-        if (entity.getPos().chebyshev(c.thrall.getPos()) > reach) {
+        if (entity.pos().chebyshev(c.thrall.pos()) > 1) {
             return Check.blocked(
-                    entity.getId() + " out of reach",
+                    entity.id() + " out of reach",
                     "step closer first"
             );
         }
@@ -137,14 +132,13 @@ public final class StrikeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        // Striking a held item is a disarm attempt.
         if (resolved instanceof Resolved.OnItem onItem) {
             if (!isHeldItem(onItem)) {
                 c.say("target is not a held item");
                 return ExitCode.BLOCKED;
             }
 
-            Entity owner = heldItemOwner(c, onItem);
+            Actor owner = heldItemOwner(c, onItem);
             if (owner == null) {
                 c.say("nothing to disarm");
                 return ExitCode.BLOCKED;
@@ -156,7 +150,6 @@ public final class StrikeVerb implements Verb {
                     owner
             );
 
-            // CombatEngine checks Actor.mainHand() or Entity.getHeld().
             if (disarm.weapon() == null) {
                 c.say("nothing to disarm");
                 return ExitCode.BLOCKED;
@@ -164,14 +157,14 @@ public final class StrikeVerb implements Verb {
 
             if (disarm.success()) {
                 c.say(
-                        "The " + disarm.weapon().name
+                        "The " + disarm.weapon().name()
                                 + " is knocked from "
-                                + owner.getName() + "'s grip."
+                                + owner.name() + "'s grip."
                 );
                 return ExitCode.SUCCESS;
             }
 
-            c.say("The blow glances off " + owner.getName() + "'s weapon.");
+            c.say("The blow glances off " + owner.name() + "'s weapon.");
             return ExitCode.MISS;
         }
 
@@ -200,7 +193,7 @@ public final class StrikeVerb implements Verb {
 
         if (!result.hit()) {
             c.say(
-                    "Strike at " + entity.getName()
+                    "Strike at " + entity.name()
                             + "'s " + part.path + " — MISS."
             );
             return ExitCode.MISS;
@@ -208,14 +201,14 @@ public final class StrikeVerb implements Verb {
 
         c.say(String.format(
                 "%s strikes %s's %s. %d dmg.",
-                result.weapon() == null ? "Bare limb" : result.weapon().name,
-                entity.getName(),
+                result.weapon() == null ? "Bare limb" : result.weapon().name(),
+                entity.name(),
                 part.path,
                 result.damage()
         ));
 
         if (result.killed()) {
-            c.say(entity.getName() + " falls.");
+            c.say(entity.name() + " falls.");
             return ExitCode.SUCCESS;
         }
 
@@ -231,11 +224,16 @@ public final class StrikeVerb implements Verb {
 
     private boolean isHeldItem(Resolved.OnItem item) {
         return item.container() != null
-                && item.container().contains("hand");
+                && item.container().contains("/hand/");
     }
 
-    private Entity heldItemOwner(VerbContext c, Resolved.OnItem item) {
-        String ownerId = item.container().split("/", 2)[0];
-        return c.world.get(ownerId);
+    private Actor heldItemOwner(VerbContext c, Resolved.OnItem item) {
+        String container = item.container();
+        int handIndex = container.indexOf("/hand/");
+        if (handIndex < 0) {
+            return null;
+        }
+
+        return c.world.actor(container.substring(0, handIndex));
     }
 }
