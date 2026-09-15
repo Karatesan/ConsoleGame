@@ -21,7 +21,7 @@ public final class StatusVerb extends FreeVerb {
         Thrall thrall = c.thrall;
         Inventory inventory = thrall.inventory();
 
-        c.say("HP " + thrall.getHp() + "/" + thrall.getMaxHp() + "  tags " + thrall.getTags()
+        c.say("HP " + thrall.hp() + "/" + thrall.maxHp() + "  tags " + thrall.tags()
                 + "\n  hand/right: " + slot(inventory, EquipmentSlot.HAND_RIGHT)
                 + "\n  hand/left : " + slot(inventory, EquipmentSlot.HAND_LEFT)
                 + "\n  pack (" + inventory.pack().size() + "/" + Inventory.PACK_MAX + "): " + inventory.pack()
