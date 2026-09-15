@@ -22,7 +22,7 @@ public final class StrikeVerb implements Verb {
             List<Entity> adj = c.world.hostilesAdjacentTo(c.thrall.pos());
             if (adj.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
             if (adj.size() > 1) return Check.invalid("ambiguous target: "
-                    + adj.stream().map(e -> e.id).toList(), "name one explicitly");
+                    + adj.stream().map(Entity::id).toList(), "name one explicitly");
             return Check.ok();
         }
         if (aimPartInvalid(c, t)) return Check.invalid(
@@ -49,38 +49,54 @@ public final class StrikeVerb implements Verb {
         Entity e = VerbHelpers.targetEntity(c, t);
         if (e == null) {
             Resolved r = VerbHelpers.resolve(c, t);
-            if (r instanceof Resolved.OnItem) return Check.ok(); // striking a held item
+            if (r instanceof Resolved.OnItem) return Check.ok();
             return Check.blocked("target not present", null);
         }
         int reach = c.thrall.mainHand() != null && c.thrall.mainHand().has(Tag.HEAVY) ? 1 : 1;
         if (e.pos().chebyshev(c.thrall.pos()) > reach)
-            return Check.blocked(e.id + " out of reach", "step closer first");
+            return Check.blocked(e.id() + " out of reach", "step closer first");
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
         String targetArg = c.inv.arg(0) == null ? VerbHelpers.soleAdjacentHostile(c) : c.inv.arg(0);
-        if (targetArg == null) { c.say("nothing to strike"); return ExitCode.BLOCKED; }
+        if (targetArg == null) {
+            c.say("nothing to strike");
+            return ExitCode.BLOCKED;
+        }
 
         Resolved r = VerbHelpers.resolve(c, targetArg);
-        if (r == null) { c.say(targetArg + " is no longer there"); return ExitCode.BLOCKED; }
+        if (r == null) {
+            c.say(targetArg + " is no longer there");
+            return ExitCode.BLOCKED;
+        }
 
-        // Striking a held item = disarm attempt.
-        if (r instanceof Resolved.OnItem oi && oi.container() != null && oi.container().contains("hand")) {
-            String ownerId = oi.container().split("/")[0];
+        if (r instanceof Resolved.OnItem oi
+                && oi.container() != null
+                && oi.container().contains("/hand/")) {
+            String ownerId = oi.container().substring(0, oi.container().indexOf("/hand/"));
             Actor owner = c.world.actor(ownerId);
-            if (owner == null || owner.mainHand() == null) { c.say("nothing to disarm"); return ExitCode.BLOCKED; }
+            if (owner == null || owner.mainHand() == null) {
+                c.say("nothing to disarm");
+                return ExitCode.BLOCKED;
+            }
+
             CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice, c.world, owner);
             if (disarm.success()) {
-                c.say("The " + disarm.weapon().name + " is knocked from " + owner.name + "'s grip.");
+                c.say("The " + disarm.weapon().name() + " is knocked from " + owner.name() + "'s grip.");
                 return ExitCode.SUCCESS;
             }
-            c.say("The blow glances off " + owner.name + "'s weapon.");
+            c.say("The blow glances off " + owner.name() + "'s weapon.");
             return ExitCode.MISS;
         }
 
-        Entity e = ((Resolved.OnEntity) r).entity();
+        if (!(r instanceof Resolved.OnEntity onEntity)) {
+            c.say("target not present");
+            return ExitCode.BLOCKED;
+        }
+
+        Entity e = onEntity.entity();
         BodyPart part = VerbHelpers.aimPart(c.inv, targetArg);
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
 
@@ -95,15 +111,18 @@ public final class StrikeVerb implements Verb {
         );
 
         if (!result.hit()) {
-            c.say("Strike at " + e.name + "'s " + part.path + " — MISS.");
+            c.say("Strike at " + e.name() + "'s " + part.path + " — MISS.");
             return ExitCode.MISS;
         }
 
         c.say(String.format("%s strikes %s's %s. %d dmg.",
-                result.weapon() == null ? "Bare limb" : result.weapon().name, e.name, part.path, result.damage()));
+                result.weapon() == null ? "Bare limb" : result.weapon().name(),
+                e.name(),
+                part.path,
+                result.damage()));
 
         if (result.killed()) {
-            c.say(e.name + " falls.");
+            c.say(e.name() + " falls.");
             return ExitCode.SUCCESS;
         }
         return ExitCode.PARTIAL;
