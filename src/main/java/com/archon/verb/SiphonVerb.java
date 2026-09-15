@@ -49,7 +49,7 @@ public final class SiphonVerb implements Verb {
         }
 
         Entity holder = holderOf(c, c.inv.arg(0));
-        if (holder != null && holder.getPos().chebyshev(c.thrall.getPos()) > 1) {
+        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
             return Check.blocked(holder.id() + " out of reach", "step closer");
         }
 
