@@ -49,9 +49,11 @@ public final class WieldVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        if (!c.thrall.inventory().pack().contains(item) && !c.thrall.inventory().addToPack(item)) {
-            c.say("cannot carry " + item.name());
-            return ExitCode.BLOCKED;
+        if (!c.thrall.inventory().pack().contains(item)) {
+            if (!c.thrall.inventory().addToPack(item)) {
+                c.say("cannot carry " + item.name());
+                return ExitCode.BLOCKED;
+            }
         }
 
         if (!c.thrall.inventory().equipFromPack(item, slot)) {
