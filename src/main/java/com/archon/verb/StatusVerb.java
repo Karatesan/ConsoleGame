@@ -6,8 +6,15 @@ import com.archon.model.Item;
 import com.archon.model.Thrall;
 
 public final class StatusVerb extends FreeVerb {
-    @Override public String name() { return "status"; }
-    @Override public String help() { return "status — thrall state. 0 AP."; }
+    @Override
+    public String name() {
+        return "status";
+    }
+
+    @Override
+    public String help() {
+        return "status — thrall state. 0 AP.";
+    }
 
     @Override
     public ExitCode execute(VerbContext c) {
