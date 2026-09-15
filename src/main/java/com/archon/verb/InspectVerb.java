@@ -33,24 +33,27 @@ public final class InspectVerb extends FreeVerb {
 
         switch (resolved) {
             case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
-            case Resolved.OnItem onItem -> {
-                if (onItem.item() == null) {
-                    c.say("nothing there");
-                } else {
-                    c.say(onItem.item().name() + " — tags " + onItem.item().tags()
-                            + (onItem.item().substance() != null
-                            ? ", contains " + onItem.item().substance()
-                            : ""));
-                }
-            }
-            case Resolved.OnTile onTile -> {
-                World.Tile tile = c.world.tile(onTile.pos());
-                c.say(onTile.pos() + " " + (tile.wall() ? "WALL" : "floor") + " — tags " + tile.tags()
-                        + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
-            }
+            case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
+            case Resolved.OnTile onTile -> inspectTile(c, onTile.pos());
         }
 
         return ExitCode.SUCCESS;
+    }
+
+    private static void inspectItem(VerbContext c, Entity item) {
+        if (item == null) {
+            c.say("nothing there");
+            return;
+        }
+
+        c.say(item.name() + " — tags " + item.tags()
+                + (item.substance() != null ? ", contains " + item.substance() : ""));
+    }
+
+    private static void inspectTile(VerbContext c, World.Pos pos) {
+        World.Tile tile = c.world.tile(pos);
+        c.say(pos + " " + (tile.wall() ? "WALL" : "floor") + " — tags " + tile.tags()
+                + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
     }
 
     private static void inspectEntity(VerbContext c, Entity entity) {
@@ -72,9 +75,9 @@ public final class InspectVerb extends FreeVerb {
         for (BodyPart part : BodyPart.values()) {
             output.append(String.format(
                     "%n  %-6s %3d%%  x%.1f",
-                    part.path,
-                    Math.max(5, 70 + part.hitMod - entity.evasion()),
-                    part.damageMult));
+                    part.path(),
+                    Math.max(5, 70 + part.hitMod() - entity.evasion()),
+                    part.damageMult()));
         }
 
         c.say(output.toString());
