@@ -9,9 +9,9 @@ public final class Item {
     private final String id;
     private final String name;
     private final Set<Tag> tags;
+    private final int damage;
     private Tag substance;
     private int durability;
-    private final int damage;
 
     public Item(String id, String name, Set<Tag> tags, Tag substance, int durability, int damage) {
         this.id = Objects.requireNonNull(id, "id");
@@ -68,15 +68,16 @@ public final class Item {
     }
 
     public Tag consumeSubstance() {
-        Tag priorSubstance = substance;
+        Tag previousSubstance = substance;
         substance = null;
-        return priorSubstance;
+        return previousSubstance;
     }
 
     public void wear(int amount) {
         if (amount < 0) {
             throw new IllegalArgumentException("Wear amount cannot be negative");
         }
+
         durability -= amount;
     }
 
