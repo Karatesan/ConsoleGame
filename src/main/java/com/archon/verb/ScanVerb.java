@@ -28,9 +28,9 @@ public final class ScanVerb extends FreeVerb {
                     e.maxHp(),
                     e.tags().contains(Tag.BURNING) ? "[BURNING] " : "",
                     e.readied() != null ? "[READIED: " + e.readied().description() + "] " : "",
-                    e.pos().chebyshev(c.thrall.getPos()) <= 1
+                    e.pos().chebyshev(c.thrall.pos()) <= 1
                             ? "adjacent"
-                            : "range " + e.pos().chebyshev(c.thrall.getPos())));
+                            : "range " + e.pos().chebyshev(c.thrall.pos())));
         }
 
         c.say(sb.toString().stripTrailing());
