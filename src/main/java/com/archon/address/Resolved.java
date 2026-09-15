@@ -1,6 +1,14 @@
 package com.archon.address;
 
-import com.archon.model.*;
+import com.archon.model.Actor;
+import com.archon.model.Address;
+import com.archon.model.BodyPart;
+import com.archon.model.Entity;
+import com.archon.model.EquipmentSlot;
+import com.archon.model.Item;
+import com.archon.model.Prop;
+import com.archon.model.Vec2;
+import com.archon.model.World;
 
 public sealed interface Resolved {
 
@@ -15,7 +23,8 @@ public sealed interface Resolved {
                 Vec2 pos = Address.resolveTileSpec(tile.spec(), world);
                 yield world.inBounds(pos) ? new OnTile(pos, tile.layer()) : null;
             }
-            case Address.InventoryAddr inventory -> resolveInventory(world.thrall(), inventory.path(), null);
+            case Address.InventoryAddr inventory ->
+                    resolveInventory(world.thrall, inventory.path(), null);
             case Address.EntityAddr entityAddress -> {
                 Entity entity = world.get(entityAddress.id());
                 if (entity == null || !entity.alive()) {
@@ -45,24 +54,23 @@ public sealed interface Resolved {
     }
 
     private static Resolved resolveInventory(Actor actor, String path, String ownerId) {
-        if (path == null) {
+        if (actor == null || path == null) {
             return null;
         }
 
-        if (path.equals("pack") || path.startsWith("pack/")) {
-            String container = ownerId == null ? "pack" : ownerId + "/pack";
-            if (path.equals("pack")) {
-                return new OnItem(null, container);
-            }
+        if (path.equals("pack")) {
+            return new OnItem(null, ownerId == null ? "pack" : ownerId + "/pack");
+        }
 
+        if (path.startsWith("pack/")) {
             Item item = actor.inventory().find(path.substring("pack/".length())).orElse(null);
-            return item == null ? null : new OnItem(item, container);
+            return item == null ? null : new OnItem(item, ownerId == null ? "pack" : ownerId + "/pack");
         }
 
         return EquipmentSlot.parse(path)
                 .map(slot -> new OnItem(
                         actor.inventory().equipped(slot),
-                        ownerId == null ? slot.path() : ownerId + "/" + slot.path()
+                        ownerId == null ? "self/" + slot.path() : ownerId + "/" + slot.path()
                 ))
                 .orElse(null);
     }
