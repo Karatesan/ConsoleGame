@@ -10,9 +10,15 @@ public final class Scenario {
     public static World testRoom(Dice dice) {
         World w = new World(12, 8, dice);
 
-        for (int x = 0; x < w.w; x++) { w.wall(x, 0); w.wall(x, w.h - 1); }
-        for (int y = 0; y < w.h; y++) { w.wall(0, y); w.wall(w.w - 1, y); }
-        w.wall(3, 3);   // pillar directly north of the thrall — used by the BLOCKED tests
+        for (int x = 0; x < w.w; x++) {
+            w.wall(x, 0);
+            w.wall(x, w.h - 1);
+        }
+        for (int y = 0; y < w.h; y++) {
+            w.wall(0, y);
+            w.wall(w.w - 1, y);
+        }
+        w.wall(3, 3);
 
         Thrall t = new Thrall(new Vec2(3, 4), 40);
         t.inventory().placeInSlotForSetup(
