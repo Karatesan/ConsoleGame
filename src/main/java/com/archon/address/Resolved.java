@@ -12,7 +12,9 @@ import com.archon.model.World;
 public sealed interface Resolved {
 
     record OnEntity(Entity entity, BodyPart part) implements Resolved {}
+
     record OnItem(Item item, String container) implements Resolved {}
+
     record OnTile(Vec2 pos, String layer) implements Resolved {}
 
     /** Returns null when the address cannot currently be resolved. */
