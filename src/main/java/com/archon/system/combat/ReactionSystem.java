@@ -17,13 +17,13 @@ public final class ReactionSystem {
     public static Entity pendingInterrupt(World world, boolean thrallMoved) {
         if (world.thrall == null) return null;
         for (Entity e : world.entities.values()) {
-            if (!e.alive() || e.readied == null || e.readiedSpent) continue;
-            switch (e.readied.trigger()) {
+            if (!e.alive() || e.readied() == null || e.isReadiedSpent()) continue;
+            switch (e.readied().trigger()) {
                 case ON_ADJACENCY -> {
-                    if (e.pos.chebyshev(world.thrall.pos) <= 1) return e;
+                    if (e.pos().chebyshev(world.thrall.pos()) <= 1) return e;
                 }
                 case ON_MOVEMENT_IN_LOS -> {
-                    if (thrallMoved && SpatialService.lineOfSight(world.map, e.pos, world.thrall.pos)) {
+                    if (thrallMoved && SpatialService.lineOfSight(world.map, e.pos(), world.thrall.pos())) {
                         return e;
                     }
                 }
@@ -44,8 +44,8 @@ public final class ReactionSystem {
      * Marks reaction as spent, damages the thrall, and returns damage dealt.
      */
     public static int resolveInterrupt(World world, Entity e) {
-        e.readiedSpent = true;
-        int dmg = e.readied.damage();
+        e.spendReadied();
+        int dmg = e.readied().damage();
         world.thrall.takeDamage(dmg);
         return dmg;
     }
