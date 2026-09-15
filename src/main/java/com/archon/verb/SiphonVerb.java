@@ -27,7 +27,7 @@ public final class SiphonVerb implements Verb {
         if (s == null) return Check.blocked("nothing to siphon from " + c.inv.arg(0), "try: inspect " + c.inv.arg(0));
         Entity holder = holderOf(c, c.inv.arg(0));
         if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1)
-            return Check.blocked(holder.id() + " out of reach", "step closer");
+            return Check.blocked(holder.getId() + " out of reach", "step closer");
         return Check.ok();
     }
 
@@ -45,13 +45,19 @@ public final class SiphonVerb implements Verb {
 
     private static Tag sourceSubstance(VerbContext c, String arg) {
         Resolved r = VerbHelpers.resolve(c, arg);
-        if (r instanceof Resolved.OnItem oi && oi.item() != null) return oi.item().substance();
+        if (r instanceof Resolved.OnItem oi && oi.getItem() != null) {
+            return oi.getItem().getSubstance();
+        }
         if (r instanceof Resolved.OnEntity oe) {
-            if (oe.entity() instanceof Actor actor && actor.mainHand() != null) return actor.mainHand().substance();
-            if (oe.entity() instanceof Prop prop && prop.contents() != null) return prop.contents().substance();
+            if (oe.getEntity() instanceof Actor actor && actor.getMainHand() != null) {
+                return actor.getMainHand().getSubstance();
+            }
+            if (oe.getEntity() instanceof Prop prop && prop.getContents() != null) {
+                return prop.getContents().getSubstance();
+            }
         }
         if (r instanceof Resolved.OnTile ot) {
-            World.Tile t = c.world.tile(ot.pos());
+            World.Tile t = c.world.tile(ot.getPos());
             if (t.has(Tag.OIL)) return Tag.OIL;
             if (t.has(Tag.WATER)) return Tag.WATER;
         }
@@ -60,7 +66,7 @@ public final class SiphonVerb implements Verb {
 
     private static Entity holderOf(VerbContext c, String arg) {
         Address a = Address.parse(arg);
-        if (a instanceof Address.EntityAddr ea) return c.world.get(ea.id());
+        if (a instanceof Address.EntityAddr ea) return c.world.get(ea.getId());
         return null;
     }
 }
