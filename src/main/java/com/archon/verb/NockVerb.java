@@ -1,7 +1,6 @@
 package com.archon.verb;
 
 import com.archon.command.Ast;
-import com.archon.thrall.WeaponState;
 
 public final class NockVerb implements Verb {
     @Override public String name() { return "nock"; }
@@ -11,14 +10,17 @@ public final class NockVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (c.thrall.weaponState() == WeaponState.NOCKED) return Check.blocked("already nocked", null);
+        if (c.thrall.isNocked()) return Check.blocked("already nocked", null);
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        if (c.thrall.weaponState() == WeaponState.NOCKED) { c.say("already nocked"); return ExitCode.BLOCKED; }
-        c.thrall.setWeaponState(WeaponState.NOCKED);
+        if (c.thrall.isNocked()) {
+            c.say("already nocked");
+            return ExitCode.BLOCKED;
+        }
+        c.thrall.nock();
         c.say("Arrow nocked.");
         return ExitCode.SUCCESS;
     }
