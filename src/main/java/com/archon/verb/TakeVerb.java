@@ -18,48 +18,75 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (c.thrall.inventory().isPackFull()) return Check.blocked("pack full (" + Inventory.PACK_MAX + ")", "drop something");
+        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
+        if (resolved instanceof Resolved.OnItem item && "pack".equals(item.container())) {
+            return Check.ok();
+        }
+        if (c.thrall.inventory().isPackFull()) {
+            return Check.blocked("pack full (" + Inventory.PACK_MAX + ")", "drop something");
+        }
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String a = c.inv.arg(0);
-        Resolved r = VerbHelpers.resolve(c, a);
+        String address = c.inv.arg(0);
+        Resolved resolved = VerbHelpers.resolve(c, address);
         Item item = null;
 
-        if (r instanceof Resolved.OnItem oi && oi.item() != null) {
-            item = oi.item();
-            if ("pack".equals(oi.container())) {
-                // already carried: taking it out is a valid pipeline source
+        if (resolved instanceof Resolved.OnItem onItem && onItem.item() != null) {
+            item = onItem.item();
+            String container = onItem.container();
+
+            if ("pack".equals(container)) {
                 c.materialOut = new Material.OfItem(item);
-                c.say("Thrall draws " + item.name + ".");
+                c.say("Thrall draws " + item.name() + ".");
                 return ExitCode.SUCCESS;
             }
-            String owner = oi.container().split("/")[0];
-            Entity oe = c.world.get(owner);
-            if (oe != null) {
-                if (oe.held == item) {
-                    if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
-                    oe.held = null;
-                } else if (oe instanceof Actor oa) {
-                    if (!c.world.dice.chance(35)) { c.say("Snatch fails."); return ExitCode.MISS; }
-                    oa.inventory().removeFromPack(item);
-                } else if (oe instanceof Prop op) {
-                    op.contents.remove(item);
+
+            int slash = container.indexOf('/');
+            String owner = slash >= 0 ? container.substring(0, slash) : container;
+
+            Actor actor = c.world.actor(owner);
+            if (actor != null) {
+                if (!c.world.dice.chance(35)) {
+                    c.say("Snatch fails.");
+                    return ExitCode.MISS;
+                }
+
+                if (container.startsWith(owner + "/hand/")) {
+                    EquipmentSlot slot = EquipmentSlot.parse(container.substring(slash + 1));
+                    actor.equipment().remove(slot);
+                } else {
+                    actor.inventory().remove(item);
+                }
+            } else {
+                Entity entity = c.world.get(owner);
+                if (entity instanceof Prop prop) {
+                    prop.removeContents(item);
                 }
             }
-        } else if (r instanceof Resolved.OnTile ot) {
-            World.Tile t = c.world.tile(ot.pos());
-            if (t.ground.isEmpty()) { c.say("nothing on the ground there"); return ExitCode.BLOCKED; }
-            item = t.ground.remove(0);
+        } else if (resolved instanceof Resolved.OnTile onTile) {
+            World.Tile tile = c.world.tile(onTile.pos());
+            if (tile.ground.isEmpty()) {
+                c.say("nothing on the ground there");
+                return ExitCode.BLOCKED;
+            }
+            item = tile.ground.remove(0);
         }
 
-        if (item == null) { c.say("cannot take " + a); return ExitCode.BLOCKED; }
-        if (c.thrall.inventory().isPackFull()) { c.say("pack full"); return ExitCode.BLOCKED; }
-        c.thrall.inventory().addToPack(item);
+        if (item == null) {
+            c.say("cannot take " + address);
+            return ExitCode.BLOCKED;
+        }
+
+        if (!c.thrall.inventory().addToPack(item)) {
+            c.say("pack full");
+            return ExitCode.BLOCKED;
+        }
+
         c.materialOut = new Material.OfItem(item);
-        c.say("Thrall takes " + item.name + ".");
+        c.say("Thrall takes " + item.name() + ".");
         return ExitCode.SUCCESS;
     }
 }
