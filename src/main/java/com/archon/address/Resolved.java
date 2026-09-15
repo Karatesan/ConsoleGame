@@ -4,7 +4,7 @@ import com.archon.model.*;
 
 public sealed interface Resolved {
 
-    record OnEntity(Entity entity, BodyPart part, String slot) implements Resolved {}
+    record OnEntity(Entity entity, BodyPart part) implements Resolved {}
     record OnItem(Item item, String container) implements Resolved {}
     record OnTile(Vec2 pos, String layer) implements Resolved {}
 
@@ -17,34 +17,66 @@ public sealed interface Resolved {
             }
             case Address.InventoryAddr inv -> {
                 String path = inv.path();
-                if (path.startsWith("pack")) {
-                    String rest = path.length() > 4 ? path.substring(5) : "";
-                    if (rest.isBlank()) yield new OnItem(null, "pack");
-                    Item it = w.thrall.inventory().findInPack(rest);
-                    yield it == null ? null : new OnItem(it, "pack");
+
+                if (path.equals("pack") || path.startsWith("pack/")) {
+                    String rest = path.equals("pack") ? "" : path.substring("pack/".length());
+                    if (rest.isBlank()) {
+                        yield new OnItem(null, "pack");
+                    }
+
+                    Item item = w.thrall.inventory().find(rest);
+                    yield item == null ? null : new OnItem(item, "pack");
                 }
-                if (EquipmentSlot.parse(path).isPresent())
-                    yield new OnEntity(w.thrall, null, path);
+
+                var slot = EquipmentSlot.parse(path);
+                if (slot.isPresent()) {
+                    EquipmentSlot equipmentSlot = slot.get();
+                    yield new OnItem(
+                            w.thrall.inventory().equipped(equipmentSlot),
+                            "self/" + equipmentSlot.path()
+                    );
+                }
+
                 yield null;
             }
             case Address.EntityAddr e -> {
-                Entity ent = w.get(e.id());
-                if (ent == null || !ent.alive()) yield null;
-                if (e.path() == null) yield new OnEntity(ent, null, null);
-                if (ent instanceof Prop prop && e.path().equals("contents"))
-                    yield new OnItem(prop.contents(), ent.id + "/contents");
-                if (ent instanceof Actor actor) {
-                    if (e.path().startsWith("pack")) {
-                        String rest = e.path().length() > 4 ? e.path().substring(5) : "";
-                        if (rest.isBlank()) yield new OnItem(null, ent.id + "/pack");
-                        Item it = actor.inventory().findInPack(rest);
-                        yield it == null ? null : new OnItem(it, ent.id + "/pack");
-                    }
-                    if (e.path().startsWith("hand/") || EquipmentSlot.parse(e.path()).isPresent())
-                        yield new OnEntity(actor, null, e.path());
+                Entity entity = w.get(e.id());
+                if (entity == null || !entity.alive()) {
+                    yield null;
                 }
-                BodyPart bp = BodyPart.parse(e.path());
-                yield bp == null ? null : new OnEntity(ent, bp, null);
+
+                String path = e.path();
+                if (path == null) {
+                    yield new OnEntity(entity, null);
+                }
+
+                if (entity instanceof Prop prop && path.equals("contents")) {
+                    yield new OnItem(prop.contents(), entity.id() + "/contents");
+                }
+
+                if (entity instanceof Actor actor) {
+                    if (path.equals("pack") || path.startsWith("pack/")) {
+                        String rest = path.equals("pack") ? "" : path.substring("pack/".length());
+                        if (rest.isBlank()) {
+                            yield new OnItem(null, entity.id() + "/pack");
+                        }
+
+                        Item item = actor.inventory().find(rest);
+                        yield item == null ? null : new OnItem(item, entity.id() + "/pack");
+                    }
+
+                    var slot = EquipmentSlot.parse(path);
+                    if (slot.isPresent()) {
+                        EquipmentSlot equipmentSlot = slot.get();
+                        yield new OnItem(
+                                actor.inventory().equipped(equipmentSlot),
+                                entity.id() + "/" + equipmentSlot.path()
+                        );
+                    }
+                }
+
+                BodyPart part = BodyPart.parse(path);
+                yield part == null ? null : new OnEntity(entity, part);
             }
         };
     }
