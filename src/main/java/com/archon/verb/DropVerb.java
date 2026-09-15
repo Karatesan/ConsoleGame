@@ -23,8 +23,8 @@ public final class DropVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        c.world.tile(c.thrall.getPos()).ground.add(item);
-        c.say("Thrall drops " + item.name + ".");
+        c.world.tile(c.thrall.pos()).ground.add(item);
+        c.say("Thrall drops " + item.name() + ".");
         return ExitCode.SUCCESS;
     }
 }
