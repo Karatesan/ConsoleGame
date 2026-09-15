@@ -160,9 +160,9 @@ public final class CombatEngine {
     }
 
     private static Item disarmMainHandAndDrop(World world, Actor actor) {
-        Item dropped = actor.disarm(EquipmentSlot.RIGHT_HAND);
+        Item dropped = actor.disarm(EquipmentSlot.HAND_RIGHT);
         if (dropped == null) {
-            dropped = actor.disarm(EquipmentSlot.LEFT_HAND);
+            dropped = actor.disarm(EquipmentSlot.HAND_LEFT);
         }
 
         drop(world, actor, dropped);
@@ -174,13 +174,13 @@ public final class CombatEngine {
             return;
         }
 
-        drop(world, actor, actor.disarm(EquipmentSlot.RIGHT_HAND));
-        drop(world, actor, actor.disarm(EquipmentSlot.LEFT_HAND));
+        drop(world, actor, actor.disarm(EquipmentSlot.HAND_RIGHT));
+        drop(world, actor, actor.disarm(EquipmentSlot.HAND_LEFT));
     }
 
     private static void drop(World world, Actor actor, Item item) {
         if (world != null && item != null) {
-            world.tile(actor.pos()).ground().add(item);
+            world.tile(actor.pos()).ground.add(item);
         }
     }
 }
