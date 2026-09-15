@@ -5,8 +5,10 @@ package com.archon.model;
  */
 public class Prop extends Entity {
 
+    private Item contents;
+
     public Prop(String id, String name, char glyph, Vec2 pos, int hp) {
-        super(id, name, glyph, Kind.PROP, pos, hp);
+        super(id, name, glyph, Kind.PROP, pos, hp, 0, 0);
     }
 
     public Prop(
@@ -22,14 +24,16 @@ public class Prop extends Entity {
     }
 
     public Item contents() {
-        return getHeld();
+        return contents;
     }
 
     public void setContents(Item contents) {
-        setHeld(contents);
+        this.contents = contents;
     }
 
-    public Item extractContents() {
-        return disarm();
+    public Item removeContents() {
+        Item removedContents = contents;
+        contents = null;
+        return removedContents;
     }
 }
