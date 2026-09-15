@@ -173,7 +173,7 @@ public abstract class Entity {
         if (amount < 0) {
             throw new IllegalArgumentException("healing amount must not be negative");
         }
-        hp = Math.min(maxHp, hp + amount);
+        hp += amount;
         return hp;
     }
 
