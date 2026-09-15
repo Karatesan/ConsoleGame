@@ -4,8 +4,6 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.*;
 
-import java.util.Locale;
-
 public final class TakeVerb implements Verb {
     @Override public String name() { return "take"; }
     @Override public String help() { return "take <address> — pick up. 1 AP. Produces material."; }
@@ -85,7 +83,7 @@ public final class TakeVerb implements Verb {
                 return ExitCode.MISS;
             }
 
-            item = actor.removeEquipped(slot);
+            item = actor.disarm(slot);
             if (item == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
@@ -105,7 +103,11 @@ public final class TakeVerb implements Verb {
                 return ExitCode.BLOCKED;
             }
 
-            prop.removeContents(item);
+            item = prop.removeContents();
+            if (item == null) {
+                c.say("cannot take " + address);
+                return ExitCode.BLOCKED;
+            }
         } else {
             c.say("cannot take " + address);
             return ExitCode.BLOCKED;
@@ -157,16 +159,10 @@ public final class TakeVerb implements Verb {
     }
 
     private static EquipmentSlot slotOf(String container) {
-        String[] parts = container.split("/");
-        for (int i = 0; i < parts.length - 1; i++) {
-            if ("hand".equals(parts[i])) {
-                try {
-                    return EquipmentSlot.valueOf(parts[i + 1].toUpperCase(Locale.ROOT));
-                } catch (IllegalArgumentException ignored) {
-                    return null;
-                }
-            }
+        int handIndex = container.indexOf("hand/");
+        if (handIndex < 0) {
+            return null;
         }
-        return null;
+        return EquipmentSlot.parse(container.substring(handIndex)).orElse(null);
     }
 }
