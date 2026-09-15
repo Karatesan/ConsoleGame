@@ -27,7 +27,7 @@ public sealed interface Resolved {
                     yield new OnEntity(entity, null);
                 }
 
-                if (entity instanceof Prop prop && path.equals("/contents")) {
+                if (entity instanceof Prop prop && path.equals("contents")) {
                     yield new OnItem(prop.contents(), entity.id() + "/contents");
                 }
 
@@ -49,13 +49,13 @@ public sealed interface Resolved {
             return null;
         }
 
-        if (path.equals("/pack") || path.startsWith("/pack/")) {
+        if (path.equals("pack") || path.startsWith("pack/")) {
             String container = ownerId == null ? "pack" : ownerId + "/pack";
-            if (path.equals("/pack")) {
+            if (path.equals("pack")) {
                 return new OnItem(null, container);
             }
 
-            Item item = actor.inventory().find(path.substring("/pack/".length()));
+            Item item = actor.inventory().find(path.substring("pack/".length())).orElse(null);
             return item == null ? null : new OnItem(item, container);
         }
 
