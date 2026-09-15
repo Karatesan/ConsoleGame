@@ -150,7 +150,7 @@ public final class CombatEngine {
 
         Item dropped = disarmMainHand(actor);
         if (dropped != null) {
-            world.tile(target.pos()).ground().add(dropped);
+            world.tile(actor.pos()).ground().add(dropped);
         }
     }
 
