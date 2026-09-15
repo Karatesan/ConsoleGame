@@ -8,8 +8,14 @@ public class Prop extends Entity {
         super(id, name, glyph, Kind.PROP, pos, hp, 0, 0);
     }
 
-    public Item contents() { return contents; }
-    public void setContents(Item item) { contents = item; }
+    public Item contents() {
+        return contents;
+    }
+
+    public void setContents(Item item) {
+        contents = item;
+    }
+
     public Item removeContents() {
         Item item = contents;
         contents = null;
