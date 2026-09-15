@@ -5,7 +5,7 @@ import com.archon.command.Ast;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
-import com.archon.world.World;
+import com.archon.model.World;
 
 public final class IgniteVerb implements Verb {
     @Override
