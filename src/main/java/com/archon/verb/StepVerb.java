@@ -30,7 +30,10 @@ public final class StepVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         Vec2 to = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!c.world.passable(to)) { c.say("blocked at " + to); return ExitCode.BLOCKED; }
+        if (!c.world.passable(to)) {
+            c.say("blocked at " + to);
+            return ExitCode.BLOCKED;
+        }
         c.thrall.moveTo(to);
         c.world.thrallMovedThisLine = true;
         c.say("Thrall advances to " + to + ".");
@@ -39,8 +42,11 @@ public final class StepVerb implements Verb {
 
     private String openDirs(VerbContext c) {
         List<String> open = new ArrayList<>();
-        for (String d : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw"))
-            if (c.world.passable(c.thrall.pos().plus(Vec2.dir(d)))) open.add(d);
+        for (String d : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw")) {
+            if (c.world.passable(c.thrall.pos().plus(Vec2.dir(d)))) {
+                open.add(d);
+            }
+        }
         return String.join(", ", open);
     }
 }
