@@ -19,17 +19,30 @@ public final class WieldVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         Item item = c.itemFromMaterialOrArg(0);
-        if (item == null) { c.say("no such item"); return ExitCode.BLOCKED; }
-        EquipmentSlot slot = c.thrall.inventory().getEquipped(EquipmentSlot.HAND_RIGHT) == null
+        if (item == null) {
+            c.say("no such item");
+            return ExitCode.BLOCKED;
+        }
+
+        EquipmentSlot slot = c.thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT) == null
                 ? EquipmentSlot.HAND_RIGHT
                 : EquipmentSlot.HAND_LEFT;
-        if (c.thrall.inventory().getEquipped(slot) != null) { c.say("both hands full"); return ExitCode.BLOCKED; }
-        if (c.thrall.inventory().pack().contains(item)) {
-            c.thrall.inventory().equipFromPack(item, slot);
-        } else {
-            c.thrall.inventory().equip(slot, item);
+        if (c.thrall.inventory().equipped(slot) != null) {
+            c.say("both hands full");
+            return ExitCode.BLOCKED;
         }
-        c.say("Thrall grips " + item.name + " (" + slot.path + ").");
+
+        if (!c.thrall.inventory().pack().contains(item) && !c.thrall.inventory().addToPack(item)) {
+            c.say("cannot carry " + item.name());
+            return ExitCode.BLOCKED;
+        }
+
+        if (!c.thrall.inventory().equipFromPack(item, slot)) {
+            c.say("cannot wield " + item.name());
+            return ExitCode.BLOCKED;
+        }
+
+        c.say("Thrall grips " + item.name() + " (" + slot.path + ").");
         return ExitCode.SUCCESS;
     }
 }
