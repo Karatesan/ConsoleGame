@@ -95,16 +95,13 @@ public final class StrikeVerb implements Verb {
         if (resolved instanceof Resolved.OnEntity onEntity) {
             entity = onEntity.entity();
         } else if (resolved instanceof Resolved.OnItem onItem) {
-            if (!isHeldItem(onItem)) {
+            Actor owner = handContainerOwner(c, onItem);
+            if (owner == null) {
                 return Check.blocked("target is not a held item", null);
             }
 
-            entity = heldItemOwner(c, onItem);
+            entity = owner;
         } else {
-            return Check.blocked("target not present", null);
-        }
-
-        if (entity == null) {
             return Check.blocked("target not present", null);
         }
 
@@ -133,14 +130,9 @@ public final class StrikeVerb implements Verb {
         }
 
         if (resolved instanceof Resolved.OnItem onItem) {
-            if (!isHeldItem(onItem)) {
-                c.say("target is not a held item");
-                return ExitCode.BLOCKED;
-            }
-
-            Actor owner = heldItemOwner(c, onItem);
+            Actor owner = handContainerOwner(c, onItem);
             if (owner == null) {
-                c.say("nothing to disarm");
+                c.say("target is not a held item");
                 return ExitCode.BLOCKED;
             }
 
@@ -222,13 +214,12 @@ public final class StrikeVerb implements Verb {
                 : VerbHelpers.soleAdjacentHostile(c);
     }
 
-    private boolean isHeldItem(Resolved.OnItem item) {
-        return item.container() != null
-                && item.container().contains("/hand/");
-    }
-
-    private Actor heldItemOwner(VerbContext c, Resolved.OnItem item) {
+    private Actor handContainerOwner(VerbContext c, Resolved.OnItem item) {
         String container = item.container();
+        if (container == null) {
+            return null;
+        }
+
         int handIndex = container.indexOf("/hand/");
         if (handIndex < 0) {
             return null;
