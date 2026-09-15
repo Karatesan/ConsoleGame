@@ -3,7 +3,6 @@ package com.archon.exec;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
-import com.archon.model.Actor;
 import com.archon.model.Entity;
 import com.archon.model.World;
 import com.archon.verb.Verbs;
@@ -48,7 +47,7 @@ public final class SettlementManager {
             Entity late = world.pendingInterrupt();
             if (late != null) {
                 int dmg = world.resolveInterrupt(late);
-                bus.post(new GameEvent.InterruptFired(late.getId(), late.readied().description(), dmg));
+                bus.post(new GameEvent.InterruptFired(late.id(), late.readied().description(), dmg));
             }
             bus.post(new GameEvent.LineComplete(trace.charged(), tax, allocation - trace.charged(), round.ap()));
         }
