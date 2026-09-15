@@ -14,7 +14,8 @@ import java.util.List;
  */
 public final class SimulationSystem {
 
-    private SimulationSystem() {}
+    private SimulationSystem() {
+    }
 
     /**
      * Spills a liquid substance onto a tile, updating tile tags and any occupant.
@@ -52,15 +53,15 @@ public final class SimulationSystem {
         List<String> log = new ArrayList<>();
         world.roundNumber++;
 
-        for (Entity e : new ArrayList<>(world.entities.values())) {
-            if (e.alive() && e.has(Tag.BURNING)) {
-                e.takeDamage(3);
-                log.add(e.name() + " burns for 3.");
-                if (!e.alive()) {
-                    log.add(e.name() + " is consumed.");
+        for (Entity entity : new ArrayList<>(world.entities.values())) {
+            if (entity.alive() && entity.has(Tag.BURNING)) {
+                entity.takeDamage(3);
+                log.add(entity.name() + " burns for 3.");
+                if (!entity.alive()) {
+                    log.add(entity.name() + " is consumed.");
                 }
             }
-            e.resetRoundState();
+            entity.resetRoundState();
         }
 
         Entity thrall = world.thrall;
