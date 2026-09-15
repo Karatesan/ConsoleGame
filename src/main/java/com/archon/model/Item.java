@@ -21,6 +21,13 @@ public final class Item {
         copiedTags.addAll(Objects.requireNonNull(tags, "tags"));
         this.tags = Collections.unmodifiableSet(copiedTags);
 
+        if (durability < 0) {
+            throw new IllegalArgumentException("Durability cannot be negative");
+        }
+        if (damage < 0) {
+            throw new IllegalArgumentException("Damage cannot be negative");
+        }
+
         this.substance = substance;
         this.durability = durability;
         this.damage = damage;
