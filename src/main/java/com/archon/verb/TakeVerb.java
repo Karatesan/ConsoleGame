@@ -43,7 +43,12 @@ public final class TakeVerb implements Verb {
             }
 
             Item item = tile.ground.remove(0);
-            c.thrall.inventory().addToPack(item);
+            if (!c.thrall.inventory().addToPack(item)) {
+                tile.ground.add(0, item);
+                c.say("pack full");
+                return ExitCode.BLOCKED;
+            }
+
             c.materialOut = new Material.OfItem(item);
             c.say("Thrall takes " + item.name() + ".");
             return ExitCode.SUCCESS;
@@ -69,11 +74,14 @@ public final class TakeVerb implements Verb {
         }
 
         String owner = ownerOf(container);
+        Actor sourceActor = null;
+        EquipmentSlot sourceSlot = null;
+        Prop sourceProp = null;
 
         if (isHandContainer(container)) {
-            Actor actor = c.world.actor(owner);
-            EquipmentSlot slot = slotOf(container);
-            if (actor == null || slot == null) {
+            sourceActor = c.world.actor(owner);
+            sourceSlot = slotOf(container);
+            if (sourceActor == null || sourceSlot == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
@@ -83,29 +91,32 @@ public final class TakeVerb implements Verb {
                 return ExitCode.MISS;
             }
 
-            item = actor.disarm(slot);
+            item = sourceActor.disarm(sourceSlot);
             if (item == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
         } else if (isPackContainer(container)) {
-            Actor actor = c.world.actor(owner);
-            if (actor == null) {
+            sourceActor = c.world.actor(owner);
+            if (sourceActor == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
 
-            actor.inventory().remove(item);
+            sourceActor.inventory().remove(item);
         } else if (isContentsContainer(container)) {
             Entity ownerEntity = c.world.get(owner);
-            Prop prop = ownerEntity instanceof Prop candidate ? candidate : null;
-            if (prop == null) {
+            sourceProp = ownerEntity instanceof Prop candidate ? candidate : null;
+            if (sourceProp == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
 
-            Item removed = prop.removeContents();
+            Item removed = sourceProp.removeContents();
             if (removed == null || removed != item) {
+                if (removed != null) {
+                    sourceProp.setContents(removed);
+                }
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
@@ -116,7 +127,19 @@ public final class TakeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        c.thrall.inventory().addToPack(item);
+        if (!c.thrall.inventory().addToPack(item)) {
+            if (sourceSlot != null && sourceActor != null) {
+                sourceActor.placeInSlotForSetup(sourceSlot, item);
+            } else if (sourceActor != null) {
+                sourceActor.inventory().addToPack(item);
+            } else if (sourceProp != null) {
+                sourceProp.setContents(item);
+            }
+
+            c.say("pack full");
+            return ExitCode.BLOCKED;
+        }
+
         c.materialOut = new Material.OfItem(item);
         c.say("Thrall takes " + item.name() + ".");
         return ExitCode.SUCCESS;
