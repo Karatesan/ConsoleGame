@@ -18,7 +18,7 @@ public final class DropVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         Item item = c.itemFromMaterialOrArg(0);
-        if (!c.thrall.inventory().remove(item)) {
+        if (item == null || !c.thrall.inventory().remove(item)) {
             c.say("not carrying that");
             return ExitCode.BLOCKED;
         }
