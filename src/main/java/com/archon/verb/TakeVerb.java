@@ -74,13 +74,10 @@ public final class TakeVerb implements Verb {
         }
 
         String owner = ownerOf(container);
-        Actor sourceActor = null;
-        EquipmentSlot sourceSlot = null;
-        Prop sourceProp = null;
 
         if (isHandContainer(container)) {
-            sourceActor = c.world.actor(owner);
-            sourceSlot = slotOf(container);
+            Actor sourceActor = c.world.actor(owner);
+            EquipmentSlot sourceSlot = slotOf(container);
             if (sourceActor == null || sourceSlot == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
@@ -97,45 +94,30 @@ public final class TakeVerb implements Verb {
                 return ExitCode.BLOCKED;
             }
         } else if (isPackContainer(container)) {
-            sourceActor = c.world.actor(owner);
-            if (sourceActor == null) {
+            Actor sourceActor = c.world.actor(owner);
+            if (sourceActor == null || !sourceActor.inventory().remove(item)) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
-
-            sourceActor.inventory().remove(item);
         } else if (isContentsContainer(container)) {
             Entity ownerEntity = c.world.get(owner);
-            sourceProp = ownerEntity instanceof Prop candidate ? candidate : null;
+            Prop sourceProp = ownerEntity instanceof Prop candidate ? candidate : null;
             if (sourceProp == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
 
-            Item removed = sourceProp.removeContents();
-            if (removed == null || removed != item) {
-                if (removed != null) {
-                    sourceProp.setContents(removed);
-                }
+            item = sourceProp.removeContents();
+            if (item == null) {
                 c.say("cannot take " + address);
                 return ExitCode.BLOCKED;
             }
-
-            item = removed;
         } else {
             c.say("cannot take " + address);
             return ExitCode.BLOCKED;
         }
 
         if (!c.thrall.inventory().addToPack(item)) {
-            if (sourceSlot != null && sourceActor != null) {
-                sourceActor.placeInSlotForSetup(sourceSlot, item);
-            } else if (sourceActor != null) {
-                sourceActor.inventory().addToPack(item);
-            } else if (sourceProp != null) {
-                sourceProp.setContents(item);
-            }
-
             c.say("pack full");
             return ExitCode.BLOCKED;
         }
