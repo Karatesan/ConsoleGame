@@ -26,9 +26,9 @@ public final class CommandManual {
                 "COMBAT",
                 "strike [target] [-a part] [-p light|normal|heavy] [-f]",
                 "1 AP (light), 2 AP (normal), 3 AP (heavy)",
-                "Strikes an adjacent enemy with the wielded weapon or bare limbs.\n"
+                "Strikes an adjacent enemy with the equipped weapon or bare limbs.\n"
                         + "If target is omitted, automatically strikes the sole adjacent hostile.\n"
-                        + "Targeting an item held in an enemy's hand (e.g. 'strike o1/hand/right') executes\n"
+                        + "Targeting an item equipped in an enemy hand slot (e.g. 'strike o1/hand/right') executes\n"
                         + "a disarm attempt, knocking the weapon to the ground.",
                 List.of(
                         new VerbDoc.FlagDoc("-a, --aim <part>", "Aim for a body part: head, torso, arm.l, arm.r, legs."),
@@ -136,7 +136,7 @@ public final class CommandManual {
                 "take <address>",
                 "1 AP (Produces material)",
                 "Takes an item into inventory. Can take from ground (@self, @x,y), from pack\n"
-                        + "(/pack/item), or attempt to snatch a weapon held by an adjacent enemy (35% chance).\n"
+                        + "(/pack/item), or attempt to snatch an equipped weapon from an adjacent enemy (35% chance).\n"
                         + "Produces the item as piped material for downstream pipeline verbs.",
                 List.of(
                         new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
@@ -158,7 +158,7 @@ public final class CommandManual {
                 "drop [item]",
                 "1 AP (Accepts material)",
                 "Drops the specified item (or material piped in from previous stage) from the thrall's\n"
-                        + "hands or pack onto the current tile.",
+                        + "hand slots or pack onto the current tile.",
                 List.of(
                         new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
                 ),
@@ -177,7 +177,7 @@ public final class CommandManual {
                 "wield [item]",
                 "1 AP (Accepts material)",
                 "Equips an item from the thrall's pack (or material piped in) into an empty hand slot\n"
-                        + "(right hand preferred, left hand secondary). Fails if both hands are occupied.",
+                        + "(right hand preferred, left hand secondary). Fails if both hand slots are occupied.",
                 List.of(
                         new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
                 ),
@@ -215,7 +215,7 @@ public final class CommandManual {
                 "ENVIRONMENT & ELEMENTAL",
                 "siphon <source>",
                 "1 AP (Produces material)",
-                "Extracts liquid (OIL or WATER) from an item in pack, an entity's held container,\n"
+                "Extracts liquid (OIL or WATER) from an item in pack, an entity's equipped container,\n"
                         + "or a ground tile. Produces the substance as material for downstream pipeline verbs.",
                 List.of(
                         new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
@@ -254,8 +254,8 @@ public final class CommandManual {
                 "ENVIRONMENT & ELEMENTAL",
                 "ignite <target>",
                 "1 AP (Requires lit source in hand)",
-                "Ignites a flammable creature or tile (such as an oil puddle). Requires holding a lit\n"
-                        + "item (e.g. lit torch) in hand. Fire deals periodic burn damage and spreads across\n"
+                "Ignites a flammable creature or tile (such as an oil puddle). Requires a lit\n"
+                        + "item (e.g. lit torch) equipped in a hand slot. Fire deals periodic burn damage and spreads across\n"
                         + "adjacent oil puddles.",
                 List.of(
                         new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
@@ -311,7 +311,7 @@ public final class CommandManual {
                 "inspect <address>",
                 "0 AP (Free action, never counts as a line)",
                 "Deeply inspects an addressable target:\n"
-                        + "- Entity: shows HP, armor, held weapon, readied reactions, and hit probabilities / damage multipliers for each body part (head, torso, arm.l, arm.r, legs).\n"
+                        + "- Entity: shows HP, armor, equipped weapon, readied reactions, and hit probabilities / damage multipliers for each body part (head, torso, arm.l, arm.r, legs).\n"
                         + "- Item: reveals item tags and contained substances.\n"
                         + "- Tile: reveals wall/floor status, tile tags (e.g. OIL, BURNING), and ground items.",
                 List.of(),
@@ -327,11 +327,11 @@ public final class CommandManual {
 
         reg(new VerbDoc(
                 "status",
-                "Display thrall vitals, held equipment, and pack",
+                "Display thrall vitals, equipped items, and pack",
                 "FREE UTILITIES",
                 "status",
                 "0 AP (Free action, never counts as a line)",
-                "Reports the thrall's current HP, active tags, items held in right and left hands,\n"
+                "Reports the thrall's current HP, active tags, items equipped in the right and left hand slots,\n"
                         + "pack inventory capacity, and whether a missile is nocked.",
                 List.of(),
                 false,
@@ -432,7 +432,7 @@ public final class CommandManual {
                                   Example: 'o1/head' (high crit), 'o1/legs' (evasion penalty)
                   <entity>/hand/right
                   <entity>/hand/left
-                                  Target held item for a disarm attack or snatch attempt.
+                                  Target an item equipped in a hand slot for a disarm attack or snatch attempt.
                                   Example: 'strike o1/hand/right', 'take o1/hand/right'
                 """);
 

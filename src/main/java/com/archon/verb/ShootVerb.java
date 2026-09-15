@@ -6,13 +6,26 @@ import com.archon.model.Entity;
 import com.archon.system.combat.CombatEngine;
 
 public final class ShootVerb implements Verb {
-    @Override public String name() { return "shoot"; }
-    @Override public String help() { return "shoot <target> [-a part] — 2 AP. Requires nocked."; }
-    @Override public int apCost(Ast.Invocation inv) { return 2; }
+    @Override
+    public String name() {
+        return "shoot";
+    }
+
+    @Override
+    public String help() {
+        return "shoot <target> [-a part] — 2 AP. Requires nocked.";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return 2;
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        if (c.inv.arg(0) == null) return Check.invalid("shoot needs a target", "try: scan");
+        if (c.inv.arg(0) == null) {
+            return Check.invalid("shoot needs a target", "try: scan");
+        }
         return Check.ok();
     }
 
@@ -37,16 +50,21 @@ public final class ShootVerb implements Verb {
                 c.world.dice,
                 c.world,
                 c.thrall,
-                e,
+                target,
                 part
         );
 
         if (!result.hit()) {
-            c.say("Arrow flies wide of " + e.name + ".");
+            c.say("Arrow flies wide of " + target.name() + ".");
             return ExitCode.MISS;
         }
-        c.say("Arrow strikes " + e.name + "'s " + part.path + ". " + result.damage() + " dmg.");
-        if (result.killed()) { c.say(e.name + " falls."); return ExitCode.SUCCESS; }
+
+        c.say("Arrow strikes " + target.name() + "'s " + part.path + ". " + result.damage() + " dmg.");
+        if (result.killed()) {
+            c.say(target.name() + " falls.");
+            return ExitCode.SUCCESS;
+        }
+
         return ExitCode.PARTIAL;
     }
 }

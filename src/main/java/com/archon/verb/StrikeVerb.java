@@ -5,15 +5,26 @@ import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
-import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
 
 import java.util.List;
 
 public final class StrikeVerb implements Verb {
-    @Override public String name() { return "strike"; }
-    @Override public String help() { return "strike [target] [-a part] [-p light|normal|heavy] [-f] — 1/2/3 AP."; }
-    @Override public int apCost(Ast.Invocation inv) { return VerbHelpers.powerAp(inv, 2); }
+
+    @Override
+    public String name() {
+        return "strike";
+    }
+
+    @Override
+    public String help() {
+        return "strike [target] [-a part] [-p light|normal|heavy] [-f] — 1/2/3 AP.";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return VerbHelpers.powerAp(inv, 2);
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
@@ -35,21 +46,40 @@ public final class StrikeVerb implements Verb {
 
     private boolean aimPartInvalid(VerbContext c, String target) {
         String aim = c.inv.flag("aim");
-        if (aim != null && BodyPart.parse(aim) == null) return true;
-        if (target.contains("/")) {
-            String p = target.substring(target.indexOf('/') + 1);
-            return BodyPart.parse(p) == null && !p.startsWith("hand/");
+        if (aim != null && BodyPart.parse(aim) == null) {
+            return true;
         }
+
+        int slash = target.indexOf('/');
+        if (slash >= 0) {
+            String part = target.substring(slash + 1);
+            return BodyPart.parse(part) == null
+                    && !part.startsWith("hand/");
+        }
+
         return false;
     }
 
     @Override
     public Check validateState(VerbContext c) {
-        String t = c.inv.arg(0) == null ? VerbHelpers.soleAdjacentHostile(c) : c.inv.arg(0);
-        Entity e = VerbHelpers.targetEntity(c, t);
-        if (e == null) {
-            Resolved r = VerbHelpers.resolve(c, t);
-            if (r instanceof Resolved.OnItem) return Check.ok(); // striking a held item
+        String target = targetArgument(c);
+        if (target == null) {
+            return Check.blocked("nothing adjacent to strike", null);
+        }
+
+        Resolved resolved = VerbHelpers.resolve(c, target);
+        Entity entity;
+
+        if (resolved instanceof Resolved.OnEntity onEntity) {
+            entity = onEntity.entity();
+        } else if (resolved instanceof Resolved.OnItem onItem) {
+            Actor owner = handContainerOwner(c, onItem);
+            if (owner == null) {
+                return Check.blocked("target is not a held item", null);
+            }
+
+            entity = owner;
+        } else {
             return Check.blocked("target not present", null);
         }
         int reach = c.thrall.mainHand() != null && c.thrall.mainHand().has(Tag.HEAVY) ? 1 : 1;
@@ -73,39 +103,83 @@ public final class StrikeVerb implements Verb {
             if (owner == null || owner.mainHand() == null) { c.say("nothing to disarm"); return ExitCode.BLOCKED; }
             CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice, c.world, owner);
             if (disarm.success()) {
-                c.say("The " + disarm.weapon().name + " is knocked from " + owner.name + "'s grip.");
+                c.say(
+                        "The " + disarm.weapon().name()
+                                + " is knocked from "
+                                + owner.name() + "'s grip."
+                );
                 return ExitCode.SUCCESS;
             }
-            c.say("The blow glances off " + owner.name + "'s weapon.");
+
+            c.say("The blow glances off " + owner.name() + "'s weapon.");
             return ExitCode.MISS;
         }
 
-        Entity e = ((Resolved.OnEntity) r).entity();
+        if (!(resolved instanceof Resolved.OnEntity onEntity)) {
+            c.say("target cannot be struck");
+            return ExitCode.BLOCKED;
+        }
+
+        Entity entity = onEntity.entity();
         BodyPart part = VerbHelpers.aimPart(c.inv, targetArg);
-        String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
+
+        String power = c.inv.flag("power");
+        if (power == null) {
+            power = "normal";
+        }
 
         CombatEngine.MeleeHitResult result = CombatEngine.resolveMelee(
                 c.world.dice,
                 c.world,
                 c.thrall,
-                e,
+                entity,
                 part,
                 power,
                 c.inv.hasFlag("force")
         );
 
         if (!result.hit()) {
-            c.say("Strike at " + e.name + "'s " + part.path + " — MISS.");
+            c.say(
+                    "Strike at " + entity.name()
+                            + "'s " + part.path + " — MISS."
+            );
             return ExitCode.MISS;
         }
 
-        c.say(String.format("%s strikes %s's %s. %d dmg.",
-                result.weapon() == null ? "Bare limb" : result.weapon().name, e.name, part.path, result.damage()));
+        c.say(String.format(
+                "%s strikes %s's %s. %d dmg.",
+                result.weapon() == null ? "Bare limb" : result.weapon().name(),
+                entity.name(),
+                part.path,
+                result.damage()
+        ));
 
         if (result.killed()) {
-            c.say(e.name + " falls.");
+            c.say(entity.name() + " falls.");
             return ExitCode.SUCCESS;
         }
+
         return ExitCode.PARTIAL;
+    }
+
+    private String targetArgument(VerbContext c) {
+        String target = c.inv.arg(0);
+        return target != null
+                ? target
+                : VerbHelpers.soleAdjacentHostile(c);
+    }
+
+    private Actor handContainerOwner(VerbContext c, Resolved.OnItem item) {
+        String container = item.container();
+        if (container == null) {
+            return null;
+        }
+
+        int handIndex = container.indexOf("/hand/");
+        if (handIndex < 0) {
+            return null;
+        }
+
+        return c.world.actor(container.substring(0, handIndex));
     }
 }

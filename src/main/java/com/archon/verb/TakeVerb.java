@@ -18,7 +18,6 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        if (c.thrall.inventory().isPackFull()) return Check.blocked("pack full (" + Inventory.PACK_MAX + ")", "drop something");
         return Check.ok();
     }
 
@@ -59,7 +58,54 @@ public final class TakeVerb implements Verb {
         if (c.thrall.inventory().isPackFull()) { c.say("pack full"); return ExitCode.BLOCKED; }
         c.thrall.inventory().addToPack(item);
         c.materialOut = new Material.OfItem(item);
-        c.say("Thrall takes " + item.name + ".");
+        c.say("Thrall takes " + item.name() + ".");
         return ExitCode.SUCCESS;
+    }
+
+    private static boolean isOwnPack(VerbContext c, String container) {
+        if ("pack".equals(container)) {
+            return true;
+        }
+
+        if (!isPackContainer(container)) {
+            return false;
+        }
+
+        Actor actor = c.world.actor(ownerOf(container));
+        return actor == c.thrall;
+    }
+
+    private static boolean isHandContainer(String container) {
+        return hasSegment(container, "hand");
+    }
+
+    private static boolean isPackContainer(String container) {
+        return "pack".equals(container) || hasSegment(container, "pack");
+    }
+
+    private static boolean isContentsContainer(String container) {
+        return hasSegment(container, "contents");
+    }
+
+    private static String ownerOf(String container) {
+        int separator = container.indexOf('/');
+        return separator < 0 ? container : container.substring(0, separator);
+    }
+
+    private static boolean hasSegment(String path, String segment) {
+        for (String part : path.split("/")) {
+            if (segment.equals(part)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static EquipmentSlot slotOf(String container) {
+        int handIndex = container.indexOf("hand/");
+        if (handIndex < 0) {
+            return null;
+        }
+        return EquipmentSlot.parse(container.substring(handIndex)).orElse(null);
     }
 }

@@ -1,7 +1,6 @@
 package com.archon.verb;
 
 import com.archon.command.Ast;
-import com.archon.model.EquipmentSlot;
 import com.archon.model.Item;
 
 public final class DropVerb implements Verb {
@@ -19,12 +18,9 @@ public final class DropVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         Item item = c.itemFromMaterialOrArg(0);
-        if (item == null) { c.say("not carrying that"); return ExitCode.BLOCKED; }
-        c.thrall.inventory().removeFromPack(item);
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            if (c.thrall.inventory().getEquipped(slot) == item) {
-                c.thrall.inventory().equip(slot, null);
-            }
+        if (item == null || !c.thrall.inventory().remove(item)) {
+            c.say("not carrying that");
+            return ExitCode.BLOCKED;
         }
         c.world.tile(c.thrall.pos()).ground.add(item);
         c.say("Thrall drops " + item.name + ".");

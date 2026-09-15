@@ -7,8 +7,15 @@ import com.archon.model.Prop;
 import com.archon.model.World;
 
 public final class InspectVerb extends FreeVerb {
-    @Override public String name() { return "inspect"; }
-    @Override public String help() { return "inspect <address> — tags, HP, hit locations. 0 AP."; }
+    @Override
+    public String name() {
+        return "inspect";
+    }
+
+    @Override
+    public String help() {
+        return "inspect <address> — tags, HP, hit locations. 0 AP.";
+    }
 
     @Override
     public ExitCode execute(VerbContext c) {
@@ -47,6 +54,13 @@ public final class InspectVerb extends FreeVerb {
                         + (t.ground.isEmpty() ? "" : ", ground " + t.ground));
             }
         }
+
+        switch (resolved) {
+            case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
+            case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
+            case Resolved.OnTile onTile -> inspectTile(c, onTile.pos());
+        }
+
         return ExitCode.SUCCESS;
     }
 }

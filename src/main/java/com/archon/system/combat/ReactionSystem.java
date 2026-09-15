@@ -12,41 +12,54 @@ public final class ReactionSystem {
     private ReactionSystem() {}
 
     /**
-     * Finds any alive, unspent readied reaction that triggers given world state and movement.
+     * Finds an alive entity with an unspent readied reaction whose
+     * trigger matches the current world state and movement.
      */
     public static Entity pendingInterrupt(World world, boolean thrallMoved) {
-        if (world.thrall == null) return null;
-        for (Entity e : world.entities.values()) {
-            if (!e.alive() || e.readied == null || e.readiedSpent) continue;
-            switch (e.readied.trigger()) {
+        if (world.thrall == null) {
+            return null;
+        }
+
+        for (Entity entity : world.entities.values()) {
+            if (!entity.alive() || entity.readied() == null || entity.isReadiedSpent()) {
+                continue;
+            }
+
+            Entity.Readied reaction = entity.readied();
+
+            switch (reaction.trigger()) {
                 case ON_ADJACENCY -> {
-                    if (e.pos.chebyshev(world.thrall.pos) <= 1) return e;
+                    if (entity.pos().chebyshev(world.thrall.pos()) <= 1) {
+                        return entity;
+                    }
                 }
+
                 case ON_MOVEMENT_IN_LOS -> {
-                    if (thrallMoved && SpatialService.lineOfSight(world.map, e.pos, world.thrall.pos)) {
-                        return e;
+                    if (thrallMoved && SpatialService.lineOfSight(world.map, entity.pos(), world.thrall.pos())) {
+                        return entity;
                     }
                 }
             }
         }
+
         return null;
     }
 
     /**
-     * Overload using world's current line movement flag.
+     * Uses the world's current line movement flag.
      */
     public static Entity pendingInterrupt(World world) {
         return pendingInterrupt(world, world.thrallMovedThisLine);
     }
 
     /**
-     * Resolves a deterministic interrupt against the thrall.
-     * Marks reaction as spent, damages the thrall, and returns damage dealt.
+     * Resolves an interrupt returned by pendingInterrupt.
+     * Marks the reaction as spent and applies its damage to the thrall.
      */
-    public static int resolveInterrupt(World world, Entity e) {
-        e.readiedSpent = true;
-        int dmg = e.readied.damage();
-        world.thrall.takeDamage(dmg);
-        return dmg;
+    public static int resolveInterrupt(World world, Entity entity) {
+        int damage = entity.readied().damage();
+        entity.spendReadied();
+        world.thrall.takeDamage(damage);
+        return damage;
     }
 }

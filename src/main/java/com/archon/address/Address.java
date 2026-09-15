@@ -33,7 +33,7 @@ public sealed interface Address {
 
     /** Resolve a tile spec: "5,4" | "self" | "e2" | "<entityId>" */
     static Vec2 resolveTileSpec(String spec, World w) {
-        if (spec.equalsIgnoreCase("self")) return w.thrall.pos;
+        if (spec.equalsIgnoreCase("self")) return w.thrall.pos();
 
         if (spec.contains(",")) {
             String[] p = spec.split(",");
@@ -45,11 +45,11 @@ public sealed interface Address {
         Vec2 d = Vec2.dir(letters);
         if (d != null) {
             int n = digits.isEmpty() ? 1 : Integer.parseInt(digits);
-            return new Vec2(w.thrall.pos.x() + d.x() * n, w.thrall.pos.y() + d.y() * n);
+            return new Vec2(w.thrall.pos().x() + d.x() * n, w.thrall.pos().y() + d.y() * n);
         }
 
         Entity e = w.get(spec);
-        if (e != null) return e.pos;
+        if (e != null) return e.pos();
 
         throw new IllegalArgumentException(
                 "unknown tile spec \"" + spec + "\" — use @x,y, @self, @e2, or @<entityId>");
