@@ -2,10 +2,8 @@ package com.archon.verb;
 
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
-import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
-import com.archon.model.World;
 
 public final class IgniteVerb implements Verb {
     @Override
@@ -57,30 +55,32 @@ public final class IgniteVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        if (resolved instanceof Resolved.Entity entityResolved) {
-            Entity entity = entityResolved.entity();
+        if (resolved instanceof Resolved.Entity entity) {
             if (!entity.has(Tag.FLAMMABLE)) {
                 c.say(entity.name() + " will not catch.");
                 return ExitCode.MISS;
             }
 
-            entity.ignite();
+            entity.model().ignite();
             c.say(entity.name() + " catches fire.");
             return ExitCode.SUCCESS;
         }
 
-        if (resolved instanceof Resolved.Tile tileResolved) {
-            Vec2 at = tileResolved.pos();
-            World.Tile tile = c.world.tile(at);
+        if (resolved instanceof Resolved.Tile tile) {
+            Vec2 at = tile.pos();
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
                 return ExitCode.MISS;
             }
 
-            tile.applyTag(Tag.BURNING);
-            Entity occupant = c.world.entityAt(at);
-            if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
-                occupant.ignite();
+            tile.model().applyTag(Tag.BURNING);
+
+            var occupantModel = c.world.entityAt(at);
+            if (occupantModel != null) {
+                Resolved.Entity occupant = new Resolved.Entity(occupantModel);
+                if (occupant.has(Tag.FLAMMABLE)) {
+                    occupant.model().ignite();
+                }
             }
 
             c.say("Fire takes hold at " + at + ".");
