@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public abstract class Entity {
@@ -19,7 +20,15 @@ public abstract class Entity {
     /**
      * A deterministic, visible reaction. Fires at most once per round.
      */
-    public record Readied(Trigger trigger, String description, int damage) {}
+    public record Readied(Trigger trigger, String description, int damage) {
+        public Readied {
+            Objects.requireNonNull(trigger, "trigger must not be null");
+            Objects.requireNonNull(description, "description must not be null");
+            if (damage < 0) {
+                throw new IllegalArgumentException("damage must not be negative");
+            }
+        }
+    }
 
     private final String id;
     private final String name;
@@ -32,14 +41,13 @@ public abstract class Entity {
     private int armor;
     private int evasion;
 
-    private final Set<Tag> tags = EnumSet.noneOf(Tag.class);
-    private final Map<BodyPart, Boolean> crippled =
+    private final EnumSet<Tag> tags = EnumSet.noneOf(Tag.class);
+    private final EnumMap<BodyPart, Boolean> crippled =
             new EnumMap<>(BodyPart.class);
 
     private Readied readied;
     private boolean readiedSpent;
     private boolean guarded;
-    private Item held;
     private boolean identified;
 
     protected Entity(
@@ -48,109 +56,53 @@ public abstract class Entity {
             char glyph,
             Kind kind,
             Vec2 pos,
-            int hp
+            int hp,
+            int armor,
+            int evasion
     ) {
-        this.id = id;
-        this.name = name;
+        this.id = Objects.requireNonNull(id, "id must not be null");
+        this.name = Objects.requireNonNull(name, "name must not be null");
         this.glyph = glyph;
-        this.kind = kind;
-        this.pos = pos;
+        this.kind = Objects.requireNonNull(kind, "kind must not be null");
+        this.pos = Objects.requireNonNull(pos, "pos must not be null");
+
+        if (hp < 0) {
+            throw new IllegalArgumentException("hp must not be negative");
+        }
+
         this.hp = hp;
         this.maxHp = hp;
+        this.armor = armor;
+        this.evasion = evasion;
     }
 
-    // ---------- Domain Methods ----------
-
-    public boolean alive() {
-        return hp > 0;
+    public String id() {
+        return id;
     }
 
-    public boolean has(Tag tag) {
-        return tags.contains(tag);
+    public String name() {
+        return name;
     }
 
-    public Entity with(Tag... tags) {
-        Collections.addAll(this.tags, tags);
-        return this;
+    public char glyph() {
+        return glyph;
     }
 
-    public Entity ready(Trigger trigger, String description, int damage) {
-        this.readied = new Readied(trigger, description, damage);
-        this.readiedSpent = false;
-        return this;
+    public Kind kind() {
+        return kind;
     }
 
-    public void clearReadied() {
-        this.readied = null;
-        this.readiedSpent = false;
+    public Vec2 pos() {
+        return pos;
     }
 
-    public boolean canReact() {
-        return alive() && readied != null && !readiedSpent;
+    public int hp() {
+        return hp;
     }
 
-    public void spendReaction() {
-        this.readiedSpent = true;
+    public int maxHp() {
+        return maxHp;
     }
-
-    public void resetReaction() {
-        this.readiedSpent = false;
-    }
-
-    public void resetRoundState() {
-        this.guarded = false;
-        this.readiedSpent = false;
-    }
-
-    public int takeDamage(int amount) {
-        this.hp -= amount;
-        return this.hp;
-    }
-
-    public int heal(int amount) {
-        this.hp = Math.min(this.maxHp, this.hp + amount);
-        return this.hp;
-    }
-
-    public void ignite() {
-        tags.add(Tag.BURNING);
-    }
-
-    public void extinguish() {
-        tags.remove(Tag.BURNING);
-    }
-
-    public Item disarm() {
-        Item previous = this.held;
-        this.held = null;
-        return previous;
-    }
-
-    public void applyTag(Tag tag) {
-        tags.add(tag);
-    }
-
-    public void removeTag(Tag tag) {
-        tags.remove(tag);
-    }
-
-    public boolean isCrippled(BodyPart part) {
-        return Boolean.TRUE.equals(crippled.get(part));
-    }
-
-    public void setCrippled(BodyPart part, boolean value) {
-        crippled.put(part, value);
-    }
-
-    public void cripple(BodyPart part) {
-        setCrippled(part, true);
-    }
-
-    public void restoreBodyPart(BodyPart part) {
-        setCrippled(part, false);
-    }
-
-    // ---------- Actor-style Accessors ----------
 
     public int armor() {
         return armor;
@@ -160,59 +112,78 @@ public abstract class Entity {
         return evasion;
     }
 
-    public Readied readied() {
-        return readied;
+    public boolean alive() {
+        return hp > 0;
+    }
+
+    public Set<Tag> tags() {
+        return Collections.unmodifiableSet(tags);
     }
 
     public Map<BodyPart, Boolean> crippled() {
         return Collections.unmodifiableMap(crippled);
     }
 
-    // ---------- Getters and Setters ----------
-
-    public String getId() {
-        return id;
+    public boolean has(Tag tag) {
+        return tags.contains(tag);
     }
 
-    public String getName() {
-        return name;
+    public boolean isIdentified() {
+        return identified;
     }
 
-    public char getGlyph() {
-        return glyph;
+    public boolean isGuarded() {
+        return guarded;
     }
 
-    public Kind getKind() {
-        return kind;
+    public Readied readied() {
+        return readied;
     }
 
-    public Vec2 getPos() {
-        return pos;
+    public boolean isReadiedSpent() {
+        return readiedSpent;
     }
 
-    public void setPos(Vec2 pos) {
-        this.pos = pos;
+    public Entity with(Tag... tags) {
+        Objects.requireNonNull(tags, "tags must not be null");
+        for (Tag tag : tags) {
+            this.tags.add(Objects.requireNonNull(tag, "tag must not be null"));
+        }
+        return this;
     }
 
-    public int getHp() {
+    public Entity ready(Trigger trigger, String description, int damage) {
+        this.readied = new Readied(trigger, description, damage);
+        this.readiedSpent = false;
+        return this;
+    }
+
+    public void moveTo(Vec2 pos) {
+        this.pos = Objects.requireNonNull(pos, "pos must not be null");
+    }
+
+    public int takeDamage(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("damage amount must not be negative");
+        }
+        hp -= amount;
         return hp;
     }
 
-    public void setHp(int hp) {
-        this.hp = hp;
-    }
-
-    public int getMaxHp() {
-        return maxHp;
+    public int heal(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("healing amount must not be negative");
+        }
+        hp = Math.min(maxHp, hp + amount);
+        return hp;
     }
 
     public void setMaxHp(int maxHp) {
+        if (maxHp < 0) {
+            throw new IllegalArgumentException("max hp must not be negative");
+        }
         this.maxHp = maxHp;
-    }
-
-    public int getArmor() {
-        // Dispatches to Actor.armor() when this entity is an Actor.
-        return armor();
+        this.hp = Math.min(this.hp, maxHp);
     }
 
     public void setArmor(int armor) {
@@ -223,52 +194,37 @@ public abstract class Entity {
         this.evasion = evasion;
     }
 
-    public Set<Tag> getTags() {
-        return tags;
-    }
-
-    public Map<BodyPart, Boolean> getCrippled() {
-        return crippled;
-    }
-
-    public Readied getReadied() {
-        return readied();
-    }
-
-    public void setReadied(Readied readied) {
-        this.readied = readied;
-    }
-
-    public boolean isReadiedSpent() {
-        return readiedSpent;
-    }
-
-    public void setReadiedSpent(boolean readiedSpent) {
-        this.readiedSpent = readiedSpent;
-    }
-
-    public boolean isGuarded() {
-        return guarded;
-    }
-
     public void setGuarded(boolean guarded) {
         this.guarded = guarded;
     }
 
-    public Item getHeld() {
-        return held;
+    public void spendReadied() {
+        readiedSpent = true;
     }
 
-    public void setHeld(Item held) {
-        this.held = held;
+    public void resetRoundState() {
+        guarded = false;
+        readiedSpent = false;
     }
 
-    public boolean isIdentified() {
-        return identified;
+    public void identify() {
+        identified = true;
     }
 
-    public void setIdentified(boolean identified) {
-        this.identified = identified;
+    public void ignite() {
+        tags.add(Tag.BURNING);
+    }
+
+    public void extinguish() {
+        tags.remove(Tag.BURNING);
+    }
+
+    public void applyTag(Tag tag) {
+        tags.add(Objects.requireNonNull(tag, "tag must not be null"));
+    }
+
+    public void removeTag(Tag tag) {
+        tags.remove(Objects.requireNonNull(tag, "tag must not be null"));
     }
 
     @Override
