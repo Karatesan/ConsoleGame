@@ -49,8 +49,8 @@ public final class VerbHelpers {
     }
 
     public static String soleAdjacentHostile(VerbContext c) {
-        List<Entity> adj = c.world.hostilesAdjacentTo(c.thrall.getPos());
-        return adj.size() == 1 ? adj.get(0).id() : null;
+        List<Entity> adjacentHostiles = c.world.hostilesAdjacentTo(c.thrall.getPos());
+        return adjacentHostiles.size() == 1 ? adjacentHostiles.get(0).id() : null;
     }
 
     public static void spill(VerbContext c, Vec2 at, Tag substance) {
