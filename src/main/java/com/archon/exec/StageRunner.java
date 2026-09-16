@@ -5,6 +5,7 @@ import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.Actor;
 import com.archon.model.World;
+import com.archon.system.ReactionSystem;
 import com.archon.verb.ExitCode;
 
 import java.util.List;
@@ -70,9 +71,9 @@ public final class StageRunner {
                 }
 
                 // 7b. interrupt check at the stage boundary
-                Actor source = world.pendingInterrupt();
+                Actor source = ReactionSystem.pendingInterrupt(world);
                 if (source != null) {
-                    int dmg = world.resolveInterrupt(source);
+                    int dmg = ReactionSystem.resolveInterrupt(world, source);
                     bus.post(new GameEvent.InterruptFired(source.id(), source.readied().description(), dmg));
                     charged += cost / 2;
                     breakStage = i + 1;
