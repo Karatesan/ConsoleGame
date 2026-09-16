@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.model.Item;
@@ -39,7 +40,7 @@ public final class VerbContext {
             return item;
         }
 
-        Resolved resolved = VerbHelpers.resolve(world, inv.arg(argIndex)).found();
+        Resolved resolved = VerbHelpers.found(VerbHelpers.resolve(this, inv.arg(argIndex)));
         if (resolved instanceof Resolved.PackedItem packedItem
                 && packedItem.owner() == thrall) {
             return packedItem.item();
