@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 
 public final class LsVerb extends FreeVerb {
@@ -9,15 +10,16 @@ public final class LsVerb extends FreeVerb {
     @Override
     public ExitCode execute(VerbContext c) {
         String a = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
-        Resolved r = VerbHelpers.resolve(c, a);
-        if (r instanceof Resolved.OnItem oi && "pack".equals(oi.container())) {
-            c.say(c.thrall.inventory().isPackEmpty() ? "(empty)" :
-                    String.join("\n", c.thrall.inventory().pack().stream()
+        Resolution resolution = VerbHelpers.resolve(c, a);
+        Resolved target = VerbHelpers.found(resolution);
+        if (target instanceof Resolved.PackRoot packRoot) {
+            c.say(packRoot.owner().inventory().isPackEmpty() ? "(empty)" :
+                    String.join("\n", packRoot.owner().inventory().pack().stream()
                             .map(i -> "  " + i.id() + "  " + i.tags()).toList()));
             return ExitCode.SUCCESS;
         }
-        if (r instanceof Resolved.OnTile ot) {
-            c.say(c.world.tile(ot.pos()).ground().toString());
+        if (target instanceof Resolved.TileTarget tileTarget) {
+            c.say(c.world.tile(tileTarget.pos()).ground().toString());
             return ExitCode.SUCCESS;
         }
         c.say("nothing to list at " + a);
