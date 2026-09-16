@@ -52,6 +52,7 @@ public final class SimulationSystem {
                 actor.resetRoundState();
             }
         }
+
         if (world.thrall.has(Tag.BURNING)) {
             world.thrall.takeDamage(3);
             log.add("Thrall burns for 3.");
