@@ -1,10 +1,11 @@
 package com.archon.verb;
 
-import com.archon.address.Resolved;
+import com.archon.address.Resolution;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.EquipmentSlot;
 import com.archon.system.combat.CombatEngine;
 import com.archon.system.spatial.SpatialService;
 
@@ -30,30 +31,35 @@ public final class StrikeVerb implements Verb {
             return Check.ok();
         }
 
-        if (aimPartInvalid(c, target)) {
+        if (aimPartInvalid(c)) {
             return Check.invalid(
-                    "no such hit location on " + target,
+                    "no such hit location",
                     "valid: head, torso, arm.l, arm.r, legs"
             );
         }
 
-        if (VerbHelpers.resolve(c, target) == null) {
+        Resolution resolution = VerbHelpers.resolve(c, target);
+        if (resolution instanceof Resolution.Failure) {
             return Check.invalid("unknown target \"" + target + "\"", "try: scan");
         }
 
         return Check.ok();
     }
 
-    private boolean aimPartInvalid(VerbContext c, String target) {
+    private boolean aimPartInvalid(VerbContext c) {
         String aim = c.inv.flag("aim");
-        if (aim != null && BodyPart.parse(aim) == null) return true;
+        return aim != null && BodyPart.parse(aim) == null;
+    }
 
-        if (target.contains("/")) {
-            String part = target.substring(target.indexOf('/') + 1);
-            return BodyPart.parse(part) == null && !part.startsWith("hand/");
+    private boolean isHandSlot(EquipmentSlot slot) {
+        return slot == EquipmentSlot.HAND_LEFT || slot == EquipmentSlot.HAND_RIGHT;
+    }
+
+    private Check validateEntityTarget(VerbContext c, Entity entity) {
+        if (entity.pos().chebyshev(c.thrall.pos()) > 1) {
+            return Check.blocked(entity.id() + " out of reach", "step closer first");
         }
-
-        return false;
+        return Check.ok();
     }
 
     private String targetArg(VerbContext c) {
@@ -67,28 +73,26 @@ public final class StrikeVerb implements Verb {
     @Override
     public Check validateState(VerbContext c) {
         String target = targetArg(c);
-        Resolved resolved = VerbHelpers.resolve(c, target);
+        Resolution resolution = VerbHelpers.resolve(c, target);
 
-        if (resolved instanceof Resolved.OnEntity onEntity) {
-            Entity entity = onEntity.entity();
-            if (entity.pos().chebyshev(c.thrall.pos()) > 1) {
-                return Check.blocked(entity.id() + " out of reach", "step closer first");
-            }
-            return Check.ok();
+        if (resolution instanceof Resolution.EntityTarget entityTarget) {
+            return validateEntityTarget(c, entityTarget.entity());
         }
 
-        if (resolved instanceof Resolved.OnItem onItem
-                && onItem.container() != null
-                && onItem.container().contains("/hand/")) {
-            String ownerId = onItem.container().substring(0, onItem.container().indexOf("/hand/"));
-            Actor owner = c.world.actor(ownerId);
-            if (owner == null || owner.mainHand() == null) {
-                return Check.blocked("nothing to disarm", null);
-            }
-            if (owner.pos().chebyshev(c.thrall.pos()) > 1) {
-                return Check.blocked(owner.id() + " out of reach", "step closer first");
-            }
-            return Check.ok();
+        if (resolution instanceof Resolution.BodyTarget bodyTarget) {
+            return validateEntityTarget(c, bodyTarget.entity());
+        }
+
+        if (resolution instanceof Resolution.EquippedItem equippedItem
+                && equippedItem.owner() instanceof Actor owner
+                && isHandSlot(equippedItem.slot())) {
+            return validateEntityTarget(c, owner);
+        }
+
+        if (resolution instanceof Resolution.EmptyEquipmentSlot emptySlot
+                && emptySlot.owner() instanceof Actor
+                && isHandSlot(emptySlot.slot())) {
+            return Check.blocked("nothing to disarm", null);
         }
 
         return Check.blocked("target not present", null);
@@ -102,22 +106,22 @@ public final class StrikeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved resolved = VerbHelpers.resolve(c, targetArg);
-        if (resolved == null) {
+        Resolution resolution = VerbHelpers.resolve(c, targetArg);
+        if (resolution instanceof Resolution.Failure) {
             c.say(targetArg + " is no longer there");
             return ExitCode.BLOCKED;
         }
 
-        if (resolved instanceof Resolved.OnItem onItem
-                && onItem.container() != null
-                && onItem.container().contains("/hand/")) {
-            String ownerId = onItem.container().substring(0, onItem.container().indexOf("/hand/"));
-            Actor owner = c.world.actor(ownerId);
-            if (owner == null || owner.mainHand() == null) {
-                c.say("nothing to disarm");
-                return ExitCode.BLOCKED;
-            }
+        if (resolution instanceof Resolution.EmptyEquipmentSlot emptySlot
+                && emptySlot.owner() instanceof Actor
+                && isHandSlot(emptySlot.slot())) {
+            c.say("nothing to disarm");
+            return ExitCode.BLOCKED;
+        }
 
+        if (resolution instanceof Resolution.EquippedItem equippedItem
+                && equippedItem.owner() instanceof Actor owner
+                && isHandSlot(equippedItem.slot())) {
             CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner);
             if (disarm.success()) {
                 c.say("The " + disarm.weapon().name() + " is knocked from " + owner.name() + "'s grip.");
@@ -128,13 +132,21 @@ public final class StrikeVerb implements Verb {
             return ExitCode.MISS;
         }
 
-        if (!(resolved instanceof Resolved.OnEntity onEntity)) {
+        Entity target;
+        BodyPart part;
+        if (resolution instanceof Resolution.EntityTarget entityTarget) {
+            target = entityTarget.entity();
+            part = VerbHelpers.aimPart(c.inv, targetArg);
+        } else if (resolution instanceof Resolution.BodyTarget bodyTarget) {
+            target = bodyTarget.entity();
+            part = c.inv.flag("aim") == null
+                    ? bodyTarget.bodyPart()
+                    : VerbHelpers.aimPart(c.inv, targetArg);
+        } else {
             c.say("target not present");
             return ExitCode.BLOCKED;
         }
 
-        Entity target = onEntity.entity();
-        BodyPart part = VerbHelpers.aimPart(c.inv, targetArg);
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
 
         CombatEngine.MeleeHitResult result = CombatEngine.resolveMelee(
