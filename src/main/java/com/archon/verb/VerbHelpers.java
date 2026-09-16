@@ -2,7 +2,11 @@ package com.archon.verb;
 
 import com.archon.address.Address;
 import com.archon.address.Resolution;
+import com.archon.address.Resolution.Failure;
+import com.archon.address.Resolution.Found;
 import com.archon.address.Resolved;
+import com.archon.address.Resolved.BodyTarget;
+import com.archon.address.Resolved.EntityTarget;
 import com.archon.command.Ast;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
@@ -22,38 +26,34 @@ public final class VerbHelpers {
         try {
             return Resolved.resolve(Address.parse(raw), c.world);
         } catch (IllegalArgumentException exception) {
-            return new Resolution.Failure(
+            return new Failure(
                     Resolution.Reason.INVALID_SYNTAX,
                     exception.getMessage());
         }
     }
 
     public static Resolved found(Resolution resolution) {
-        return resolution instanceof Resolution.Found found ? found.target() : null;
+        return resolution instanceof Found found ? found.target() : null;
     }
 
     public static String failureDetail(Resolution resolution) {
-        return resolution instanceof Resolution.Failure failure ? failure.detail() : null;
+        return resolution instanceof Failure failure ? failure.detail() : null;
     }
 
     public static Entity targetEntity(VerbContext c, String raw) {
         Resolved target = found(resolve(c, raw));
-        if (target instanceof Resolved.EntityTarget entityTarget) {
+        if (target instanceof EntityTarget entityTarget) {
             return entityTarget.entity();
         }
-        if (target instanceof Resolved.BodyTarget bodyTarget) {
+        if (target instanceof BodyTarget bodyTarget) {
             return bodyTarget.entity();
         }
         return null;
     }
 
     public static BodyPart aimPart(Ast.Invocation inv, String targetArg) {
-        String aim = inv.flag("aim");
-        if (aim != null) {
-            BodyPart p = BodyPart.parse(aim);
-            if (p != null) return p;
-        }
-        return BodyPart.TORSO;
+        BodyPart aim = inv.flag("aim");
+        return aim != null ? aim : BodyPart.TORSO;
     }
 
     public static int powerAp(Ast.Invocation inv, int base) {
