@@ -43,16 +43,18 @@ public final class InspectVerb extends FreeVerb {
 
         output.append("\n  Tags: ").append(entity.tags());
 
-        if (entity instanceof Actor actor && actor.mainHand() != null) {
-            output.append("\n  Holding: ").append(actor.mainHand().name());
-        }
+        if (entity instanceof Actor actor) {
+            if (actor.mainHand() != null) {
+                output.append("\n  Holding: ").append(actor.mainHand().name());
+            }
 
-        if (entity.readied() != null && !entity.isReadiedSpent()) {
-            output.append("\n  READIED: ")
-                    .append(entity.readied().description())
-                    .append(" (")
-                    .append(entity.readied().damage())
-                    .append(" dmg)");
+            if (actor.readied() != null && !actor.isReadiedSpent()) {
+                output.append("\n  READIED: ")
+                        .append(actor.readied().description())
+                        .append(" (")
+                        .append(actor.readied().damage())
+                        .append(" dmg)");
+            }
         }
 
         for (BodyPart part : BodyPart.values()) {
