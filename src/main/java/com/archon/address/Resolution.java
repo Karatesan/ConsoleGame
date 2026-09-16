@@ -25,6 +25,7 @@ public sealed interface Resolution permits Resolution.Found, Resolution.Failure 
         OUT_OF_BOUNDS,
         UNKNOWN_ENTITY,
         DEAD_ENTITY,
-        INVALID_PATH
+        INVALID_PATH,
+        UNSUPPORTED_LAYER
     }
 }
