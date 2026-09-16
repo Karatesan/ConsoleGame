@@ -41,9 +41,9 @@ public final class TakeVerb implements Verb {
     public Check validateState(VerbContext c) {
         Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
 
-        if ((resolution instanceof Resolution.PackedItem packedItem
+        if ((resolution instanceof Resolution.Resolved.PackedItem packedItem
                 && packedItem.owner() == c.thrall)
-                || (resolution instanceof Resolution.EquippedItem equippedItem
+                || (resolution instanceof Resolution.Resolved.EquippedItem equippedItem
                 && equippedItem.owner() == c.thrall)) {
             return Check.ok();
         }
@@ -63,19 +63,19 @@ public final class TakeVerb implements Verb {
         String address = c.inv.arg(0);
         Resolution resolution = VerbHelpers.resolve(c, address);
 
-        if (resolution instanceof Resolution.PackedItem packedItem) {
+        if (resolution instanceof Resolution.Resolved.PackedItem packedItem) {
             return takeInventoryItem(c, address, packedItem.owner(), packedItem.item());
         }
 
-        if (resolution instanceof Resolution.EquippedItem equippedItem) {
+        if (resolution instanceof Resolution.Resolved.EquippedItem equippedItem) {
             return takeInventoryItem(c, address, equippedItem.owner(), equippedItem.item());
         }
 
-        if (resolution instanceof Resolution.PropContents propContents) {
+        if (resolution instanceof Resolution.Resolved.PropContents propContents) {
             return takePropContents(c, address, propContents.prop(), propContents.item());
         }
 
-        if (resolution instanceof Resolution.TileTarget tileTarget) {
+        if (resolution instanceof Resolution.Resolved.TileTarget tileTarget) {
             return takeGroundItem(c, tileTarget);
         }
 
@@ -89,10 +89,6 @@ public final class TakeVerb implements Verb {
             Actor owner,
             Item item
     ) {
-        /*
-         * An item already owned by the thrall is a valid pipeline source.
-         * Do not move it between inventory locations.
-         */
         if (owner == c.thrall) {
             c.materialOut = new Material.OfItem(item);
             c.say("Thrall draws " + item.name() + ".");
@@ -138,7 +134,7 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takeGroundItem(
             VerbContext c,
-            Resolution.TileTarget tileTarget
+            Resolution.Resolved.TileTarget tileTarget
     ) {
         if (c.thrall.inventory().isPackFull()) {
             c.say("pack full");
@@ -165,5 +161,4 @@ public final class TakeVerb implements Verb {
         c.say("Thrall takes " + item.name() + ".");
         return ExitCode.SUCCESS;
     }
-
 }
