@@ -1,6 +1,6 @@
 package com.archon.verb;
 
-import com.archon.address.Address;
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
@@ -42,8 +42,16 @@ public final class SiphonVerb implements Verb {
     @Override
     public Check validateState(VerbContext c) {
         String source = c.inv.arg(0);
-        Tag substance = sourceSubstance(c, source);
+        Resolution resolution = VerbHelpers.resolve(c, source);
 
+        if (!(resolution instanceof Resolved target)) {
+            return Check.blocked(
+                    "nothing to siphon from " + source,
+                    "try: inspect " + source
+            );
+        }
+
+        Tag substance = sourceSubstance(c, target);
         if (substance == null) {
             return Check.blocked(
                     "nothing to siphon from " + source,
@@ -51,7 +59,19 @@ public final class SiphonVerb implements Verb {
             );
         }
 
-        Entity holder = holderOf(c, source);
+        Entity holder = null;
+        if (target instanceof Resolved.PackedItem packedItem) {
+            holder = packedItem.owner();
+        } else if (target instanceof Resolved.EquippedItem equippedItem) {
+            holder = equippedItem.owner();
+        } else if (target instanceof Resolved.PropContents propContents) {
+            holder = propContents.prop();
+        } else if (target instanceof Resolved.EntityTarget entityTarget) {
+            holder = entityTarget.entity();
+        } else if (target instanceof Resolved.BodyTarget bodyTarget) {
+            holder = bodyTarget.entity();
+        }
+
         if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
             return Check.blocked(holder.id() + " out of reach", "step closer");
         }
@@ -61,7 +81,10 @@ public final class SiphonVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Tag substance = sourceSubstance(c, c.inv.arg(0));
+        Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
+        Tag substance = resolution instanceof Resolved target
+                ? sourceSubstance(c, target)
+                : null;
 
         if (substance == null) {
             c.say("nothing to siphon");
@@ -73,15 +96,21 @@ public final class SiphonVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static Tag sourceSubstance(VerbContext c, String address) {
-        Resolved resolved = VerbHelpers.resolve(c, address);
-
-        if (resolved instanceof Resolved.OnItem onItem) {
-            return substanceOf(onItem.item());
+    private static Tag sourceSubstance(VerbContext c, Resolved target) {
+        if (target instanceof Resolved.PackedItem packedItem) {
+            return substanceOf(packedItem.item());
         }
 
-        if (resolved instanceof Resolved.OnEntity onEntity) {
-            Entity entity = onEntity.entity();
+        if (target instanceof Resolved.EquippedItem equippedItem) {
+            return substanceOf(equippedItem.item());
+        }
+
+        if (target instanceof Resolved.PropContents propContents) {
+            return substanceOf(propContents.item());
+        }
+
+        if (target instanceof Resolved.EntityTarget entityTarget) {
+            Entity entity = entityTarget.entity();
 
             if (entity instanceof Actor actor) {
                 return substanceOf(actor.mainHand());
@@ -92,8 +121,20 @@ public final class SiphonVerb implements Verb {
             }
         }
 
-        if (resolved instanceof Resolved.OnTile onTile) {
-            GameMap.Tile tile = c.world.tile(onTile.pos());
+        if (target instanceof Resolved.BodyTarget bodyTarget) {
+            Entity entity = bodyTarget.entity();
+
+            if (entity instanceof Actor actor) {
+                return substanceOf(actor.mainHand());
+            }
+
+            if (entity instanceof Prop prop) {
+                return substanceOf(prop.contents());
+            }
+        }
+
+        if (target instanceof Resolved.TileTarget tileTarget) {
+            GameMap.Tile tile = c.world.tile(tileTarget.pos());
 
             if (tile.has(Tag.OIL)) {
                 return Tag.OIL;
@@ -109,15 +150,5 @@ public final class SiphonVerb implements Verb {
 
     private static Tag substanceOf(Item item) {
         return item == null ? null : item.substance();
-    }
-
-    private static Entity holderOf(VerbContext c, String address) {
-        Address parsed = Address.parse(address);
-
-        if (parsed instanceof Address.EntityAddr entityAddress) {
-            return c.world.get(entityAddress.id());
-        }
-
-        return null;
     }
 }
