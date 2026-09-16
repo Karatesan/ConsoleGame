@@ -4,10 +4,10 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.Entity;
+import com.archon.model.GameMap;
 import com.archon.model.Inventory;
 import com.archon.model.Item;
 import com.archon.model.Prop;
-import com.archon.model.World;
 
 public final class TakeVerb implements Verb {
     @Override
@@ -101,7 +101,7 @@ public final class TakeVerb implements Verb {
         Entity owner = c.world.get(ownerId);
 
         if (owner instanceof Actor actor) {
-            if (!c.world.dice.chance(35)) {
+            if (!c.world.dice().chance(35)) {
                 c.say("Snatch fails.");
                 return ExitCode.MISS;
             }
@@ -135,13 +135,13 @@ public final class TakeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        World.Tile tile = c.world.tile(onTile.pos());
-        if (tile.ground.isEmpty()) {
+        GameMap.Tile tile = c.world.map().tile(onTile.pos());
+        if (tile.ground().isEmpty()) {
             c.say("nothing on the ground there");
             return ExitCode.BLOCKED;
         }
 
-        Item item = tile.ground.remove(0);
+        Item item = c.world.map().removeFirstGroundItem(onTile.pos());
         return addToThrallPack(c, item);
     }
 
