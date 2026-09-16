@@ -5,6 +5,7 @@ import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.Actor;
 import com.archon.model.World;
+import com.archon.system.ReactionSystem;
 import com.archon.verb.Verbs;
 
 /**
@@ -44,15 +45,15 @@ public final class SettlementManager {
             ));
         } else {
             round.spend(trace.charged());
-            Actor late = world.pendingInterrupt();
+            Actor late = ReactionSystem.pendingInterrupt(world);
             if (late != null) {
-                int dmg = world.resolveInterrupt(late);
+                int dmg = ReactionSystem.resolveInterrupt(world, late);
                 bus.post(new GameEvent.InterruptFired(late.id(), late.readied().description(), dmg));
             }
             bus.post(new GameEvent.LineComplete(trace.charged(), tax, allocation - trace.charged(), round.ap()));
         }
 
-        if (!world.thrall.alive()) {
+        if (!world.thrall().alive()) {
             bus.post(new GameEvent.ThrallDied());
             return new Executor.Outcome(
                     trace.broke() ? Executor.Kind.BROKE : Executor.Kind.COMPLETE,
