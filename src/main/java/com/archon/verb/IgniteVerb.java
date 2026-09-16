@@ -1,6 +1,9 @@
 package com.archon.verb;
 
-import com.archon.address.Resolved;
+import com.archon.address.BodyTarget;
+import com.archon.address.EntityTarget;
+import com.archon.address.Resolution;
+import com.archon.address.TileTarget;
 import com.archon.command.Ast;
 import com.archon.model.Entity;
 import com.archon.model.GameMap;
@@ -52,14 +55,15 @@ public final class IgniteVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        final Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
-        if (resolved == null) {
-            c.say("cannot resolve " + c.inv.arg(0));
+        final Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
+        final var target = VerbHelpers.found(resolution);
+        if (target == null) {
+            c.say("cannot resolve " + c.inv.arg(0) + ": " + resolution.detail());
             return ExitCode.BLOCKED;
         }
 
-        if (resolved instanceof final Resolved.OnEntity onEntity) {
-            final Entity entity = onEntity.entity();
+        if (target instanceof final EntityTarget entityTarget) {
+            final Entity entity = entityTarget.entity();
             if (!entity.has(Tag.FLAMMABLE)) {
                 c.say(entity.name() + " will not catch.");
                 return ExitCode.MISS;
@@ -69,8 +73,19 @@ public final class IgniteVerb implements Verb {
             return ExitCode.SUCCESS;
         }
 
-        if (resolved instanceof Resolved.OnTile onTile) {
-            final Vec2 at = onTile.pos();
+        if (target instanceof final BodyTarget bodyTarget) {
+            final Entity entity = bodyTarget.entity();
+            if (!entity.has(Tag.FLAMMABLE)) {
+                c.say(entity.name() + " will not catch.");
+                return ExitCode.MISS;
+            }
+            entity.ignite();
+            c.say(entity.name() + " catches fire.");
+            return ExitCode.SUCCESS;
+        }
+
+        if (target instanceof final TileTarget tileTarget) {
+            final Vec2 at = tileTarget.pos();
             final GameMap.Tile tile = c.world.tile(at);
 
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
