@@ -39,12 +39,14 @@ public final class VerbContext {
             return item;
         }
 
-        Resolved target = VerbHelpers.resolve(world, inv.arg(argIndex));
-        if (target instanceof Resolved.PackedItem packedItem && packedItem.owner() == thrall) {
+        Resolved resolved = VerbHelpers.resolve(world, inv.arg(argIndex));
+        if (resolved instanceof Resolved.PackedItem packedItem
+                && packedItem.owner() == thrall) {
             return packedItem.item();
         }
 
-        if (target instanceof Resolved.EquippedItem equippedItem && equippedItem.owner() == thrall) {
+        if (resolved instanceof Resolved.EquippedItem equippedItem
+                && equippedItem.owner() == thrall) {
             return equippedItem.item();
         }
 
