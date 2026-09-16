@@ -55,10 +55,6 @@ public final class GameMap {
         requireTile(position).wall = wall;
     }
 
-    public void setWall(int x, int y, boolean wall) {
-        setWall(new Vec2(x, y), wall);
-    }
-
     public void addTag(Vec2 position, Tag tag) {
         requireTile(position).tags.add(Objects.requireNonNull(tag, "tag"));
     }
