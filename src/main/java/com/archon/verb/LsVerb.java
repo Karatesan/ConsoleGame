@@ -2,8 +2,6 @@ package com.archon.verb;
 
 import com.archon.address.Resolved;
 
-import java.util.List;
-
 public final class LsVerb extends FreeVerb {
     @Override public String name() { return "ls"; }
     @Override public String help() { return "ls <address> — list contents. 0 AP."; }
@@ -19,7 +17,7 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
         if (r instanceof Resolved.OnTile ot) {
-            c.say(List.copyOf(c.world.tile(ot.pos()).ground()).toString());
+            c.say(c.world.tile(ot.pos()).ground().toString());
             return ExitCode.SUCCESS;
         }
         c.say("nothing to list at " + a);
