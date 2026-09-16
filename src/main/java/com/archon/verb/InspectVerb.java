@@ -4,6 +4,7 @@ import com.archon.address.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.GameMap;
 import com.archon.model.Item;
 
 public final class InspectVerb extends FreeVerb {
@@ -27,7 +28,7 @@ public final class InspectVerb extends FreeVerb {
             case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
             case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
             case Resolved.OnTile onTile -> {
-                var tile = c.world.tile(onTile.pos());
+                GameMap.Tile tile = c.world.tile(onTile.pos());
                 c.say(onTile.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
                         + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
             }
