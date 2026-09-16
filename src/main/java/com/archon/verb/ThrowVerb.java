@@ -1,7 +1,6 @@
 package com.archon.verb;
 
 import com.archon.address.Resolution;
-import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
 import com.archon.model.Vec2;
@@ -43,11 +42,10 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved resolved = ((Resolution.Success) resolution).resolved();
-        Vec2 at = switch (resolved) {
-            case Resolved.EntityTarget entity -> entity.entity().pos();
-            case Resolved.BodyTarget body -> body.body().entity().pos();
-            case Resolved.TileTarget tile -> tile.tile().pos();
+        Vec2 at = switch (resolution) {
+            case Resolution.Resolved.EntityTarget entity -> entity.entity().pos();
+            case Resolution.Resolved.BodyTarget body -> body.body().entity().pos();
+            case Resolution.Resolved.TileTarget tile -> tile.tile().pos();
             default -> {
                 c.say("cannot throw at " + targetArg);
                 yield null;
