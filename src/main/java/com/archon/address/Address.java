@@ -15,7 +15,7 @@ public sealed interface Address {
     record TileAddr(String spec, Layer layer) implements Address {
     }
 
-    public static Address parse(String source) {
+    static Address parse(String source) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException("empty address");
         }
