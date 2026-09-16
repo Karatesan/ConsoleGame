@@ -35,7 +35,6 @@ public final class Item {
         EnumSet<Tag> copiedTags = EnumSet.noneOf(Tag.class);
         copiedTags.addAll(tags);
         this.tags = copiedTags;
-
         this.substance = substance;
         this.durability = durability;
         this.damage = damage;
