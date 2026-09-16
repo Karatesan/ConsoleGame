@@ -2,24 +2,23 @@ package com.archon.model;
 
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.Objects;
 import java.util.Set;
 
 public final class Item {
     private final String id;
     private final String name;
     private final Set<Tag> tags;
-    private final int damage;
     private Tag substance;
     private int durability;
+    private final int damage;
 
     public Item(String id, String name, Set<Tag> tags, Tag substance, int durability, int damage) {
-        this.id = Objects.requireNonNull(id, "id");
-        this.name = Objects.requireNonNull(name, "name");
+        this.id = id;
+        this.name = name;
 
         EnumSet<Tag> copiedTags = EnumSet.noneOf(Tag.class);
-        copiedTags.addAll(Objects.requireNonNull(tags, "tags"));
-        this.tags = Collections.unmodifiableSet(copiedTags);
+        copiedTags.addAll(tags);
+        this.tags = copiedTags;
 
         this.substance = substance;
         this.durability = durability;
@@ -27,11 +26,10 @@ public final class Item {
     }
 
     public static Item weapon(String id, String name, int damage, int durability, Tag... tags) {
-        Objects.requireNonNull(tags, "tags");
-
         EnumSet<Tag> itemTags = EnumSet.noneOf(Tag.class);
-        Collections.addAll(itemTags, tags);
-
+        if (tags != null) {
+            Collections.addAll(itemTags, tags);
+        }
         return new Item(id, name, itemTags, null, durability, damage);
     }
 
@@ -48,7 +46,7 @@ public final class Item {
     }
 
     public Set<Tag> tags() {
-        return tags;
+        return Collections.unmodifiableSet(tags);
     }
 
     public Tag substance() {
@@ -68,16 +66,15 @@ public final class Item {
     }
 
     public Tag consumeSubstance() {
-        Tag previousSubstance = substance;
+        Tag value = substance;
         substance = null;
-        return previousSubstance;
+        return value;
     }
 
     public void wear(int amount) {
         if (amount < 0) {
-            throw new IllegalArgumentException("Wear amount cannot be negative");
+            throw new IllegalArgumentException("wear cannot be negative");
         }
-
         durability -= amount;
     }
 

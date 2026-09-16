@@ -65,7 +65,7 @@ public final class World {
 
     public Actor actor(String id) {
         Entity entity = get(id);
-        return entity instanceof Actor ? (Actor) entity : null;
+        return entity instanceof Actor actor ? actor : null;
     }
 
     public Entity entityAt(Vec2 p) {
@@ -90,8 +90,8 @@ public final class World {
         return ReactionSystem.pendingInterrupt(this);
     }
 
-    public int resolveInterrupt(Entity entity) {
-        return ReactionSystem.resolveInterrupt(this, entity);
+    public int resolveInterrupt(Entity e) {
+        return ReactionSystem.resolveInterrupt(this, e);
     }
 
     // ---------- World tick ----------

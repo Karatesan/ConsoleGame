@@ -1,16 +1,19 @@
 package com.archon.model;
 
 /**
- * Encapsulates immutable base creature attributes used during initialization.
- * Live health and defensive state are owned by the entity.
+ * Immutable creature initialization values.
+ * Live health and defenses are owned by {@link Entity}.
  */
 public record CreatureStats(int maxHp, int armor, int evasion, int strength) {
 
+    /**
+     * Creates creature initialization values with the default strength of {@code 3}.
+     *
+     * @param maxHp maximum health
+     * @param armor initial armor value
+     * @param evasion initial evasion value
+     */
     public CreatureStats(int maxHp, int armor, int evasion) {
         this(maxHp, armor, evasion, 3);
-    }
-
-    public static CreatureStats of(int maxHp, int armor, int evasion, int strength) {
-        return new CreatureStats(maxHp, armor, evasion, strength);
     }
 }

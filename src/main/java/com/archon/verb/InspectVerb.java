@@ -3,64 +3,74 @@ package com.archon.verb;
 import com.archon.address.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
-import com.archon.model.Prop;
+import com.archon.model.Entity;
+import com.archon.model.Item;
 import com.archon.model.World;
 
 public final class InspectVerb extends FreeVerb {
-    @Override
-    public String name() {
-        return "inspect";
-    }
+    @Override public String name() { return "inspect"; }
+    @Override public String help() { return "inspect <address> — tags, HP, hit locations. 0 AP."; }
 
-    @Override
-    public String help() {
-        return "inspect <address> — tags, HP, hit locations. 0 AP.";
-    }
+    @Override public ExitCode execute(VerbContext c) {
+        String address = c.inv.arg(0);
+        if (address == null) {
+            c.say("inspect what?");
+            return ExitCode.INVALID;
+        }
 
-    @Override
-    public ExitCode execute(VerbContext c) {
-        String a = c.inv.arg(0);
-        if (a == null) { c.say("inspect what?"); return ExitCode.INVALID; }
-        Resolved r = VerbHelpers.resolve(c, a);
-        if (r == null) { c.say("cannot perceive " + a); return ExitCode.INVALID; }
-        switch (r) {
-            case Resolved.OnActor oa -> {
-                Actor actor = oa.actor();
-                StringBuilder sb = new StringBuilder(
-                        actor.getName() + " \"" + actor.getId() + "\" — HP " + actor.getHp() + "/" + actor.getMaxHp() + ", Armor " + actor.getArmor());
-                sb.append("\n  Tags: ").append(actor.getTags());
-                if (actor.getHeld() != null) sb.append("\n  Holding: ").append(actor.getHeld().getName());
-                if (actor.getReadied() != null && !actor.isReadiedSpent())
-                    sb.append("\n  READIED: ").append(actor.getReadied().description())
-                            .append(" (").append(actor.getReadied().damage()).append(" dmg)");
-                for (BodyPart p : BodyPart.values())
-                    sb.append(String.format("%n  %-6s %3d%%  x%.1f", p.path,
-                            Math.max(5, 70 + p.hitMod - actor.getEvasion()), p.damageMult));
-                c.say(sb.toString());
-            }
-            case Resolved.OnProp op -> {
-                Prop prop = op.prop();
-                StringBuilder sb = new StringBuilder(
-                        prop.getName() + " \"" + prop.getId() + "\" — HP " + prop.getHp() + "/" + prop.getMaxHp() + ", Armor " + prop.getArmor());
-                sb.append("\n  Tags: ").append(prop.getTags());
-                c.say(sb.toString());
-            }
-            case Resolved.OnItem oi -> c.say(oi.item() == null ? "nothing there"
-                    : oi.item().getName() + " — tags " + oi.item().getTags()
-                    + (oi.item().getSubstance() != null ? ", contains " + oi.item().getSubstance() : ""));
-            case Resolved.OnTile ot -> {
-                World.Tile t = c.world.tile(ot.pos());
-                c.say(ot.pos() + " " + (t.wall ? "WALL" : "floor") + " — tags " + t.tags
-                        + (t.ground.isEmpty() ? "" : ", ground " + t.ground));
-            }
+        Resolved resolved = VerbHelpers.resolve(c, address);
+        if (resolved == null) {
+            c.say("cannot perceive " + address);
+            return ExitCode.INVALID;
         }
 
         switch (resolved) {
             case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
             case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
-            case Resolved.OnTile onTile -> inspectTile(c, onTile.pos());
+            case Resolved.OnTile onTile -> {
+                World.Tile tile = c.world.tile(onTile.pos());
+                c.say(onTile.pos() + " " + (tile.wall ? "WALL" : "floor") + " — tags " + tile.tags
+                        + (tile.ground.isEmpty() ? "" : ", ground " + tile.ground));
+            }
         }
 
         return ExitCode.SUCCESS;
+    }
+
+    private void inspectEntity(VerbContext c, Entity entity) {
+        StringBuilder output = new StringBuilder(entity.name() + " \"" + entity.id() + "\" — HP "
+                + entity.hp() + "/" + entity.maxHp() + ", Armor " + entity.armor());
+
+        output.append("\n  Tags: ").append(entity.tags());
+
+        if (entity instanceof Actor actor && actor.mainHand() != null) {
+            output.append("\n  Holding: ").append(actor.mainHand().name());
+        }
+
+        if (entity.readied() != null && !entity.isReadiedSpent()) {
+            output.append("\n  READIED: ")
+                    .append(entity.readied().description())
+                    .append(" (")
+                    .append(entity.readied().damage())
+                    .append(" dmg)");
+        }
+
+        for (BodyPart part : BodyPart.values()) {
+            output.append(String.format(
+                    "%n  %-6s %3d%%  x%.1f",
+                    part.path,
+                    Math.max(5, 70 + part.hitMod - entity.evasion()),
+                    part.damageMult
+            ));
+        }
+
+        c.say(output.toString());
+    }
+
+    private void inspectItem(VerbContext c, Item item) {
+        c.say(item == null
+                ? "nothing there"
+                : item.name() + " — tags " + item.tags()
+                        + (item.substance() == null ? "" : ", contains " + item.substance()));
     }
 }

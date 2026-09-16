@@ -10,73 +10,67 @@ import com.archon.model.Vec2;
 import com.archon.model.World;
 
 public sealed interface Resolved {
+    record OnEntity(Entity entity, BodyPart part) implements Resolved { }
 
-    record OnEntity(Entity entity, BodyPart part) implements Resolved {}
+    record OnItem(Item item, String container) implements Resolved { }
 
-    record OnItem(Item item, String container) implements Resolved {}
+    record OnTile(Vec2 pos, String layer) implements Resolved { }
 
-    record OnTile(Vec2 pos, String layer) implements Resolved {}
-
-    /** Returns null when the address cannot currently be resolved. */
     static Resolved resolve(Address address, World world) {
         return switch (address) {
             case Address.TileAddr tile -> {
                 Vec2 pos = Address.resolveTileSpec(tile.spec(), world);
                 yield world.inBounds(pos) ? new OnTile(pos, tile.layer()) : null;
             }
-            case Address.InventoryAddr inventory ->
-                    resolveInventory(world.thrall, inventory.path(), null);
-            case Address.EntityAddr entityAddress -> {
-                Entity entity = world.get(entityAddress.id());
-                if (entity == null || !entity.alive()) {
-                    yield null;
-                }
-                if (EquipmentSlot.parse(path).isPresent())
-                    yield new OnEntity(w.thrall, null, path);
-                yield null;
-            }
-            case Address.EntityAddr e -> {
-                Entity ent = w.get(e.id());
-                if (ent == null || !ent.alive()) yield null;
-                if (e.path() == null) yield new OnEntity(ent, null, null);
-                if (ent instanceof Prop prop && e.path().equals("contents"))
-                    yield new OnItem(prop.contents(), ent.id + "/contents");
-                if (ent instanceof Actor actor) {
-                    if (e.path().startsWith("pack")) {
-                        String rest = e.path().length() > 4 ? e.path().substring(5) : "";
-                        if (rest.isBlank()) yield new OnItem(null, ent.id + "/pack");
-                        Item it = actor.inventory().findInPack(rest);
-                        yield it == null ? null : new OnItem(it, ent.id + "/pack");
-                    }
-                    if (e.path().startsWith("hand/") || EquipmentSlot.parse(e.path()).isPresent())
-                        yield new OnEntity(actor, null, e.path());
-                }
-
-                BodyPart part = BodyPart.parse(path);
-                yield part == null ? null : new OnEntity(entity, part);
-            }
+            case Address.InventoryAddr inventory -> resolveInventory(world.thrall, inventory.path(), "self");
+            case Address.EntityAddr entityAddress -> resolveEntity(entityAddress, world);
         };
     }
 
+    private static Resolved resolveEntity(Address.EntityAddr address, World world) {
+        Entity entity = world.get(address.id());
+        if (entity == null || !entity.alive()) {
+            return null;
+        }
+
+        String path = address.path();
+        if (path == null) {
+            return new OnEntity(entity, null);
+        }
+
+        if (entity instanceof Prop prop && path.equals("contents")) {
+            return new OnItem(prop.contents(), entity.id() + "/contents");
+        }
+
+        if (entity instanceof Actor actor) {
+            Resolved inventory = resolveInventory(actor, path, entity.id());
+            if (inventory != null) {
+                return inventory;
+            }
+        }
+
+        BodyPart part = BodyPart.parse(path);
+        return part == null ? null : new OnEntity(entity, part);
+    }
+
     private static Resolved resolveInventory(Actor actor, String path, String ownerId) {
-        if (actor == null || path == null) {
+        if (path == null) {
             return null;
         }
 
         if (path.equals("pack")) {
-            return new OnItem(null, ownerId == null ? "pack" : ownerId + "/pack");
+            return new OnItem(null, ownerId.equals("self") ? "pack" : ownerId + "/pack");
         }
 
         if (path.startsWith("pack/")) {
             Item item = actor.inventory().find(path.substring("pack/".length())).orElse(null);
-            return item == null ? null : new OnItem(item, ownerId == null ? "pack" : ownerId + "/pack");
+            return item == null
+                    ? null
+                    : new OnItem(item, ownerId.equals("self") ? "pack" : ownerId + "/pack");
         }
 
         return EquipmentSlot.parse(path)
-                .map(slot -> new OnItem(
-                        actor.inventory().equipped(slot),
-                        ownerId == null ? "self/" + slot.path : ownerId + "/" + slot.path
-                ))
+                .<Resolved>map(slot -> new OnItem(actor.inventory().equipped(slot), ownerId + "/" + slot.path))
                 .orElse(null);
     }
 }

@@ -43,18 +43,17 @@ public final class WieldVerb implements Verb {
 
         EquipmentSlot slot = c.thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT) == null
                 ? EquipmentSlot.HAND_RIGHT
-                : c.thrall.inventory().equipped(EquipmentSlot.HAND_LEFT) == null
-                        ? EquipmentSlot.HAND_LEFT
-                        : null;
-        if (slot == null) {
+                : EquipmentSlot.HAND_LEFT;
+        if (c.thrall.inventory().equipped(slot) != null) {
             c.say("both hands full");
             return ExitCode.BLOCKED;
         }
 
-        boolean packed = c.thrall.inventory().pack().stream().anyMatch(candidate -> candidate == item);
-        if (!packed && !c.thrall.inventory().addToPack(item)) {
-            c.say("cannot carry " + item.name());
-            return ExitCode.BLOCKED;
+        if (!c.thrall.inventory().pack().contains(item)) {
+            if (!c.thrall.inventory().addToPack(item)) {
+                c.say("cannot carry " + item.name());
+                return ExitCode.BLOCKED;
+            }
         }
 
         if (!c.thrall.inventory().equipFromPack(item, slot)) {

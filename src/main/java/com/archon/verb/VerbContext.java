@@ -6,6 +6,8 @@ import com.archon.model.Item;
 import com.archon.model.Thrall;
 import com.archon.model.World;
 
+import java.util.Optional;
+
 public final class VerbContext {
     public final World world;
     public final Thrall thrall;
@@ -45,15 +47,15 @@ public final class VerbContext {
         }
 
         String name = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
-        Item item = thrall.inventory().find(name).orElse(null);
-        if (item != null) {
-            return item;
+        Optional<Item> item = thrall.inventory().find(name);
+        if (item.isPresent()) {
+            return item.get();
         }
 
         return thrall.inventory().equipment().values().stream()
-                .filter(candidate -> candidate != null
-                        && (candidate.id().equalsIgnoreCase(name)
-                        || candidate.name().equalsIgnoreCase(name)))
+                .filter(itemValue -> itemValue != null
+                        && (itemValue.id().equalsIgnoreCase(name)
+                        || itemValue.name().equalsIgnoreCase(name)))
                 .findFirst()
                 .orElse(null);
     }

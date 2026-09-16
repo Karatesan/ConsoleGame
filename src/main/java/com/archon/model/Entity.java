@@ -4,71 +4,37 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
-public abstract class Entity {
+public class Entity {
+    public enum Kind { CREATURE, PROP, DOOR }
 
-    public enum Kind {
-        CREATURE, PROP, DOOR
-    }
+    public enum Trigger { ON_ADJACENCY, ON_MOVEMENT_IN_LOS }
 
-    public enum Trigger {
-        ON_ADJACENCY, ON_MOVEMENT_IN_LOS
-    }
-
-    /**
-     * A deterministic, visible reaction. Fires at most once per round.
-     */
-    public record Readied(Trigger trigger, String description, int damage) {
-        public Readied {
-            Objects.requireNonNull(trigger, "trigger must not be null");
-            Objects.requireNonNull(description, "description must not be null");
-            if (damage < 0) {
-                throw new IllegalArgumentException("damage must not be negative");
-            }
-        }
-    }
+    public record Readied(Trigger trigger, String description, int damage) { }
 
     private final String id;
     private final String name;
     private final char glyph;
     private final Kind kind;
-
     private Vec2 pos;
     private int hp;
     private int maxHp;
     private int armor;
     private int evasion;
-
-    private final EnumSet<Tag> tags = EnumSet.noneOf(Tag.class);
-    private final EnumMap<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
-
+    private final Set<Tag> tags = EnumSet.noneOf(Tag.class);
+    private final Map<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
     private Readied readied;
     private boolean readiedSpent;
     private boolean guarded;
     private boolean identified;
 
-    protected Entity(
-            String id,
-            String name,
-            char glyph,
-            Kind kind,
-            Vec2 pos,
-            int hp,
-            int armor,
-            int evasion
-    ) {
-        this.id = Objects.requireNonNull(id, "id must not be null");
-        this.name = Objects.requireNonNull(name, "name must not be null");
+    public Entity(String id, String name, char glyph, Kind kind, Vec2 pos, int hp, int armor, int evasion) {
+        this.id = id;
+        this.name = name;
         this.glyph = glyph;
-        this.kind = Objects.requireNonNull(kind, "kind must not be null");
-        this.pos = Objects.requireNonNull(pos, "pos must not be null");
-
-        if (hp < 0) {
-            throw new IllegalArgumentException("hp must not be negative");
-        }
-
+        this.kind = kind;
+        this.pos = pos;
         this.hp = hp;
         this.maxHp = hp;
         this.armor = armor;
@@ -143,27 +109,23 @@ public abstract class Entity {
         return readiedSpent;
     }
 
-    public Entity with(Tag... tags) {
-        Objects.requireNonNull(tags, "tags must not be null");
-        for (Tag tag : tags) {
-            this.tags.add(Objects.requireNonNull(tag, "tag must not be null"));
-        }
+    public Entity with(Tag... values) {
+        Collections.addAll(tags, values);
         return this;
     }
 
     public Entity ready(Trigger trigger, String description, int damage) {
-        this.readied = new Readied(trigger, description, damage);
-        this.readiedSpent = false;
+        readied = new Readied(trigger, description, damage);
         return this;
     }
 
-    public void moveTo(Vec2 pos) {
-        this.pos = Objects.requireNonNull(pos, "pos must not be null");
+    public void moveTo(Vec2 destination) {
+        pos = destination;
     }
 
     public int takeDamage(int amount) {
         if (amount < 0) {
-            throw new IllegalArgumentException("damage amount must not be negative");
+            throw new IllegalArgumentException("damage cannot be negative");
         }
         hp -= amount;
         return hp;
@@ -171,32 +133,32 @@ public abstract class Entity {
 
     public int heal(int amount) {
         if (amount < 0) {
-            throw new IllegalArgumentException("healing amount must not be negative");
+            throw new IllegalArgumentException("healing cannot be negative");
         }
         hp += amount;
         return hp;
     }
 
-    public void setMaxHp(int maxHp) {
-        if (maxHp < 0) {
-            throw new IllegalArgumentException("max hp must not be negative");
+    public void setMaxHp(int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("maximum HP cannot be negative");
         }
-        if (maxHp < this.maxHp) {
-            hp = Math.min(hp, maxHp);
+        maxHp = value;
+        if (hp > maxHp) {
+            hp = maxHp;
         }
-        this.maxHp = maxHp;
     }
 
-    public void setArmor(int armor) {
-        this.armor = armor;
+    public void setArmor(int value) {
+        armor = value;
     }
 
-    public void setEvasion(int evasion) {
-        this.evasion = evasion;
+    public void setEvasion(int value) {
+        evasion = value;
     }
 
-    public void setGuarded(boolean guarded) {
-        this.guarded = guarded;
+    public void setGuarded(boolean value) {
+        guarded = value;
     }
 
     public void spendReadied() {
@@ -204,8 +166,8 @@ public abstract class Entity {
     }
 
     public void resetRoundState() {
-        guarded = false;
         readiedSpent = false;
+        guarded = false;
     }
 
     public void identify() {
@@ -221,11 +183,11 @@ public abstract class Entity {
     }
 
     public void applyTag(Tag tag) {
-        tags.add(Objects.requireNonNull(tag, "tag must not be null"));
+        tags.add(tag);
     }
 
     public void removeTag(Tag tag) {
-        tags.remove(Objects.requireNonNull(tag, "tag must not be null"));
+        tags.remove(tag);
     }
 
     @Override

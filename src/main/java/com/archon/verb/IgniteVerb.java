@@ -51,19 +51,18 @@ public final class IgniteVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
+        final Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
         if (resolved == null) {
             c.say("cannot resolve " + c.inv.arg(0));
             return ExitCode.BLOCKED;
         }
 
-        if (resolved instanceof Resolved.OnEntity onEntity) {
-            Entity entity = onEntity.entity();
+        if (resolved instanceof final Resolved.OnEntity onEntity) {
+            final Entity entity = onEntity.entity();
             if (!entity.has(Tag.FLAMMABLE)) {
                 c.say(entity.name() + " will not catch.");
                 return ExitCode.MISS;
             }
-
             entity.ignite();
             c.say(entity.name() + " catches fire.");
             return ExitCode.SUCCESS;
@@ -72,6 +71,7 @@ public final class IgniteVerb implements Verb {
         if (resolved instanceof Resolved.OnTile onTile) {
             Vec2 at = onTile.pos();
             World.Tile tile = c.world.tile(at);
+
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
                 return ExitCode.MISS;
@@ -88,7 +88,7 @@ public final class IgniteVerb implements Verb {
             return ExitCode.SUCCESS;
         }
 
-        c.say("cannot ignite that");
+        c.say("cannot ignite " + c.inv.arg(0));
         return ExitCode.BLOCKED;
     }
 

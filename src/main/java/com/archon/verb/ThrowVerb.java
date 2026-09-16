@@ -18,8 +18,7 @@ public final class ThrowVerb implements Verb {
         if (c.inv.args().size() < need) {
             return Check.invalid(
                     "throw needs " + (piped ? "a target" : "an item and a target"),
-                    "e.g. take /pack/flask_oil | throw o1"
-            );
+                    "e.g. take /pack/flask_oil | throw o1");
         }
         return Check.ok();
     }
@@ -37,25 +36,28 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved r = VerbHelpers.resolve(c, targetArg);
-        if (r == null) {
+        Resolved resolved = VerbHelpers.resolve(c, targetArg);
+        if (resolved == null) {
             c.say("cannot resolve " + targetArg);
             return ExitCode.BLOCKED;
         }
 
-        Vec2 at = switch (r) {
-            case Resolved.OnEntity oe -> oe.entity().pos();
-            case Resolved.OnTile ot -> ot.pos();
+        Vec2 at = switch (resolved) {
+            case Resolved.OnEntity entity -> entity.entity().pos();
+            case Resolved.OnTile tile -> tile.pos();
             case Resolved.OnItem ignored -> c.thrall.pos();
         };
 
-        c.thrall.inventory().remove(item);
-        c.say("Flask arcs toward " + at + " and shatters.");
-
-        if (item.substance() != null) {
-            VerbHelpers.spill(c, at, item.consumeSubstance());
+        if (!piped && !c.thrall.inventory().remove(item)) {
+            c.say("no such item to throw");
+            return ExitCode.BLOCKED;
         }
 
+        c.say("Flask arcs toward " + at + " and shatters.");
+        var substance = item.consumeSubstance();
+        if (substance != null) {
+            VerbHelpers.spill(c, at, substance);
+        }
         return ExitCode.SUCCESS;
     }
 }

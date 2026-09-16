@@ -5,6 +5,7 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.Entity;
+import com.archon.model.Item;
 import com.archon.model.Prop;
 import com.archon.model.Tag;
 import com.archon.model.World;
@@ -40,23 +41,28 @@ public final class SiphonVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        Tag substance = sourceSubstance(c, c.inv.arg(0));
+        String source = c.inv.arg(0);
+        Tag substance = sourceSubstance(c, source);
+
         if (substance == null) {
             return Check.blocked(
-                    "nothing to siphon from " + c.inv.arg(0),
-                    "try: inspect " + c.inv.arg(0)
+                    "nothing to siphon from " + source,
+                    "try: inspect " + source
             );
         }
 
-        Entity holder = holderOf(c, c.inv.arg(0));
-        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1)
-            return Check.blocked(holder.id + " out of reach", "step closer");
+        Entity holder = holderOf(c, source);
+        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
+            return Check.blocked(holder.id() + " out of reach", "step closer");
+        }
+
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
         Tag substance = sourceSubstance(c, c.inv.arg(0));
+
         if (substance == null) {
             c.say("nothing to siphon");
             return ExitCode.BLOCKED;
@@ -67,36 +73,32 @@ public final class SiphonVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static Tag sourceSubstance(VerbContext c, String arg) {
-        Resolved r = VerbHelpers.resolve(c, arg);
-        if (r instanceof Resolved.OnItem oi && oi.item() != null) return oi.item().substance;
-        if (r instanceof Resolved.OnEntity oe) {
-            if (oe.entity() instanceof Actor actor && actor.mainHand() != null) return actor.mainHand().substance;
-            if (oe.entity() instanceof Prop prop && prop.contents() != null) return prop.contents().substance;
-        }
-        if (r instanceof Resolved.OnTile ot) {
-            World.Tile t = c.world.tile(ot.pos());
-            if (t.has(Tag.OIL)) return Tag.OIL;
-            if (t.has(Tag.WATER)) return Tag.WATER;
+    private static Tag sourceSubstance(VerbContext c, String address) {
+        Resolved resolved = VerbHelpers.resolve(c, address);
+
+        if (resolved instanceof Resolved.OnItem onItem) {
+            return substanceOf(onItem.item());
         }
 
         if (resolved instanceof Resolved.OnEntity onEntity) {
             Entity entity = onEntity.entity();
 
-            if (entity instanceof Actor actor && actor.mainHand() != null) {
-                return actor.mainHand().substance();
+            if (entity instanceof Actor actor) {
+                return substanceOf(actor.mainHand());
             }
 
-            if (entity instanceof Prop prop && prop.contents() != null) {
-                return prop.contents().substance();
+            if (entity instanceof Prop prop) {
+                return substanceOf(prop.contents());
             }
         }
 
         if (resolved instanceof Resolved.OnTile onTile) {
             World.Tile tile = c.world.tile(onTile.pos());
+
             if (tile.has(Tag.OIL)) {
                 return Tag.OIL;
             }
+
             if (tile.has(Tag.WATER)) {
                 return Tag.WATER;
             }
@@ -105,11 +107,17 @@ public final class SiphonVerb implements Verb {
         return null;
     }
 
-    private static Entity holderOf(VerbContext c, String arg) {
-        Address address = Address.parse(arg);
-        if (address instanceof Address.EntityAddr entityAddress) {
+    private static Tag substanceOf(Item item) {
+        return item == null ? null : item.substance();
+    }
+
+    private static Entity holderOf(VerbContext c, String address) {
+        Address parsed = Address.parse(address);
+
+        if (parsed instanceof Address.EntityAddr entityAddress) {
             return c.world.get(entityAddress.id());
         }
+
         return null;
     }
 }

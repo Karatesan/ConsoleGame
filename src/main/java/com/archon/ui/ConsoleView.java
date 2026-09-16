@@ -54,7 +54,6 @@ public final class ConsoleView implements View {
                 }
                 emit("    0 AP spent. Line not counted.");
             }
-
             case GameEvent.LineStart s ->
                     emit("> " + s.raw() + "   [alloc " + s.allocation() + " AP, tax " + s.tax() + ", "
                             + (s.chain() ? "CHAIN" : "SINGLE") + "]");
@@ -67,11 +66,10 @@ public final class ConsoleView implements View {
                     emit(String.format("  [%d]   %-36s SKIPPED      (%s)", s.index(), s.render(), s.why()));
 
             case GameEvent.LineComplete c -> {
-                emit(String.format("  LINE COMPLETE — %d AP charged, %d tax, %d returned unused. AP %d.", c.charged(),
-                        c.tax(), c.returnedUnused(), c.apLeft()));
+                emit(String.format("  LINE COMPLETE — %d AP charged, %d tax, %d returned unused. AP %d.",
+                        c.charged(), c.tax(), c.returnedUnused(), c.apLeft()));
                 dirty = true;
             }
-
             case GameEvent.LineBroke b -> {
                 emit("x BREAK — " + b.reason());
                 emit(String.format("    Forfeited: %d AP allocation + %d AP penalty = %d AP.", b.allocation(),
@@ -81,7 +79,6 @@ public final class ConsoleView implements View {
                 }
                 dirty = true;
             }
-
             case GameEvent.InterruptFired i ->
                     emit("!! INTERRUPT — " + i.source() + " (" + i.description() + "). " + i.damage() + " dmg.");
 
@@ -92,12 +89,10 @@ public final class ConsoleView implements View {
                 r.worldLog().forEach(this::emit);
                 dirty = true;
             }
-
             case GameEvent.RoundStart s -> {
                 emit("== ROUND " + s.round() + " — AP " + s.ap() + "/" + s.ap());
                 dirty = true;
             }
-
             case GameEvent.ThrallDied d -> {
                 emit("*** THE THRALL COLLAPSES. THE LINK GOES DARK. ***");
                 dirty = true;
@@ -114,12 +109,13 @@ public final class ConsoleView implements View {
             System.out.print(grid(w));
             System.out.print(hud(w, round));
             separator();
-            log.forEach(line -> System.out.println("  " + line));
+            log.forEach(l -> System.out.println("  " + l));
             separator();
             dirty = false;
             return;
         }
 
+        // streaming: only redraw the board when the world actually changed
         if (!dirty) {
             return;
         }
@@ -153,8 +149,8 @@ public final class ConsoleView implements View {
                 Vec2 p = new Vec2(x, y);
                 World.Tile t = w.tile(p);
                 Entity e = w.entityAt(p);
-
                 char c;
+
                 if (t.wall) {
                     c = '#';
                 } else if (e != null) {
@@ -188,8 +184,18 @@ public final class ConsoleView implements View {
         return String.format("""
                         ROUND %d   HP %d/%d   AP [%s] %d/%d   LINE %d (next tax: +%d AP)
                         hand/right: %-18s hand/left: %-18s pack %d/%d
-                        """, r.roundNo(), t.hp(), t.maxHp(), pips.toString().trim(), r.ap(), RoundState.BASE_AP, r.linesUsed(),
-                r.taxForNextLine(), name(t.inventory().getEquipped(EquipmentSlot.HAND_RIGHT)), name(t.inventory().getEquipped(EquipmentSlot.HAND_LEFT)), t.inventory().pack().size(),
+                        """,
+                r.roundNo(),
+                t.hp(),
+                t.maxHp(),
+                pips.toString().trim(),
+                r.ap(),
+                RoundState.BASE_AP,
+                r.linesUsed(),
+                r.taxForNextLine(),
+                name(t.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
+                name(t.inventory().equipped(EquipmentSlot.HAND_LEFT)),
+                t.inventory().pack().size(),
                 Inventory.PACK_MAX);
     }
 

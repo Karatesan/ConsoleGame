@@ -11,8 +11,9 @@ public final class DropVerb implements Verb {
 
     @Override
     public Check validateStructural(VerbContext c) {
-        if (c.inv.arg(0) == null && !c.acceptsPipedMaterial()) return Check.invalid("drop what?", null);
-        return Check.ok();
+        return c.inv.arg(0) == null && !c.acceptsPipedMaterial()
+                ? Check.invalid("drop what?", null)
+                : Check.ok();
     }
 
     @Override
@@ -22,8 +23,9 @@ public final class DropVerb implements Verb {
             c.say("not carrying that");
             return ExitCode.BLOCKED;
         }
+
         c.world.tile(c.thrall.pos()).ground.add(item);
-        c.say("Thrall drops " + item.name + ".");
+        c.say("Thrall drops " + item.name() + ".");
         return ExitCode.SUCCESS;
     }
 }
