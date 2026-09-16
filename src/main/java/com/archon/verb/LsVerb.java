@@ -31,11 +31,6 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
 
-        if (target instanceof Resolved.TileTarget tileTarget) {
-            c.say(c.world.tile(tileTarget.pos()).ground().toString());
-            return ExitCode.SUCCESS;
-        }
-
         c.say("nothing to list");
         return ExitCode.INVALID;
     }
