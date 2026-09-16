@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolution;
 import com.archon.command.Ast;
 import com.archon.model.Item;
@@ -52,17 +53,18 @@ public final class PourVerb implements Verb {
         }
 
         Resolution resolution = VerbHelpers.resolve(c, targetArg);
-        if (resolution instanceof Resolution.Failure failure) {
-            c.say("cannot resolve " + targetArg + ": " + failure.detail());
+        Address target = VerbHelpers.found(resolution);
+        if (target == null) {
+            c.say("cannot resolve " + targetArg + ": " + VerbHelpers.failureDetail(resolution));
             return ExitCode.BLOCKED;
         }
 
         Vec2 at;
-        if (resolution instanceof Resolution.EntityTarget entityTarget) {
+        if (target instanceof Address.EntityTarget entityTarget) {
             at = entityTarget.entity().pos();
-        } else if (resolution instanceof Resolution.BodyTarget bodyTarget) {
+        } else if (target instanceof Address.BodyTarget bodyTarget) {
             at = bodyTarget.entity().pos();
-        } else if (resolution instanceof Resolution.TileTarget tileTarget) {
+        } else if (target instanceof Address.TileTarget tileTarget) {
             at = tileTarget.tile().pos();
         } else {
             c.say("cannot pour onto " + targetArg);
