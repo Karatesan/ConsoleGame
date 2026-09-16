@@ -1,6 +1,8 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolution;
+import com.archon.address.Resolution.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
@@ -27,34 +29,37 @@ public final class InspectVerb extends FreeVerb {
         }
 
         Resolution resolution = VerbHelpers.resolve(c, address);
-        if (!(resolution instanceof Resolution.Resolved resolved)) {
+        Resolved target = VerbHelpers.found(resolution);
+        if (target == null) {
             c.say("cannot perceive " + address);
             return ExitCode.INVALID;
         }
 
-        switch (resolved) {
-            case Resolution.Resolved.EntityTarget entityTarget -> inspectEntity(c, entityTarget.entity());
-            case Resolution.Resolved.BodyTarget bodyTarget -> inspectEntity(c, bodyTarget.entity());
-            case Resolution.Resolved.PackedItem packedItem -> inspectItem(c, packedItem.item());
-            case Resolution.Resolved.EquippedItem equippedItem -> inspectItem(c, equippedItem.item());
-            case Resolution.Resolved.PropContents propContents -> inspectItem(c, propContents.item());
-            case Resolution.Resolved.PackRoot ignored -> c.say("pack root");
-            case Resolution.Resolved.EmptyEquipmentSlot ignored -> c.say("nothing there");
-            case Resolution.Resolved.EmptyPropContents ignored -> c.say("nothing there");
-            case Resolution.Resolved.TileTarget tileTarget -> inspectTile(c, tileTarget);
+        switch (target) {
+            case Resolved.EntityTarget entityTarget -> inspectEntity(c, entityTarget.entity());
+            case Resolved.BodyTarget bodyTarget -> inspectEntity(c, bodyTarget.entity());
+            case Resolved.PackedItem packedItem -> inspectItemTarget(c, packedItem.item());
+            case Resolved.EquippedItem equippedItem -> inspectItemTarget(c, equippedItem.item());
+            case Resolved.PropContents propContents -> inspectItemTarget(c, propContents.item());
+            case Resolved.PackRoot ignored -> c.say("pack root");
+            case Resolved.EmptyEquipmentSlot ignored -> c.say("nothing there");
+            case Resolved.EmptyPropContents ignored -> c.say("nothing there");
+            case Resolved.TileTarget tileTarget -> inspectTile(c, tileTarget);
         }
 
         return ExitCode.SUCCESS;
     }
 
-    private void inspectTile(VerbContext c, Resolution.Resolved.TileTarget tileTarget) {
+    private void inspectTile(VerbContext c, Resolved.TileTarget tileTarget) {
         GameMap.Tile tile = c.world.tile(tileTarget.pos());
+
+        if (tileTarget.layer() == Address.Layer.CEILING) {
+            c.say(tileTarget.pos() + " ceiling — tags " + tile.ceiling());
+            return;
+        }
+
         StringBuilder output = new StringBuilder(tileTarget.pos() + " " + (tile.isWall() ? "WALL" : "floor")
                 + " — tags " + tile.tags());
-
-        if (tileTarget.pos().layer().name().equals("CEILING")) {
-            output.append(", ceiling tags ").append(tile.ceilingTags());
-        }
 
         if (!tile.ground().isEmpty()) {
             output.append(", ground ").append(tile.ground());
@@ -93,6 +98,15 @@ public final class InspectVerb extends FreeVerb {
         }
 
         c.say(output.toString());
+    }
+
+    private void inspectItemTarget(VerbContext c, Item item) {
+        if (item == null) {
+            c.say("nothing there");
+            return;
+        }
+
+        inspectItem(c, item);
     }
 
     private void inspectItem(VerbContext c, Item item) {
