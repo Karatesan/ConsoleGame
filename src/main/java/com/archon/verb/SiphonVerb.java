@@ -5,10 +5,10 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.Entity;
+import com.archon.model.GameMap;
 import com.archon.model.Item;
 import com.archon.model.Prop;
 import com.archon.model.Tag;
-import com.archon.model.World;
 
 public final class SiphonVerb implements Verb {
     @Override
@@ -93,7 +93,7 @@ public final class SiphonVerb implements Verb {
         }
 
         if (resolved instanceof Resolved.OnTile onTile) {
-            World.Tile tile = c.world.tile(onTile.pos());
+            GameMap.Tile tile = c.world.tile(onTile.pos());
 
             if (tile.has(Tag.OIL)) {
                 return Tag.OIL;
