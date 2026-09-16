@@ -92,7 +92,13 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             }
         }
 
-        enum Failure implements Resolution {
+        record Failure(Reason reason) implements Resolution {
+            public Failure {
+                reason = Objects.requireNonNull(reason, "reason");
+            }
+        }
+
+        enum Reason {
             INVALID_TILE_SPEC,
             UNKNOWN_ENTITY,
             DEAD_ENTITY,
@@ -115,14 +121,14 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
     private static Resolution resolveTile(Address.TileAddr address, World world) {
         String spec = address.spec();
         if (spec == null) {
-            return Resolution.Failure.INVALID_TILE_SPEC;
+            return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
         String value = spec.trim();
         if (value.equalsIgnoreCase("self")) {
             Actor thrall = world.thrall();
             if (thrall == null || !thrall.alive()) {
-                return Resolution.Failure.DEAD_ENTITY;
+                return failure(Resolution.Reason.DEAD_ENTITY);
             }
 
             return resolveTilePosition(thrall.pos(), address.layer(), world);
@@ -138,40 +144,42 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
                         address.layer(),
                         world);
             } catch (NumberFormatException ignored) {
-                return Resolution.Failure.INVALID_TILE_SPEC;
+                return failure(Resolution.Reason.INVALID_TILE_SPEC);
             }
         }
 
         if (value.indexOf(',') >= 0) {
-            return Resolution.Failure.INVALID_TILE_SPEC;
+            return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
         Matcher direction = DIRECTION_PATTERN.matcher(value);
         if (direction.matches()) {
             int distance = parsePositiveDistance(direction.group(2));
             if (distance < 1) {
-                return Resolution.Failure.INVALID_TILE_SPEC;
+                return failure(Resolution.Reason.INVALID_TILE_SPEC);
             }
 
             Actor thrall = world.thrall();
             if (thrall == null || !thrall.alive() || thrall.pos() == null) {
-                return Resolution.Failure.DEAD_ENTITY;
+                return failure(Resolution.Reason.DEAD_ENTITY);
             }
 
             try {
-                Vec2 pos = offset(thrall.pos(), direction.group(1), distance);
-                return resolveTilePosition(pos, address.layer(), world);
+                return resolveTilePosition(
+                        offset(thrall.pos(), direction.group(1), distance),
+                        address.layer(),
+                        world);
             } catch (ArithmeticException ignored) {
-                return Resolution.Failure.INVALID_TILE_SPEC;
+                return failure(Resolution.Reason.INVALID_TILE_SPEC);
             }
         }
 
         Entity entity = world.get(value);
         if (entity == null) {
-            return Resolution.Failure.UNKNOWN_ENTITY;
+            return failure(Resolution.Reason.UNKNOWN_ENTITY);
         }
         if (!entity.alive()) {
-            return Resolution.Failure.DEAD_ENTITY;
+            return failure(Resolution.Reason.DEAD_ENTITY);
         }
 
         return resolveTilePosition(entity.pos(), address.layer(), world);
@@ -179,26 +187,26 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
 
     private static Resolution resolveTilePosition(Vec2 pos, Address.Layer layer, World world) {
         if (pos == null) {
-            return Resolution.Failure.INVALID_TILE_SPEC;
+            return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
         return world.inBounds(pos)
                 ? found(new TileTarget(pos, layer))
-                : Resolution.Failure.OUT_OF_BOUNDS;
+                : failure(Resolution.Reason.OUT_OF_BOUNDS);
     }
 
     private static Resolution resolveEntity(Address.EntityAddr address, World world) {
         String id = address.id();
         if (id == null || id.isBlank()) {
-            return Resolution.Failure.UNKNOWN_ENTITY;
+            return failure(Resolution.Reason.UNKNOWN_ENTITY);
         }
 
         Entity entity = world.get(id);
         if (entity == null) {
-            return Resolution.Failure.UNKNOWN_ENTITY;
+            return failure(Resolution.Reason.UNKNOWN_ENTITY);
         }
         if (!entity.alive()) {
-            return Resolution.Failure.DEAD_ENTITY;
+            return failure(Resolution.Reason.DEAD_ENTITY);
         }
 
         String path = address.path();
@@ -215,24 +223,25 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
 
         if (entity instanceof Actor actor) {
             Resolution inventoryResolution = resolveInventory(actor, path);
-            if (!(inventoryResolution instanceof Resolution.Failure failure)
-                    || failure != Resolution.Failure.INVALID_PATH) {
+            if (inventoryResolution instanceof Resolution.Found
+                    || ((Resolution.Failure) inventoryResolution).reason()
+                            != Resolution.Reason.INVALID_PATH) {
                 return inventoryResolution;
             }
         }
 
         BodyPart part = BodyPart.parse(path);
         return part == null
-                ? Resolution.Failure.INVALID_PATH
+                ? failure(Resolution.Reason.INVALID_PATH)
                 : found(new BodyTarget(entity, part));
     }
 
     private static Resolution resolveInventory(Actor actor, String path) {
         if (actor == null || !actor.alive()) {
-            return Resolution.Failure.DEAD_ENTITY;
+            return failure(Resolution.Reason.DEAD_ENTITY);
         }
         if (path == null || path.isEmpty()) {
-            return Resolution.Failure.INVALID_PATH;
+            return failure(Resolution.Reason.INVALID_PATH);
         }
 
         if (path.equals("pack")) {
@@ -242,12 +251,12 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         if (path.startsWith("pack/")) {
             String itemPath = path.substring("pack/".length());
             if (itemPath.isEmpty()) {
-                return Resolution.Failure.INVALID_PATH;
+                return failure(Resolution.Reason.INVALID_PATH);
             }
 
             Item item = actor.inventory().find(itemPath).orElse(null);
             return item == null
-                    ? Resolution.Failure.INVALID_PATH
+                    ? failure(Resolution.Reason.INVALID_PATH)
                     : found(new PackedItem(actor, item));
         }
 
@@ -258,11 +267,15 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
                             ? found(new EmptyEquipmentSlot(actor, slot))
                             : found(new EquippedItem(actor, slot, item));
                 })
-                .orElse(Resolution.Failure.INVALID_PATH);
+                .orElseGet(() -> failure(Resolution.Reason.INVALID_PATH));
     }
 
     private static Resolution.Found found(Resolved target) {
         return new Resolution.Found(target);
+    }
+
+    private static Resolution.Failure failure(Resolution.Reason reason) {
+        return new Resolution.Failure(reason);
     }
 
     private static int parsePositiveDistance(String value) {
