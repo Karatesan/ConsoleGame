@@ -84,8 +84,13 @@ public final class SiphonVerb implements Verb {
     public ExitCode execute(VerbContext c) {
         Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
         Resolved target = VerbHelpers.found(resolution);
-        Tag substance = target == null ? null : sourceSubstance(c, target);
 
+        if (target == null) {
+            c.say("nothing to siphon");
+            return ExitCode.BLOCKED;
+        }
+
+        Tag substance = sourceSubstance(c, target);
         if (substance == null) {
             c.say("nothing to siphon");
             return ExitCode.BLOCKED;
