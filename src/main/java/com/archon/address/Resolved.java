@@ -125,8 +125,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
-        String value = spec.trim();
-        if (value.equalsIgnoreCase("self")) {
+        if (spec.equalsIgnoreCase("self")) {
             Actor thrall = world.thrall();
             if (thrall == null || !thrall.alive()) {
                 return failure(Resolution.Reason.DEAD_ENTITY);
@@ -135,7 +134,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             return resolveTilePosition(thrall.pos(), address.layer(), world);
         }
 
-        Matcher coordinateMatcher = COORDINATE_PATTERN.matcher(value);
+        Matcher coordinateMatcher = COORDINATE_PATTERN.matcher(spec);
         if (coordinateMatcher.matches()) {
             try {
                 Vec2 position = new Vec2(
@@ -147,11 +146,11 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             }
         }
 
-        if (value.indexOf(',') >= 0) {
+        if (spec.indexOf(',') >= 0) {
             return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
-        Matcher directionMatcher = DIRECTION_PATTERN.matcher(value);
+        Matcher directionMatcher = DIRECTION_PATTERN.matcher(spec);
         if (directionMatcher.matches()) {
             int distance = parsePositiveDistance(directionMatcher.group(2));
             if (distance < 1) {
@@ -171,7 +170,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             }
         }
 
-        Entity entity = world.get(value);
+        Entity entity = world.get(spec);
         if (entity == null) {
             return failure(Resolution.Reason.UNKNOWN_ENTITY);
         }
