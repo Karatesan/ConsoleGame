@@ -3,6 +3,7 @@ package com.archon.ui;
 import com.archon.event.GameEvent;
 import com.archon.exec.RoundState;
 import com.archon.model.*;
+import com.archon.system.spatial.SpatialService;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -147,19 +148,19 @@ public final class ConsoleView implements View {
             sb.append(String.format("%3d ", y));
             for (int x = 0; x < w.width(); x++) {
                 Vec2 p = new Vec2(x, y);
-                GameMap.Tile t = w.map().tile(p);
+                GameMap.Tile tile = w.tile(p);
                 Entity e = SpatialService.entityAt(w, p);
                 char c;
 
-                if (t.isWall()) {
+                if (tile.isWall()) {
                     c = '#';
                 } else if (e != null) {
                     c = e.glyph();
-                } else if (t.has(Tag.BURNING)) {
+                } else if (tile.has(Tag.BURNING)) {
                     c = '*';
-                } else if (t.has(Tag.OIL)) {
+                } else if (tile.has(Tag.OIL)) {
                     c = '~';
-                } else if (!t.ground().isEmpty()) {
+                } else if (!tile.ground().isEmpty()) {
                     c = '%';
                 } else {
                     c = '.';
