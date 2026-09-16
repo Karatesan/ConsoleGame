@@ -1,5 +1,6 @@
 package com.archon.address;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,9 +19,10 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         Resolved.EmptyEquipmentSlot, Resolved.PropContents,
         Resolved.EmptyPropContents, Resolved.TileTarget {
 
-    Pattern COORDINATE_PATTERN = Pattern.compile("^([+-]?\\d+)\\s*,\\s*([+-]?\\d+)$");
+    Pattern COORDINATE_PATTERN = Pattern.compile("^([+-]?\\d+),([+-]?\\d+)$");
     Pattern DIRECTION_PATTERN = Pattern.compile(
-            "^([A-Za-z]+)(?:(?:\\s+|\\s*[/,:]\\s*)(\\S+))?$");
+            "^(n|ne|e|se|s|sw|w|nw)(?:\\s+(.*))?$",
+            Pattern.CASE_INSENSITIVE);
 
     record EntityTarget(Entity entity) implements Resolved {
         public EntityTarget {
@@ -83,9 +85,9 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         }
     }
 
-    sealed interface Resolution permits Resolution.Success, Resolution.Failure {
-        record Success(Resolved target) implements Resolution {
-            public Success {
+    sealed interface Resolution permits Resolution.Found, Resolution.Failure {
+        record Found(Resolved target) implements Resolution {
+            public Found {
                 target = Objects.requireNonNull(target, "target");
             }
         }
@@ -106,77 +108,83 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         return switch (address) {
             case Address.TileAddr tile -> resolveTile(tile, world);
             case Address.InventoryAddr inventory -> resolveInventory(world.thrall(), inventory.path());
-            case Address.EntityAddr entityAddress -> resolveEntity(entityAddress, world);
+            case Address.EntityAddr entity -> resolveEntity(entity, world);
         };
     }
 
     private static Resolution resolveTile(Address.TileAddr address, World world) {
-        Vec2 pos = resolveTilePosition(address.spec(), world);
-        if (pos == null) {
+        String spec = address.spec();
+        if (spec == null) {
             return Resolution.Failure.INVALID_TILE_SPEC;
         }
 
-        return world.inBounds(pos)
-                ? success(new TileTarget(pos, address.layer()))
-                : Resolution.Failure.OUT_OF_BOUNDS;
-    }
-
-    private static Vec2 resolveTilePosition(String spec, World world) {
-        if (spec == null) {
-            return null;
-        }
-
         String value = spec.trim();
-        if (value.isEmpty()) {
-            return null;
-        }
-
         if (value.equalsIgnoreCase("self")) {
             Actor thrall = world.thrall();
-            return thrall != null && thrall.alive() ? thrall.pos() : null;
+            if (thrall == null || !thrall.alive()) {
+                return Resolution.Failure.DEAD_ENTITY;
+            }
+
+            return resolveTilePosition(thrall.pos(), address.layer(), world);
         }
 
         Matcher coordinate = COORDINATE_PATTERN.matcher(value);
         if (coordinate.matches()) {
             try {
-                return new Vec2(
-                        Integer.parseInt(coordinate.group(1)),
-                        Integer.parseInt(coordinate.group(2)));
+                return resolveTilePosition(
+                        new Vec2(
+                                Integer.parseInt(coordinate.group(1)),
+                                Integer.parseInt(coordinate.group(2))),
+                        address.layer(),
+                        world);
             } catch (NumberFormatException ignored) {
-                return null;
+                return Resolution.Failure.INVALID_TILE_SPEC;
             }
         }
 
         if (value.indexOf(',') >= 0) {
-            return null;
+            return Resolution.Failure.INVALID_TILE_SPEC;
         }
 
         Matcher direction = DIRECTION_PATTERN.matcher(value);
         if (direction.matches()) {
-            int[] delta = directionDelta(direction.group(1));
-            if (delta != null) {
-                int distance = parseDistance(direction.group(2));
-                if (distance <= 0) {
-                    return null;
-                }
+            int distance = parsePositiveDistance(direction.group(2));
+            if (distance < 1) {
+                return Resolution.Failure.INVALID_TILE_SPEC;
+            }
 
-                Actor thrall = world.thrall();
-                if (thrall == null || !thrall.alive() || thrall.pos() == null) {
-                    return null;
-                }
+            Actor thrall = world.thrall();
+            if (thrall == null || !thrall.alive() || thrall.pos() == null) {
+                return Resolution.Failure.DEAD_ENTITY;
+            }
 
-                try {
-                    return new Vec2(
-                            Math.addExact(thrall.pos().x(), Math.multiplyExact(delta[0], distance)),
-                            Math.addExact(thrall.pos().y(), Math.multiplyExact(delta[1], distance)));
-                } catch (ArithmeticException ignored) {
-                    return null;
-                }
+            try {
+                Vec2 pos = offset(thrall.pos(), direction.group(1), distance);
+                return resolveTilePosition(pos, address.layer(), world);
+            } catch (ArithmeticException ignored) {
+                return Resolution.Failure.INVALID_TILE_SPEC;
             }
         }
 
         Entity entity = world.get(value);
-        return entity != null && entity.alive() ? entity.pos() : null;
+        if (entity == null) {
+            return Resolution.Failure.UNKNOWN_ENTITY;
+        }
+        if (!entity.alive()) {
+            return Resolution.Failure.DEAD_ENTITY;
+        }
+
+        return resolveTilePosition(entity.pos(), address.layer(), world);
+    }
+
+    private static Resolution resolveTilePosition(Vec2 pos, Address.Layer layer, World world) {
+        if (pos == null) {
+            return Resolution.Failure.INVALID_TILE_SPEC;
+        }
+
+        return world.inBounds(pos)
+                ? found(new TileTarget(pos, layer))
+                : Resolution.Failure.OUT_OF_BOUNDS;
     }
 
     private static Resolution resolveEntity(Address.EntityAddr address, World world) {
@@ -195,28 +203,28 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
 
         String path = address.path();
         if (path == null) {
-            return success(new EntityTarget(entity));
+            return found(new EntityTarget(entity));
         }
 
         if (entity instanceof Prop prop && path.equals("contents")) {
-            Item contents = prop.contents();
-            return contents == null
-                    ? success(new EmptyPropContents(prop))
-                    : success(new PropContents(prop, contents));
+            Item item = prop.contents();
+            return item == null
+                    ? found(new EmptyPropContents(prop))
+                    : found(new PropContents(prop, item));
         }
 
         if (entity instanceof Actor actor) {
-            Resolution inventory = resolveInventory(actor, path);
-            if (!(inventory instanceof Resolution.Failure failure)
+            Resolution inventoryResolution = resolveInventory(actor, path);
+            if (!(inventoryResolution instanceof Resolution.Failure failure)
                     || failure != Resolution.Failure.INVALID_PATH) {
-                return inventory;
+                return inventoryResolution;
             }
         }
 
         BodyPart part = BodyPart.parse(path);
         return part == null
                 ? Resolution.Failure.INVALID_PATH
-                : success(new BodyTarget(entity, part));
+                : found(new BodyTarget(entity, part));
     }
 
     private static Resolution resolveInventory(Actor actor, String path) {
@@ -228,7 +236,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         }
 
         if (path.equals("pack")) {
-            return success(new PackRoot(actor));
+            return found(new PackRoot(actor));
         }
 
         if (path.startsWith("pack/")) {
@@ -240,47 +248,81 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             Item item = actor.inventory().find(itemPath).orElse(null);
             return item == null
                     ? Resolution.Failure.INVALID_PATH
-                    : success(new PackedItem(actor, item));
+                    : found(new PackedItem(actor, item));
         }
 
         return EquipmentSlot.parse(path)
                 .<Resolution>map(slot -> {
                     Item item = actor.inventory().equipped(slot);
                     return item == null
-                            ? success(new EmptyEquipmentSlot(actor, slot))
-                            : success(new EquippedItem(actor, slot, item));
+                            ? found(new EmptyEquipmentSlot(actor, slot))
+                            : found(new EquippedItem(actor, slot, item));
                 })
                 .orElse(Resolution.Failure.INVALID_PATH);
     }
 
-    private static Resolution.Success success(Resolved target) {
-        return new Resolution.Success(target);
+    private static Resolution.Found found(Resolved target) {
+        return new Resolution.Found(target);
     }
 
-    private static int parseDistance(String value) {
+    private static int parsePositiveDistance(String value) {
         if (value == null) {
             return 1;
         }
 
+        if (!value.matches("[1-9]\\d*")) {
+            return -1;
+        }
+
         try {
-            int distance = Integer.parseInt(value);
-            return distance > 0 ? distance : -1;
+            return Integer.parseInt(value);
         } catch (NumberFormatException ignored) {
             return -1;
         }
     }
 
-    private static int[] directionDelta(String value) {
-        return switch (value.toLowerCase()) {
-            case "n", "north", "up" -> new int[] { 0, -1 };
-            case "ne", "northeast" -> new int[] { 1, -1 };
-            case "e", "east", "right" -> new int[] { 1, 0 };
-            case "se", "southeast" -> new int[] { 1, 1 };
-            case "s", "south", "down" -> new int[] { 0, 1 };
-            case "sw", "southwest" -> new int[] { -1, 1 };
-            case "w", "west", "left" -> new int[] { -1, 0 };
-            case "nw", "northwest" -> new int[] { -1, -1 };
-            default -> null;
-        };
+    private static Vec2 offset(Vec2 origin, String direction, int distance) {
+        int dx;
+        int dy;
+
+        switch (direction.toLowerCase(Locale.ROOT)) {
+            case "n" -> {
+                dx = 0;
+                dy = -1;
+            }
+            case "ne" -> {
+                dx = 1;
+                dy = -1;
+            }
+            case "e" -> {
+                dx = 1;
+                dy = 0;
+            }
+            case "se" -> {
+                dx = 1;
+                dy = 1;
+            }
+            case "s" -> {
+                dx = 0;
+                dy = 1;
+            }
+            case "sw" -> {
+                dx = -1;
+                dy = 1;
+            }
+            case "w" -> {
+                dx = -1;
+                dy = 0;
+            }
+            case "nw" -> {
+                dx = -1;
+                dy = -1;
+            }
+            default -> throw new IllegalArgumentException("Unsupported direction: " + direction);
+        }
+
+        return new Vec2(
+                Math.addExact(origin.x(), Math.multiplyExact(dx, distance)),
+                Math.addExact(origin.y(), Math.multiplyExact(dy, distance)));
     }
 }
