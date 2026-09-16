@@ -26,7 +26,7 @@ public sealed interface Address {
     }
 
     static Vec2 resolveTileSpec(String spec, World world) {
-        if (spec.equalsIgnoreCase("self")) return world.thrall.pos();
+        if (spec.equalsIgnoreCase("self")) return world.thrall().pos();
         if (spec.contains(",")) {
             String[] parts = spec.split(",");
             return new Vec2(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()));
@@ -36,7 +36,7 @@ public sealed interface Address {
         Vec2 direction = Vec2.dir(letters);
         if (direction != null) {
             int distance = digits.isEmpty() ? 1 : Integer.parseInt(digits);
-            return new Vec2(world.thrall.pos().x() + direction.x() * distance, world.thrall.pos().y() + direction.y() * distance);
+            return new Vec2(world.thrall().pos().x() + direction.x() * distance, world.thrall().pos().y() + direction.y() * distance);
         }
         Entity entity = world.get(spec);
         if (entity != null) return entity.pos();
