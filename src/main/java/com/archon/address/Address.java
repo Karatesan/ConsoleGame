@@ -23,7 +23,7 @@ public sealed interface Address {
         }
     }
 
-    static Address parse(String source) {
+    public static Address parse(String source) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException("empty address");
         }
