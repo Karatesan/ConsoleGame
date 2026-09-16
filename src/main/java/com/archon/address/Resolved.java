@@ -112,9 +112,10 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         Objects.requireNonNull(world, "world");
 
         return switch (address) {
-            case Address.TileAddr tile -> resolveTile(tile, world);
-            case Address.InventoryAddr inventory -> resolveInventory(world.thrall(), inventory.path());
-            case Address.EntityAddr entity -> resolveEntity(entity, world);
+            case Address.TileAddr tileAddress -> resolveTile(tileAddress, world);
+            case Address.InventoryAddr inventoryAddress ->
+                resolveInventory(world.thrall(), inventoryAddress.path());
+            case Address.EntityAddr entityAddress -> resolveEntity(entityAddress, world);
         };
     }
 
@@ -134,15 +135,13 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             return resolveTilePosition(thrall.pos(), address.layer(), world);
         }
 
-        Matcher coordinate = COORDINATE_PATTERN.matcher(value);
-        if (coordinate.matches()) {
+        Matcher coordinateMatcher = COORDINATE_PATTERN.matcher(value);
+        if (coordinateMatcher.matches()) {
             try {
-                return resolveTilePosition(
-                        new Vec2(
-                                Integer.parseInt(coordinate.group(1)),
-                                Integer.parseInt(coordinate.group(2))),
-                        address.layer(),
-                        world);
+                Vec2 position = new Vec2(
+                        Integer.parseInt(coordinateMatcher.group(1)),
+                        Integer.parseInt(coordinateMatcher.group(2)));
+                return resolveTilePosition(position, address.layer(), world);
             } catch (NumberFormatException ignored) {
                 return failure(Resolution.Reason.INVALID_TILE_SPEC);
             }
@@ -152,9 +151,9 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
-        Matcher direction = DIRECTION_PATTERN.matcher(value);
-        if (direction.matches()) {
-            int distance = parsePositiveDistance(direction.group(2));
+        Matcher directionMatcher = DIRECTION_PATTERN.matcher(value);
+        if (directionMatcher.matches()) {
+            int distance = parsePositiveDistance(directionMatcher.group(2));
             if (distance < 1) {
                 return failure(Resolution.Reason.INVALID_TILE_SPEC);
             }
@@ -165,10 +164,8 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
             }
 
             try {
-                return resolveTilePosition(
-                        offset(thrall.pos(), direction.group(1), distance),
-                        address.layer(),
-                        world);
+                Vec2 position = offset(thrall.pos(), directionMatcher.group(1), distance);
+                return resolveTilePosition(position, address.layer(), world);
             } catch (ArithmeticException ignored) {
                 return failure(Resolution.Reason.INVALID_TILE_SPEC);
             }
@@ -185,13 +182,13 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         return resolveTilePosition(entity.pos(), address.layer(), world);
     }
 
-    private static Resolution resolveTilePosition(Vec2 pos, Address.Layer layer, World world) {
-        if (pos == null) {
+    private static Resolution resolveTilePosition(Vec2 position, Address.Layer layer, World world) {
+        if (position == null) {
             return failure(Resolution.Reason.INVALID_TILE_SPEC);
         }
 
-        return world.inBounds(pos)
-                ? found(new TileTarget(pos, layer))
+        return world.inBounds(position)
+                ? found(new TileTarget(position, layer))
                 : failure(Resolution.Reason.OUT_OF_BOUNDS);
     }
 
