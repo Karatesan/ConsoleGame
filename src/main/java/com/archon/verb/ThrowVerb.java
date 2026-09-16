@@ -42,16 +42,15 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Vec2 at = switch (resolution) {
-            case Resolution.Resolved.EntityTarget entity -> entity.entity().pos();
-            case Resolution.Resolved.BodyTarget body -> body.body().entity().pos();
-            case Resolution.Resolved.TileTarget tile -> tile.tile().pos();
-            default -> {
-                c.say("cannot throw at " + targetArg);
-                yield null;
-            }
-        };
-        if (at == null) {
+        Vec2 at;
+        if (resolution instanceof Resolution.Resolved.EntityTarget entity) {
+            at = entity.entity().pos();
+        } else if (resolution instanceof Resolution.Resolved.BodyTarget body) {
+            at = body.body().entity().pos();
+        } else if (resolution instanceof Resolution.Resolved.TileTarget tile) {
+            at = tile.tile().pos();
+        } else {
+            c.say("cannot throw at " + targetArg);
             return ExitCode.BLOCKED;
         }
 
