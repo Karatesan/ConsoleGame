@@ -5,7 +5,6 @@ import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Item;
-import com.archon.model.World;
 
 public final class InspectVerb extends FreeVerb {
     @Override public String name() { return "inspect"; }
@@ -28,9 +27,9 @@ public final class InspectVerb extends FreeVerb {
             case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
             case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
             case Resolved.OnTile onTile -> {
-                World.Tile tile = c.world.tile(onTile.pos());
-                c.say(onTile.pos() + " " + (tile.wall ? "WALL" : "floor") + " — tags " + tile.tags
-                        + (tile.ground.isEmpty() ? "" : ", ground " + tile.ground));
+                var tile = c.world.tile(onTile.pos());
+                c.say(onTile.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
+                        + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
             }
         }
 
