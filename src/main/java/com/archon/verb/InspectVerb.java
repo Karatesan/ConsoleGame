@@ -1,6 +1,15 @@
 package com.archon.verb;
 
-import com.archon.address.Resolved;
+import com.archon.address.Resolution;
+import com.archon.address.Resolved.BodyTarget;
+import com.archon.address.Resolved.EmptyEquipmentSlot;
+import com.archon.address.Resolved.EmptyPropContents;
+import com.archon.address.Resolved.EntityTarget;
+import com.archon.address.Resolved.EquippedItem;
+import com.archon.address.Resolved.PackRoot;
+import com.archon.address.Resolved.PackedItem;
+import com.archon.address.Resolved.PropContents;
+import com.archon.address.Resolved.TileTarget;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
@@ -18,18 +27,24 @@ public final class InspectVerb extends FreeVerb {
             return ExitCode.INVALID;
         }
 
-        Resolved resolved = VerbHelpers.resolve(c, address);
-        if (resolved == null) {
+        Resolution resolution = VerbHelpers.resolve(c, address);
+        if (resolution.resolved() == null) {
             c.say("cannot perceive " + address);
             return ExitCode.INVALID;
         }
 
-        switch (resolved) {
-            case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
-            case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
-            case Resolved.OnTile onTile -> {
-                GameMap.Tile tile = c.world.tile(onTile.pos());
-                c.say(onTile.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
+        switch (resolution.resolved()) {
+            case EntityTarget entityTarget -> inspectEntity(c, entityTarget.entity());
+            case BodyTarget bodyTarget -> inspectEntity(c, bodyTarget.entity());
+            case PackedItem packedItem -> inspectItem(c, packedItem.item());
+            case EquippedItem equippedItem -> inspectItem(c, equippedItem.item());
+            case PropContents propContents -> inspectItem(c, propContents.item());
+            case PackRoot packRoot -> c.say("pack root");
+            case EmptyEquipmentSlot emptyEquipmentSlot -> c.say("nothing there");
+            case EmptyPropContents emptyPropContents -> c.say("nothing there");
+            case TileTarget tileTarget -> {
+                GameMap.Tile tile = c.world.tile(tileTarget.pos());
+                c.say(tileTarget.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
                         + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
             }
         }
@@ -70,9 +85,7 @@ public final class InspectVerb extends FreeVerb {
     }
 
     private void inspectItem(VerbContext c, Item item) {
-        c.say(item == null
-                ? "nothing there"
-                : item.name() + " — tags " + item.tags()
-                        + (item.substance() == null ? "" : ", contains " + item.substance()));
+        c.say(item.name() + " — tags " + item.tags()
+                + (item.substance() == null ? "" : ", contains " + item.substance()));
     }
 }
