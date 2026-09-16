@@ -16,9 +16,9 @@ public final class ReactionSystem {
      * Finds any alive, unspent readied reaction that triggers given world state and movement.
      */
     public static Actor pendingInterrupt(World world, boolean thrallMoved) {
-        if (world.thrall == null) return null;
+        if (world.thrall() == null) return null;
 
-        for (Entity entity : world.entities.values()) {
+        for (Entity entity : world.entities().values()) {
             if (!(entity instanceof Actor actor)) {
                 continue;
             }
@@ -29,14 +29,14 @@ public final class ReactionSystem {
 
             switch (actor.readied().trigger()) {
                 case ON_ADJACENCY -> {
-                    if (actor.pos().chebyshev(world.thrall.pos()) <= 1) {
+                    if (actor.pos().chebyshev(world.thrall().pos()) <= 1) {
                         return actor;
                     }
                 }
                 case ON_MOVEMENT_IN_LOS -> {
                     if (thrallMoved
                             && SpatialService.lineOfSight(
-                                    world.map, actor.pos(), world.thrall.pos())) {
+                                    world.map(), actor.pos(), world.thrall().pos())) {
                         return actor;
                     }
                 }
@@ -50,7 +50,7 @@ public final class ReactionSystem {
      * Overload using world's current line movement flag.
      */
     public static Actor pendingInterrupt(World world) {
-        return pendingInterrupt(world, world.thrallMovedThisLine);
+        return pendingInterrupt(world, world.thrallMovedThisLine());
     }
 
     /**
@@ -60,7 +60,7 @@ public final class ReactionSystem {
     public static int resolveInterrupt(World world, Actor actor) {
         int damage = actor.readied().damage();
         actor.spendReadied();
-        world.thrall.takeDamage(damage);
+        world.thrall().takeDamage(damage);
         return damage;
     }
 }
