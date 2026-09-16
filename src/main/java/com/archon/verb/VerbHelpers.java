@@ -7,8 +7,8 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
-import com.archon.service.SpatialService;
 import com.archon.system.environment.SimulationSystem;
+import com.archon.system.spatial.SpatialService;
 
 import java.util.List;
 
