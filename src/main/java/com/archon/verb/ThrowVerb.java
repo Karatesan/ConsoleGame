@@ -3,6 +3,7 @@ package com.archon.verb;
 import com.archon.address.Resolution;
 import com.archon.command.Ast;
 import com.archon.model.Item;
+import com.archon.model.Tile;
 import com.archon.model.Vec2;
 
 public final class ThrowVerb implements Verb {
@@ -47,8 +48,13 @@ public final class ThrowVerb implements Verb {
             at = entity.entity().pos();
         } else if (found instanceof Resolution.Resolved.BodyTarget body) {
             at = body.body().entity().pos();
-        } else if (found instanceof Resolution.Resolved.TileTarget tile) {
+        } else if (found instanceof Resolution.Resolved.TileTarget tile
+                && tile.tile().type() == Tile.Type.FLOOR) {
             at = tile.tile().pos();
+        } else if (found instanceof Resolution.Resolved.TileTarget tile
+                && tile.tile().type() == Tile.Type.CEILING) {
+            c.say("cannot throw at ceiling");
+            return ExitCode.BLOCKED;
         } else {
             c.say("cannot throw at " + targetArg);
             return ExitCode.BLOCKED;
