@@ -25,7 +25,7 @@ public class Actor extends Entity {
     }
 
     private final Inventory inventory = new Inventory();
-    private final Map<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
+    private final EnumMap<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
     private final int strength;
     private Readied readied;
     private boolean readiedSpent;
@@ -82,14 +82,6 @@ public class Actor extends Entity {
     }
 
     public Actor ready(Trigger trigger, String description, int damage) {
-        Objects.requireNonNull(trigger, "trigger");
-        if (description == null || description.isBlank()) {
-            throw new IllegalArgumentException("description must not be blank");
-        }
-        if (damage < 0) {
-            throw new IllegalArgumentException("damage must be nonnegative");
-        }
-
         readied = new Readied(trigger, description, damage);
         readiedSpent = false;
         return this;
