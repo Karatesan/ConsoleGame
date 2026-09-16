@@ -21,7 +21,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
 
     Pattern COORDINATE_PATTERN = Pattern.compile("^([+-]?\\d+),([+-]?\\d+)$");
     Pattern DIRECTION_PATTERN = Pattern.compile(
-            "^(n|ne|e|se|s|sw|w|nw)(?:\\s+(.*))?$",
+            "^(n|ne|e|se|s|sw|w|nw)(?:\\s+([1-9]\\d*))?$",
             Pattern.CASE_INSENSITIVE);
 
     record EntityTarget(Entity entity) implements Resolved {
@@ -281,10 +281,6 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
     private static int parsePositiveDistance(String value) {
         if (value == null) {
             return 1;
-        }
-
-        if (!value.matches("[1-9]\\d*")) {
-            return -1;
         }
 
         try {
