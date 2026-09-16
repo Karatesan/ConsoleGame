@@ -3,7 +3,6 @@ package com.archon.verb;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Entity;
-import com.archon.model.GameMap;
 import com.archon.model.SpatialService;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
@@ -71,9 +70,9 @@ public final class IgniteVerb implements Verb {
 
         if (resolved instanceof Resolved.OnTile onTile) {
             final Vec2 at = onTile.pos();
-            final GameMap.Tile tile = c.world.map().tile(at);
 
-            if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
+            if (!c.world.map().hasTag(at, Tag.OIL)
+                    && !c.world.map().hasTag(at, Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
                 return ExitCode.MISS;
             }
