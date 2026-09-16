@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.model.Actor;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 
@@ -31,7 +32,9 @@ public final class ScanVerb extends FreeVerb {
                     e.hp(),
                     e.maxHp(),
                     e.tags().contains(Tag.BURNING) ? "[BURNING] " : "",
-                    e.readied() != null ? "[READIED: " + e.readied().description() + "] " : "",
+                    e instanceof Actor actor && actor.readied() != null
+                            ? "[READIED: " + actor.readied().description() + "] "
+                            : "",
                     e.pos().chebyshev(c.thrall.pos()) <= 1
                             ? "adjacent"
                             : "range " + e.pos().chebyshev(c.thrall.pos())
