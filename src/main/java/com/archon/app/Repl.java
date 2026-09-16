@@ -50,7 +50,7 @@ public final class Repl {
 
             Executor.Outcome o = exec.submit(raw);
 
-            if (!world.thrall.alive()) {
+            if (!world.thrall().alive()) {
                 view.frame(world, round);
                 System.out.println("Run over.");
                 break;

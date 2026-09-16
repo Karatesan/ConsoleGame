@@ -1,5 +1,6 @@
 package com.archon.system.combat;
 
+import com.archon.model.Actor;
 import com.archon.model.Entity;
 import com.archon.model.World;
 import com.archon.system.spatial.SpatialService;
@@ -12,23 +13,38 @@ public final class ReactionSystem {
     private ReactionSystem() {}
 
     /**
-     * Finds any alive, unspent readied reaction that triggers given world state and movement.
+     * Finds the first alive actor with an unspent readied reaction that is triggered by the
+     * current world state and thrall movement.
+     *
+     * @param world current world state
+     * @param thrallMoved whether the thrall moved during the current line
+     * @return the actor whose reaction is triggered, or {@code null} if none is pending
      */
-    public static Entity pendingInterrupt(World world, boolean thrallMoved) {
-        if (world.thrall == null) return null;
+    public static Actor pendingInterrupt(World world, boolean thrallMoved) {
+        if (world.thrall() == null) {
+            return null;
+        }
 
-        for (Entity e : world.entities.values()) {
-            if (!e.alive() || e.readied() == null || e.isReadiedSpent()) continue;
+        for (Entity entity : world.entities()) {
+            if (!(entity instanceof Actor actor)) {
+                continue;
+            }
 
-            switch (e.readied().trigger()) {
+            if (!actor.alive() || actor.readied() == null || actor.isReadiedSpent()) {
+                continue;
+            }
+
+            switch (actor.readied().trigger()) {
                 case ON_ADJACENCY -> {
-                    if (e.pos().chebyshev(world.thrall.pos()) <= 1) {
-                        return e;
+                    if (actor.pos().chebyshev(world.thrall().pos()) <= 1) {
+                        return actor;
                     }
                 }
                 case ON_MOVEMENT_IN_LOS -> {
-                    if (thrallMoved && SpatialService.lineOfSight(world.map, e.pos(), world.thrall.pos())) {
-                        return e;
+                    if (thrallMoved
+                            && SpatialService.lineOfSight(
+                                    world.map(), actor.pos(), world.thrall().pos())) {
+                        return actor;
                     }
                 }
             }
@@ -38,20 +54,26 @@ public final class ReactionSystem {
     }
 
     /**
-     * Overload using world's current line movement flag.
+     * Finds a pending interrupt using the world's current movement flag.
+     *
+     * @param world current world state
+     * @return the actor whose reaction is triggered, or {@code null} if none is pending
      */
-    public static Entity pendingInterrupt(World world) {
-        return pendingInterrupt(world, world.thrallMovedThisLine);
+    public static Actor pendingInterrupt(World world) {
+        return pendingInterrupt(world, world.thrallMovedThisLine());
     }
 
     /**
-     * Resolves a deterministic interrupt against the thrall.
-     * Marks reaction as spent, damages the thrall, and returns damage dealt.
+     * Resolves an actor's readied reaction against the thrall.
+     *
+     * @param world current world state
+     * @param actor actor whose reaction is being resolved
+     * @return damage dealt to the thrall
      */
-    public static int resolveInterrupt(World world, Entity e) {
-        e.spendReadied();
-        int damage = e.readied().damage();
-        world.thrall.takeDamage(damage);
+    public static int resolveInterrupt(World world, Actor actor) {
+        int damage = actor.readied().damage();
+        actor.spendReadied();
+        world.thrall().takeDamage(damage);
         return damage;
     }
 }

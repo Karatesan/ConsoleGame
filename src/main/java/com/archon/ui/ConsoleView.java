@@ -2,7 +2,16 @@ package com.archon.ui;
 
 import com.archon.event.GameEvent;
 import com.archon.exec.RoundState;
-import com.archon.model.*;
+import com.archon.model.Entity;
+import com.archon.model.EquipmentSlot;
+import com.archon.model.GameMap;
+import com.archon.model.Inventory;
+import com.archon.model.Item;
+import com.archon.model.Tag;
+import com.archon.model.Thrall;
+import com.archon.model.Vec2;
+import com.archon.model.World;
+import com.archon.system.spatial.SpatialService;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -101,29 +110,29 @@ public final class ConsoleView implements View {
     }
 
     @Override
-    public void frame(World w, RoundState round) {
+    public void frame(World world, RoundState round) {
         if (fullscreen) {
             System.out.print("\033[H\033[2J");
             System.out.flush();
             header();
-            System.out.print(grid(w));
-            System.out.print(hud(w, round));
+            System.out.print(grid(world));
+            System.out.print(hud(world, round));
             separator();
-            log.forEach(l -> System.out.println("  " + l));
+            log.forEach(line -> System.out.println("  " + line));
             separator();
             dirty = false;
             return;
         }
 
-        // streaming: only redraw the board when the world actually changed
+        // Streaming: only redraw the board when the world actually changed.
         if (!dirty) {
             return;
         }
 
         dirty = false;
         header();
-        System.out.print(grid(w));
-        System.out.print(hud(w, round));
+        System.out.print(grid(world));
+        System.out.print(hud(world, round));
         separator();
     }
 
@@ -136,36 +145,36 @@ public final class ConsoleView implements View {
         System.out.println("-----------------------------------------------------------------------------");
     }
 
-    private String grid(World w) {
+    private String grid(World world) {
         StringBuilder sb = new StringBuilder("    ");
-        for (int x = 0; x < w.w; x++) {
+        for (int x = 0; x < world.width(); x++) {
             sb.append(x % 10).append(' ');
         }
         sb.append('\n');
 
-        for (int y = 0; y < w.h; y++) {
+        for (int y = 0; y < world.height(); y++) {
             sb.append(String.format("%3d ", y));
-            for (int x = 0; x < w.w; x++) {
-                Vec2 p = new Vec2(x, y);
-                World.Tile t = w.tile(p);
-                Entity e = w.entityAt(p);
-                char c;
+            for (int x = 0; x < world.width(); x++) {
+                Vec2 position = new Vec2(x, y);
+                GameMap.Tile tile = world.tile(position);
+                Entity entity = SpatialService.entityAt(world, position);
+                char glyph;
 
-                if (t.wall) {
-                    c = '#';
-                } else if (e != null) {
-                    c = e.glyph();
-                } else if (t.has(Tag.BURNING)) {
-                    c = '*';
-                } else if (t.has(Tag.OIL)) {
-                    c = '~';
-                } else if (!t.ground.isEmpty()) {
-                    c = '%';
+                if (tile.isWall()) {
+                    glyph = '#';
+                } else if (entity != null) {
+                    glyph = entity.glyph();
+                } else if (tile.has(Tag.BURNING)) {
+                    glyph = '*';
+                } else if (tile.has(Tag.OIL)) {
+                    glyph = '~';
+                } else if (!tile.ground().isEmpty()) {
+                    glyph = '%';
                 } else {
-                    c = '.';
+                    glyph = '.';
                 }
 
-                sb.append(c).append(' ');
+                sb.append(glyph).append(' ');
             }
             sb.append('\n');
         }
@@ -173,29 +182,29 @@ public final class ConsoleView implements View {
         return sb.toString();
     }
 
-    private String hud(World w, RoundState r) {
-        Thrall t = w.thrall;
+    private String hud(World world, RoundState round) {
+        Thrall thrall = world.thrall();
         StringBuilder pips = new StringBuilder();
 
         for (int i = 0; i < RoundState.BASE_AP; i++) {
-            pips.append(i < r.ap() ? '*' : 'o').append(' ');
+            pips.append(i < round.ap() ? '*' : 'o').append(' ');
         }
 
         return String.format("""
                         ROUND %d   HP %d/%d   AP [%s] %d/%d   LINE %d (next tax: +%d AP)
                         hand/right: %-18s hand/left: %-18s pack %d/%d
                         """,
-                r.roundNo(),
-                t.hp(),
-                t.maxHp(),
+                round.roundNo(),
+                thrall.hp(),
+                thrall.maxHp(),
                 pips.toString().trim(),
-                r.ap(),
+                round.ap(),
                 RoundState.BASE_AP,
-                r.linesUsed(),
-                r.taxForNextLine(),
-                name(t.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
-                name(t.inventory().equipped(EquipmentSlot.HAND_LEFT)),
-                t.inventory().pack().size(),
+                round.linesUsed(),
+                round.taxForNextLine(),
+                name(thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
+                name(thrall.inventory().equipped(EquipmentSlot.HAND_LEFT)),
+                thrall.inventory().pack().size(),
                 Inventory.PACK_MAX);
     }
 

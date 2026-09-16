@@ -17,7 +17,7 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
         if (r instanceof Resolved.OnTile ot) {
-            c.say(c.world.tile(ot.pos()).ground.toString());
+            c.say(c.world.tile(ot.pos()).ground().toString());
             return ExitCode.SUCCESS;
         }
         c.say("nothing to list at " + a);

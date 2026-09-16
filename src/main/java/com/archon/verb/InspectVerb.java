@@ -4,8 +4,8 @@ import com.archon.address.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.GameMap;
 import com.archon.model.Item;
-import com.archon.model.World;
 
 public final class InspectVerb extends FreeVerb {
     @Override public String name() { return "inspect"; }
@@ -28,9 +28,9 @@ public final class InspectVerb extends FreeVerb {
             case Resolved.OnEntity onEntity -> inspectEntity(c, onEntity.entity());
             case Resolved.OnItem onItem -> inspectItem(c, onItem.item());
             case Resolved.OnTile onTile -> {
-                World.Tile tile = c.world.tile(onTile.pos());
-                c.say(onTile.pos() + " " + (tile.wall ? "WALL" : "floor") + " — tags " + tile.tags
-                        + (tile.ground.isEmpty() ? "" : ", ground " + tile.ground));
+                GameMap.Tile tile = c.world.tile(onTile.pos());
+                c.say(onTile.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
+                        + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
             }
         }
 
@@ -43,16 +43,18 @@ public final class InspectVerb extends FreeVerb {
 
         output.append("\n  Tags: ").append(entity.tags());
 
-        if (entity instanceof Actor actor && actor.mainHand() != null) {
-            output.append("\n  Holding: ").append(actor.mainHand().name());
-        }
+        if (entity instanceof Actor actor) {
+            if (actor.mainHand() != null) {
+                output.append("\n  Holding: ").append(actor.mainHand().name());
+            }
 
-        if (entity.readied() != null && !entity.isReadiedSpent()) {
-            output.append("\n  READIED: ")
-                    .append(entity.readied().description())
-                    .append(" (")
-                    .append(entity.readied().damage())
-                    .append(" dmg)");
+            if (actor.readied() != null && !actor.isReadiedSpent()) {
+                output.append("\n  READIED: ")
+                        .append(actor.readied().description())
+                        .append(" (")
+                        .append(actor.readied().damage())
+                        .append(" dmg)");
+            }
         }
 
         for (BodyPart part : BodyPart.values()) {

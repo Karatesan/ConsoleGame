@@ -1,17 +1,12 @@
 package com.archon.model;
 
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public class Entity {
     public enum Kind { CREATURE, PROP, DOOR }
-
-    public enum Trigger { ON_ADJACENCY, ON_MOVEMENT_IN_LOS }
-
-    public record Readied(Trigger trigger, String description, int damage) { }
 
     private final String id;
     private final String name;
@@ -23,18 +18,24 @@ public class Entity {
     private int armor;
     private int evasion;
     private final Set<Tag> tags = EnumSet.noneOf(Tag.class);
-    private final Map<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
-    private Readied readied;
-    private boolean readiedSpent;
-    private boolean guarded;
     private boolean identified;
 
     public Entity(String id, String name, char glyph, Kind kind, Vec2 pos, int hp, int armor, int evasion) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("id cannot be null or blank");
+        }
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("name cannot be null or blank");
+        }
+        if (hp < 0) {
+            throw new IllegalArgumentException("initial HP cannot be negative");
+        }
+
         this.id = id;
         this.name = name;
         this.glyph = glyph;
-        this.kind = kind;
-        this.pos = pos;
+        this.kind = Objects.requireNonNull(kind, "kind cannot be null");
+        this.pos = Objects.requireNonNull(pos, "position cannot be null");
         this.hp = hp;
         this.maxHp = hp;
         this.armor = armor;
@@ -85,10 +86,6 @@ public class Entity {
         return Collections.unmodifiableSet(tags);
     }
 
-    public Map<BodyPart, Boolean> crippled() {
-        return Collections.unmodifiableMap(crippled);
-    }
-
     public boolean has(Tag tag) {
         return tags.contains(tag);
     }
@@ -97,37 +94,20 @@ public class Entity {
         return identified;
     }
 
-    public boolean isGuarded() {
-        return guarded;
-    }
-
-    public Readied readied() {
-        return readied;
-    }
-
-    public boolean isReadiedSpent() {
-        return readiedSpent;
-    }
-
     public Entity with(Tag... values) {
         Collections.addAll(tags, values);
         return this;
     }
 
-    public Entity ready(Trigger trigger, String description, int damage) {
-        readied = new Readied(trigger, description, damage);
-        return this;
-    }
-
     public void moveTo(Vec2 destination) {
-        pos = destination;
+        pos = Objects.requireNonNull(destination, "destination cannot be null");
     }
 
     public int takeDamage(int amount) {
         if (amount < 0) {
             throw new IllegalArgumentException("damage cannot be negative");
         }
-        hp -= amount;
+        hp = amount >= hp ? 0 : hp - amount;
         return hp;
     }
 
@@ -135,7 +115,7 @@ public class Entity {
         if (amount < 0) {
             throw new IllegalArgumentException("healing cannot be negative");
         }
-        hp += amount;
+        hp = amount >= maxHp - hp ? maxHp : hp + amount;
         return hp;
     }
 
@@ -155,19 +135,6 @@ public class Entity {
 
     public void setEvasion(int value) {
         evasion = value;
-    }
-
-    public void setGuarded(boolean value) {
-        guarded = value;
-    }
-
-    public void spendReadied() {
-        readiedSpent = true;
-    }
-
-    public void resetRoundState() {
-        readiedSpent = false;
-        guarded = false;
     }
 
     public void identify() {

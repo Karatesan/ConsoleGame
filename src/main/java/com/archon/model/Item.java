@@ -2,6 +2,7 @@ package com.archon.model;
 
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Set;
 
 public final class Item {
@@ -13,13 +14,27 @@ public final class Item {
     private final int damage;
 
     public Item(String id, String name, Set<Tag> tags, Tag substance, int durability, int damage) {
-        this.id = id;
-        this.name = name;
+        this.id = Objects.requireNonNull(id, "id cannot be null");
+        if (id.isBlank()) {
+            throw new IllegalArgumentException("id cannot be blank");
+        }
+
+        this.name = Objects.requireNonNull(name, "name cannot be null");
+        if (name.isBlank()) {
+            throw new IllegalArgumentException("name cannot be blank");
+        }
+
+        Objects.requireNonNull(tags, "tags cannot be null");
+        if (durability < 0) {
+            throw new IllegalArgumentException("durability cannot be negative");
+        }
+        if (damage < 0) {
+            throw new IllegalArgumentException("damage cannot be negative");
+        }
 
         EnumSet<Tag> copiedTags = EnumSet.noneOf(Tag.class);
         copiedTags.addAll(tags);
         this.tags = copiedTags;
-
         this.substance = substance;
         this.durability = durability;
         this.damage = damage;
@@ -75,7 +90,7 @@ public final class Item {
         if (amount < 0) {
             throw new IllegalArgumentException("wear cannot be negative");
         }
-        durability -= amount;
+        durability = Math.max(0, durability - amount);
     }
 
     @Override

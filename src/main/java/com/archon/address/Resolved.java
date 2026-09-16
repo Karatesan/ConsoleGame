@@ -22,7 +22,8 @@ public sealed interface Resolved {
                 Vec2 pos = Address.resolveTileSpec(tile.spec(), world);
                 yield world.inBounds(pos) ? new OnTile(pos, tile.layer()) : null;
             }
-            case Address.InventoryAddr inventory -> resolveInventory(world.thrall, inventory.path(), "self");
+            case Address.InventoryAddr inventory ->
+                    resolveInventory(world.thrall(), inventory.path(), "self");
             case Address.EntityAddr entityAddress -> resolveEntity(entityAddress, world);
         };
     }
@@ -70,7 +71,9 @@ public sealed interface Resolved {
         }
 
         return EquipmentSlot.parse(path)
-                .<Resolved>map(slot -> new OnItem(actor.inventory().equipped(slot), ownerId + "/" + slot.path))
+                .<Resolved>map(slot -> new OnItem(
+                        actor.inventory().equipped(slot),
+                        ownerId + "/" + slot.path))
                 .orElse(null);
     }
 }
