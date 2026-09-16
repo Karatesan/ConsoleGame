@@ -1,9 +1,7 @@
 package com.archon.verb;
 
-import com.archon.address.BodyTarget;
-import com.archon.address.EntityTarget;
 import com.archon.address.Resolution;
-import com.archon.address.TileTarget;
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Entity;
 import com.archon.model.GameMap;
@@ -55,38 +53,24 @@ public final class IgniteVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        final Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
-        final var target = VerbHelpers.found(resolution);
+        Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
+        Resolved target = VerbHelpers.found(resolution);
         if (target == null) {
-            c.say("cannot resolve " + c.inv.arg(0) + ": " + resolution.detail());
+            c.say("cannot resolve " + c.inv.arg(0) + ": " + VerbHelpers.failureDetail(resolution));
             return ExitCode.BLOCKED;
         }
 
-        if (target instanceof final EntityTarget entityTarget) {
-            final Entity entity = entityTarget.entity();
-            if (!entity.has(Tag.FLAMMABLE)) {
-                c.say(entity.name() + " will not catch.");
-                return ExitCode.MISS;
-            }
-            entity.ignite();
-            c.say(entity.name() + " catches fire.");
-            return ExitCode.SUCCESS;
+        if (target instanceof Resolved.EntityTarget entityTarget) {
+            return igniteEntity(c, entityTarget.entity());
         }
 
-        if (target instanceof final BodyTarget bodyTarget) {
-            final Entity entity = bodyTarget.entity();
-            if (!entity.has(Tag.FLAMMABLE)) {
-                c.say(entity.name() + " will not catch.");
-                return ExitCode.MISS;
-            }
-            entity.ignite();
-            c.say(entity.name() + " catches fire.");
-            return ExitCode.SUCCESS;
+        if (target instanceof Resolved.BodyTarget bodyTarget) {
+            return igniteEntity(c, bodyTarget.entity());
         }
 
-        if (target instanceof final TileTarget tileTarget) {
-            final Vec2 at = tileTarget.pos();
-            final GameMap.Tile tile = c.world.tile(at);
+        if (target instanceof Resolved.TileTarget tileTarget) {
+            Vec2 at = tileTarget.pos();
+            GameMap.Tile tile = c.world.tile(at);
 
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
@@ -95,7 +79,7 @@ public final class IgniteVerb implements Verb {
 
             c.world.map().addTag(at, Tag.BURNING);
 
-            final Entity occupant = SpatialService.entityAt(c.world, at);
+            Entity occupant = SpatialService.entityAt(c.world, at);
             if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
                 occupant.ignite();
             }
@@ -106,6 +90,17 @@ public final class IgniteVerb implements Verb {
 
         c.say("cannot ignite " + c.inv.arg(0));
         return ExitCode.BLOCKED;
+    }
+
+    private static ExitCode igniteEntity(VerbContext c, Entity entity) {
+        if (!entity.has(Tag.FLAMMABLE)) {
+            c.say(entity.name() + " will not catch.");
+            return ExitCode.MISS;
+        }
+
+        entity.ignite();
+        c.say(entity.name() + " catches fire.");
+        return ExitCode.SUCCESS;
     }
 
     private static boolean hasFlame(VerbContext c) {
