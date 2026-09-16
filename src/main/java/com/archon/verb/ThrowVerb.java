@@ -36,18 +36,18 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolution resolution = VerbHelpers.resolve(c, targetArg);
-        if (resolution instanceof Resolution.Failure failure) {
+        Resolution found = VerbHelpers.resolve(c, targetArg);
+        if (found instanceof Resolution.Failure failure) {
             c.say("cannot resolve target: " + failure.detail());
             return ExitCode.BLOCKED;
         }
 
         Vec2 at;
-        if (resolution instanceof Resolution.Resolved.EntityTarget entity) {
+        if (found instanceof Resolution.Resolved.EntityTarget entity) {
             at = entity.entity().pos();
-        } else if (resolution instanceof Resolution.Resolved.BodyTarget body) {
+        } else if (found instanceof Resolution.Resolved.BodyTarget body) {
             at = body.body().entity().pos();
-        } else if (resolution instanceof Resolution.Resolved.TileTarget tile) {
+        } else if (found instanceof Resolution.Resolved.TileTarget tile) {
             at = tile.tile().pos();
         } else {
             c.say("cannot throw at " + targetArg);
