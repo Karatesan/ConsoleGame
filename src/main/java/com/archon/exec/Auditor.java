@@ -43,7 +43,7 @@ public final class Auditor {
 
         sb.append("\n  BREAK EXPOSURE:\n");
         boolean any = false;
-        for (Entity e : world.entities.values()) {
+        for (Entity e : world.entities()) {
             if (e instanceof Actor actor
                     && actor.alive()
                     && actor.readied() != null
