@@ -53,7 +53,7 @@ public final class CombatEngine {
             String power,
             boolean force
     ) {
-        int hitChance = 70 + part.hitMod() - target.evasion()
+        int hitChance = 70 + part.hitMod - target.evasion()
                 + ("light".equals(power) ? 20 : "heavy".equals(power) ? -20 : 0);
 
         if (target.isGuarded() && !force) {
@@ -68,7 +68,7 @@ public final class CombatEngine {
         }
 
         int baseDamage = (weapon == null ? 3 : weapon.damage()) + attacker.strength();
-        double multiplier = part.damageMult()
+        double multiplier = part.damageMult
                 * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
         int damage = Math.max(1, (int) Math.round(baseDamage * multiplier) - target.armor());
 
@@ -98,7 +98,7 @@ public final class CombatEngine {
 
         Item dropped = disarmMainHand(owner);
         if (dropped != null && world != null) {
-            world.tile(owner.pos()).ground().add(dropped);
+            world.tile(owner.pos()).ground.add(dropped);
         }
 
         return new DisarmResult(dropped != null, dropped);
@@ -113,7 +113,7 @@ public final class CombatEngine {
     ) {
         int distance = target.pos().chebyshev(attacker.pos());
         int rangeModifier = distance <= 1 ? -20 : distance <= 4 ? 0 : distance <= 8 ? -10 : -25;
-        int hitChance = clampHitChance(70 + part.hitMod() + rangeModifier - target.evasion());
+        int hitChance = clampHitChance(70 + part.hitMod + rangeModifier - target.evasion());
 
         if (!dice.chance(hitChance)) {
             return new RangedHitResult(false, hitChance, 0, part, false);
@@ -150,7 +150,7 @@ public final class CombatEngine {
 
         Item dropped = disarmMainHand(actor);
         if (dropped != null) {
-            world.tile(actor.pos()).ground().add(dropped);
+            world.tile(actor.pos()).ground.add(dropped);
         }
     }
 

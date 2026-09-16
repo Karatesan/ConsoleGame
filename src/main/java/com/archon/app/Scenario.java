@@ -52,7 +52,7 @@ public final class Scenario {
         brazier.with(Tag.METAL, Tag.LIT);
         w.add(brazier);
 
-        Door door = new Door("d1", "Oak Door", '+', new Vec2(2, 3), 30);
+        Door door = new Door("d1", "Oak Door", '+', new Vec2(2, 3), 30, 10);
         door.setArmor(2);
         door.with(Tag.WOOD, Tag.BREAKABLE, Tag.SOLID, Tag.FLAMMABLE);
         w.add(door);

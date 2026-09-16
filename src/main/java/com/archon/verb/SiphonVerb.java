@@ -5,68 +5,119 @@ import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.Entity;
+import com.archon.model.Item;
 import com.archon.model.Prop;
 import com.archon.model.Tag;
 import com.archon.model.World;
 
 public final class SiphonVerb implements Verb {
-    @Override public String name() { return "siphon"; }
-    @Override public String help() { return "siphon <source> — draw liquid. 1 AP. Produces material."; }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
-    @Override public boolean producesMaterial() { return true; }
+    @Override
+    public String name() {
+        return "siphon";
+    }
+
+    @Override
+    public String help() {
+        return "siphon <source> — draw liquid. 1 AP. Produces material.";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return 1;
+    }
+
+    @Override
+    public boolean producesMaterial() {
+        return true;
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        if (c.inv.arg(0) == null) return Check.invalid("siphon from what?", null);
+        if (c.inv.arg(0) == null) {
+            return Check.invalid("siphon from what?", null);
+        }
         return Check.ok();
     }
 
     @Override
     public Check validateState(VerbContext c) {
-        Tag s = sourceSubstance(c, c.inv.arg(0));
-        if (s == null) return Check.blocked("nothing to siphon from " + c.inv.arg(0), "try: inspect " + c.inv.arg(0));
-        Entity holder = holderOf(c, c.inv.arg(0));
-        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1)
-            return Check.blocked(holder.getId() + " out of reach", "step closer");
+        String source = c.inv.arg(0);
+        Tag substance = sourceSubstance(c, source);
+
+        if (substance == null) {
+            return Check.blocked(
+                    "nothing to siphon from " + source,
+                    "try: inspect " + source
+            );
+        }
+
+        Entity holder = holderOf(c, source);
+        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
+            return Check.blocked(holder.id() + " out of reach", "step closer");
+        }
+
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Tag s = sourceSubstance(c, c.inv.arg(0));
-        if (s == null) {
+        Tag substance = sourceSubstance(c, c.inv.arg(0));
+
+        if (substance == null) {
             c.say("nothing to siphon");
             return ExitCode.BLOCKED;
         }
-        c.materialOut = new Material.OfSubstance(s);
-        c.say("Thrall draws " + s.name().toLowerCase() + ".");
+
+        c.materialOut = new Material.OfSubstance(substance);
+        c.say("Thrall draws " + substance.name().toLowerCase() + ".");
         return ExitCode.SUCCESS;
     }
 
-    private static Tag sourceSubstance(VerbContext c, String arg) {
-        Resolved r = VerbHelpers.resolve(c, arg);
-        if (r instanceof Resolved.OnItem oi && oi.getItem() != null) {
-            return oi.getItem().getSubstance();
+    private static Tag sourceSubstance(VerbContext c, String address) {
+        Resolved resolved = VerbHelpers.resolve(c, address);
+
+        if (resolved instanceof Resolved.OnItem onItem) {
+            return substanceOf(onItem.item());
         }
-        if (r instanceof Resolved.OnEntity oe) {
-            if (oe.getEntity() instanceof Actor actor && actor.getMainHand() != null) {
-                return actor.getMainHand().getSubstance();
+
+        if (resolved instanceof Resolved.OnEntity onEntity) {
+            Entity entity = onEntity.entity();
+
+            if (entity instanceof Actor actor) {
+                return substanceOf(actor.mainHand());
             }
-            if (oe.getEntity() instanceof Prop prop && prop.getContents() != null) {
-                return prop.getContents().getSubstance();
+
+            if (entity instanceof Prop prop) {
+                return substanceOf(prop.contents());
             }
         }
-        if (r instanceof Resolved.OnTile ot) {
-            World.Tile t = c.world.tile(ot.getPos());
-            if (t.has(Tag.OIL)) return Tag.OIL;
-            if (t.has(Tag.WATER)) return Tag.WATER;
+
+        if (resolved instanceof Resolved.OnTile onTile) {
+            World.Tile tile = c.world.tile(onTile.pos());
+
+            if (tile.has(Tag.OIL)) {
+                return Tag.OIL;
+            }
+
+            if (tile.has(Tag.WATER)) {
+                return Tag.WATER;
+            }
         }
+
         return null;
     }
 
-    private static Entity holderOf(VerbContext c, String arg) {
-        Address a = Address.parse(arg);
-        if (a instanceof Address.EntityAddr ea) return c.world.get(ea.getId());
+    private static Tag substanceOf(Item item) {
+        return item == null ? null : item.substance();
+    }
+
+    private static Entity holderOf(VerbContext c, String address) {
+        Address parsed = Address.parse(address);
+
+        if (parsed instanceof Address.EntityAddr entityAddress) {
+            return c.world.get(entityAddress.id());
+        }
+
         return null;
     }
 }

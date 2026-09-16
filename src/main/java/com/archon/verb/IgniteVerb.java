@@ -68,16 +68,18 @@ public final class IgniteVerb implements Verb {
             return ExitCode.SUCCESS;
         }
 
-        if (resolved instanceof final Resolved.OnTile onTile) {
-            final Vec2 at = onTile.pos();
-            final World.Tile tile = c.world.tile(at);
+        if (resolved instanceof Resolved.OnTile onTile) {
+            Vec2 at = onTile.pos();
+            World.Tile tile = c.world.tile(at);
+
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
                 return ExitCode.MISS;
             }
 
-            tile.apply(Tag.BURNING);
-            final Entity occupant = c.world.entityAt(at);
+            tile.tags.add(Tag.BURNING);
+
+            Entity occupant = c.world.entityAt(at);
             if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
                 occupant.ignite();
             }
