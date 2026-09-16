@@ -61,7 +61,7 @@ public final class Inventory {
             throw new IllegalArgumentException("item is already in this inventory");
         }
         if (equipment.get(slot) != null) {
-            throw new IllegalStateException("equipment slot is already occupied: " + slot);
+            throw new IllegalStateException("equipment slot is already occupied: " + slot.path());
         }
 
         equipment.put(slot, item);
