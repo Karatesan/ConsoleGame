@@ -71,7 +71,7 @@ public final class IgniteVerb implements Verb {
 
         if (resolved instanceof Resolved.OnTile onTile) {
             final Vec2 at = onTile.pos();
-            final GameMap.Tile tile = c.world.tile(at);
+            final GameMap.Tile tile = c.world.map().tile(at);
 
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
