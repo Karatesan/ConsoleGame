@@ -39,7 +39,7 @@ public final class VerbContext {
             return item;
         }
 
-        Resolved resolved = VerbHelpers.resolve(world, inv.arg(argIndex));
+        Resolved resolved = VerbHelpers.resolve(world, inv.arg(argIndex)).found();
         if (resolved instanceof Resolved.PackedItem packedItem
                 && packedItem.owner() == thrall) {
             return packedItem.item();
