@@ -31,7 +31,17 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
 
-        c.say("nothing to list");
+        if (target instanceof Resolved.TileTarget tileTarget) {
+            c.say(tileTarget.tile().ground().isEmpty()
+                    ? "(empty)"
+                    : String.join(
+                            "\n",
+                            tileTarget.tile().ground().stream()
+                                    .map(item -> "  " + item.id() + "  " + item.tags())
+                                    .toList()));
+            return ExitCode.SUCCESS;
+        }
+
         return ExitCode.INVALID;
     }
 }
