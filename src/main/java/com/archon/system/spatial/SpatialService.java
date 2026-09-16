@@ -19,12 +19,13 @@ public final class SpatialService {
         if (world.thrall() != null && world.thrall().pos().equals(p)) return world.thrall();
         return world.entities().stream()
                 .filter(e -> e.alive() && e.pos().equals(p))
-                .findFirst().orElse(null);
+                .findFirst()
+                .orElse(null);
     }
 
     public static boolean passable(World world, Vec2 p) {
-        GameMap.Tile t = world.tile(p);
-        return t != null && !t.isWall() && entityAt(world, p) == null;
+        GameMap.Tile tile = world.tile(p);
+        return tile != null && !tile.isWall() && entityAt(world, p) == null;
     }
 
     public static List<Entity> hostilesAdjacentTo(World world, Vec2 p) {
@@ -35,9 +36,14 @@ public final class SpatialService {
     }
 
     public static boolean lineOfSight(GameMap map, Vec2 a, Vec2 b) {
-        int dx = Math.abs(b.x() - a.x()), dy = Math.abs(b.y() - a.y());
-        int sx = a.x() < b.x() ? 1 : -1, sy = a.y() < b.y() ? 1 : -1;
-        int err = dx - dy, x = a.x(), y = a.y();
+        int dx = Math.abs(b.x() - a.x());
+        int dy = Math.abs(b.y() - a.y());
+        int sx = a.x() < b.x() ? 1 : -1;
+        int sy = a.y() < b.y() ? 1 : -1;
+        int err = dx - dy;
+        int x = a.x();
+        int y = a.y();
+
         while (x != b.x() || y != b.y()) {
             int e2 = 2 * err;
             if (e2 > -dy) {
@@ -49,9 +55,11 @@ public final class SpatialService {
                 y += sy;
             }
             if (x == b.x() && y == b.y()) break;
-            GameMap.Tile t = map.tile(new Vec2(x, y));
-            if (t == null || t.isWall()) return false;
+
+            GameMap.Tile tile = map.tile(new Vec2(x, y));
+            if (tile == null || tile.isWall()) return false;
         }
+
         return true;
     }
 
