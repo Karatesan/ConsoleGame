@@ -2,6 +2,7 @@ package com.archon.exec;
 
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
+import com.archon.model.Actor;
 import com.archon.model.Entity;
 import com.archon.model.World;
 import com.archon.verb.Check;
@@ -43,10 +44,11 @@ public final class Auditor {
         sb.append("\n  BREAK EXPOSURE:\n");
         boolean any = false;
         for (Entity e : world.entities.values()) {
-            if (e.alive() && e.readied() != null && !e.isReadiedSpent()) {
+            if (e.alive() && e instanceof Actor actor
+                    && actor.readied() != null && !actor.isReadiedSpent()) {
                 any = true;
                 sb.append(String.format("    • %s is READIED (%s, %d dmg) → interrupt at a stage boundary%n",
-                        e.id(), e.readied().description(), e.readied().damage()));
+                        e.id(), actor.readied().description(), actor.readied().damage()));
             }
         }
         if (line.stages().size() > 1) {
