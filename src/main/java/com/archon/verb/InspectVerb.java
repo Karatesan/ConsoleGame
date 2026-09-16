@@ -41,14 +41,26 @@ public final class InspectVerb extends FreeVerb {
             case Resolution.Resolved.PackRoot ignored -> c.say("pack root");
             case Resolution.Resolved.EmptyEquipmentSlot ignored -> c.say("nothing there");
             case Resolution.Resolved.EmptyPropContents ignored -> c.say("nothing there");
-            case Resolution.Resolved.TileTarget tileTarget -> {
-                GameMap.Tile tile = c.world.tile(tileTarget.pos());
-                c.say(tileTarget.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
-                        + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground()));
-            }
+            case Resolution.Resolved.TileTarget tileTarget -> inspectTile(c, tileTarget);
         }
 
         return ExitCode.SUCCESS;
+    }
+
+    private void inspectTile(VerbContext c, Resolution.Resolved.TileTarget tileTarget) {
+        GameMap.Tile tile = c.world.tile(tileTarget.pos());
+        StringBuilder output = new StringBuilder(tileTarget.pos() + " " + (tile.isWall() ? "WALL" : "floor")
+                + " — tags " + tile.tags());
+
+        if (tileTarget.pos().layer().name().equals("CEILING")) {
+            output.append(", ceiling tags ").append(tile.ceilingTags());
+        }
+
+        if (!tile.ground().isEmpty()) {
+            output.append(", ground ").append(tile.ground());
+        }
+
+        c.say(output.toString());
     }
 
     private void inspectEntity(VerbContext c, Entity entity) {
@@ -84,11 +96,6 @@ public final class InspectVerb extends FreeVerb {
     }
 
     private void inspectItem(VerbContext c, Item item) {
-        if (item == null) {
-            c.say("nothing there");
-            return;
-        }
-
         c.say(item.name() + " — tags " + item.tags()
                 + (item.substance() == null ? "" : ", contains " + item.substance()));
     }
