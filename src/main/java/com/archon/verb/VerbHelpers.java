@@ -51,7 +51,7 @@ public final class VerbHelpers {
         return null;
     }
 
-    public static BodyPart aimPart(Ast.Invocation inv, String targetArg) {
+    public static BodyPart aimPart(Ast.Invocation inv) {
         BodyPart aim = inv.flag("aim");
         return aim != null ? aim : BodyPart.TORSO;
     }
