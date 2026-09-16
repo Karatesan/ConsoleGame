@@ -1,6 +1,16 @@
 package com.archon.app;
 
-import com.archon.model.*;
+import com.archon.model.Actor;
+import com.archon.model.CreatureStats;
+import com.archon.model.Dice;
+import com.archon.model.Door;
+import com.archon.model.EquipmentSlot;
+import com.archon.model.Item;
+import com.archon.model.Prop;
+import com.archon.model.Tag;
+import com.archon.model.Thrall;
+import com.archon.model.Vec2;
+import com.archon.model.World;
 
 import java.util.Set;
 
@@ -8,17 +18,17 @@ import java.util.Set;
 public final class Scenario {
 
     public static World testRoom(Dice dice) {
-        World w = new World(12, 8, dice);
+        World world = new World(12, 8, dice);
 
-        for (int x = 0; x < w.w; x++) {
-            w.wall(x, 0);
-            w.wall(x, w.h - 1);
+        for (int x = 0; x < world.width(); x++) {
+            world.map().setWall(new Vec2(x, 0), true);
+            world.map().setWall(new Vec2(x, world.height() - 1), true);
         }
-        for (int y = 0; y < w.h; y++) {
-            w.wall(0, y);
-            w.wall(w.w - 1, y);
+        for (int y = 0; y < world.height(); y++) {
+            world.map().setWall(new Vec2(0, y), true);
+            world.map().setWall(new Vec2(world.width() - 1, y), true);
         }
-        w.wall(3, 3);
+        world.map().setWall(new Vec2(3, 3), true);
 
         Thrall t = new Thrall(new Vec2(3, 4), 40);
         t.inventory().placeInSlotForSetup(
@@ -29,34 +39,42 @@ public final class Scenario {
                 new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1));
         t.inventory().addToPack(Item.flask("flask_oil", "oil flask", Tag.OIL));
         t.inventory().addToPack(Item.flask("flask_water", "water flask", Tag.WATER));
-        w.thrall = t;
+        world.installThrall(t);
 
         Actor orc = new Actor("o1", "Orc Guard", 'O', new Vec2(3, 5), new CreatureStats(24, 3, 5));
         orc.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_RIGHT,
                 Item.weapon("iron_sword", "iron sword", 7, 12, Tag.METAL));
         orc.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
-        w.add(orc);
+        world.add(orc);
 
-        Actor archer = new Actor("g1", "Goblin Archer", 'G', new Vec2(8, 4), new CreatureStats(12, 0, 10));
+        Actor archer =
+                new Actor("g1", "Goblin Archer", 'G', new Vec2(8, 4), new CreatureStats(12, 0, 10));
         archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
         archer.ready(Actor.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement in line of sight", 6);
-        w.add(archer);
+        world.add(archer);
 
         Prop barrel = new Prop("b1", "Oil Barrel", 'B', new Vec2(2, 5), 8);
         barrel.with(Tag.WOOD, Tag.CONTAINER, Tag.FLAMMABLE, Tag.BREAKABLE);
-        barrel.setContents(new Item("oil", "oil", Set.of(Tag.LIQUID, Tag.OIL, Tag.FLAMMABLE), Tag.OIL, 1, 0));
-        w.add(barrel);
+        barrel.setContents(
+                new Item(
+                        "oil",
+                        "oil",
+                        Set.of(Tag.LIQUID, Tag.OIL, Tag.FLAMMABLE),
+                        Tag.OIL,
+                        1,
+                        0));
+        world.add(barrel);
 
         Prop brazier = new Prop("br1", "Brazier", 'i', new Vec2(4, 5), 10);
         brazier.with(Tag.METAL, Tag.LIT);
-        w.add(brazier);
+        world.add(brazier);
 
         Door door = new Door("d1", "Oak Door", '+', new Vec2(2, 3), 30, 10);
         door.setArmor(2);
         door.with(Tag.WOOD, Tag.BREAKABLE, Tag.SOLID, Tag.FLAMMABLE);
-        w.add(door);
+        world.add(door);
 
-        return w;
+        return world;
     }
 }
