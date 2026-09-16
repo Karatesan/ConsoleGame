@@ -33,7 +33,15 @@ public class Actor extends Entity {
     private boolean nocked;
 
     public Actor(String id, String name, char glyph, Vec2 pos, CreatureStats stats) {
-        super(id, name, glyph, Kind.CREATURE, pos, stats.maxHp(), stats.armor(), stats.evasion());
+        super(
+                id,
+                name,
+                glyph,
+                Kind.CREATURE,
+                pos,
+                Objects.requireNonNull(stats, "stats").maxHp(),
+                stats.armor(),
+                stats.evasion());
         this.strength = stats.strength();
 
         for (BodyPart bodyPart : BodyPart.values()) {
