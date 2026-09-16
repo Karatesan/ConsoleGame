@@ -98,7 +98,7 @@ public final class CombatEngine {
 
         Item dropped = disarmMainHand(owner);
         if (dropped != null && world != null) {
-            world.tile(owner.pos()).ground.add(dropped);
+            world.map().placeGroundItem(owner.pos(), dropped);
         }
 
         return new DisarmResult(dropped != null, dropped);
@@ -150,7 +150,7 @@ public final class CombatEngine {
 
         Item dropped = disarmMainHand(actor);
         if (dropped != null) {
-            world.tile(actor.pos()).ground.add(dropped);
+            world.map().placeGroundItem(actor.pos(), dropped);
         }
     }
 
