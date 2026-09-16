@@ -85,6 +85,7 @@ public final class GameMap {
     }
 
     private Tile requireTile(Vec2 position) {
+        Objects.requireNonNull(position, "position");
         if (!inBounds(position)) {
             throw new IllegalArgumentException("Position is outside the map: " + position);
         }
