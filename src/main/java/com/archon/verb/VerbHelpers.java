@@ -7,6 +7,7 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
+import com.archon.service.SpatialService;
 import com.archon.system.environment.SimulationSystem;
 
 import java.util.List;
@@ -49,7 +50,7 @@ public final class VerbHelpers {
     }
 
     public static String soleAdjacentHostile(VerbContext c) {
-        List<Entity> adjacentHostiles = c.world.hostilesAdjacentTo(c.thrall.pos());
+        List<Entity> adjacentHostiles = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
         return adjacentHostiles.size() == 1 ? adjacentHostiles.get(0).id() : null;
     }
 
