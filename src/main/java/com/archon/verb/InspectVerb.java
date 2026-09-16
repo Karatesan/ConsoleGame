@@ -38,9 +38,9 @@ public final class InspectVerb extends FreeVerb {
             case Resolution.Resolved.PackedItem packedItem -> inspectItem(c, packedItem.item());
             case Resolution.Resolved.EquippedItem equippedItem -> inspectItem(c, equippedItem.item());
             case Resolution.Resolved.PropContents propContents -> inspectItem(c, propContents.item());
-            case Resolution.Resolved.PackRoot ignored -> c.say("your pack");
-            case Resolution.Resolved.EmptyEquipmentSlot ignored -> c.say("that equipment slot is empty");
-            case Resolution.Resolved.EmptyPropContents ignored -> c.say("that container is empty");
+            case Resolution.Resolved.PackRoot ignored -> c.say("pack root");
+            case Resolution.Resolved.EmptyEquipmentSlot ignored -> c.say("nothing there");
+            case Resolution.Resolved.EmptyPropContents ignored -> c.say("nothing there");
             case Resolution.Resolved.TileTarget tileTarget -> {
                 GameMap.Tile tile = c.world.tile(tileTarget.pos());
                 c.say(tileTarget.pos() + " " + (tile.isWall() ? "WALL" : "floor") + " — tags " + tile.tags()
@@ -84,6 +84,11 @@ public final class InspectVerb extends FreeVerb {
     }
 
     private void inspectItem(VerbContext c, Item item) {
+        if (item == null) {
+            c.say("nothing there");
+            return;
+        }
+
         c.say(item.name() + " — tags " + item.tags()
                 + (item.substance() == null ? "" : ", contains " + item.substance()));
     }
