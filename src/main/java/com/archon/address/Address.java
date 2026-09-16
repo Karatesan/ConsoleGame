@@ -1,6 +1,5 @@
 package com.archon.address;
 
-/** Parsed, unresolved reference. Everything addressable is a path. */
 public sealed interface Address {
     enum Layer {
         FLOOR,
@@ -15,11 +14,16 @@ public sealed interface Address {
 
     record TileAddr(String spec, Layer layer) implements Address {
         public TileAddr {
-            java.util.Objects.requireNonNull(layer, "layer");
+            if (spec == null || spec.isBlank()) {
+                throw new IllegalArgumentException("empty tile spec");
+            }
+            if (layer == null) {
+                throw new IllegalArgumentException("layer is required");
+            }
         }
     }
 
-    public static Address parse(String source) {
+    static Address parse(String source) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException("empty address");
         }
