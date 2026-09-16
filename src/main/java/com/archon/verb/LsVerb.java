@@ -2,6 +2,7 @@ package com.archon.verb;
 
 import com.archon.address.Resolution;
 import com.archon.address.Resolved;
+import com.archon.world.Layer;
 
 public final class LsVerb extends FreeVerb {
     @Override
@@ -31,7 +32,7 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
 
-        if (target instanceof Resolved.TileTarget tileTarget) {
+        if (target instanceof Resolved.TileTarget tileTarget && tileTarget.layer() == Layer.FLOOR) {
             c.say(tileTarget.tile().ground().isEmpty()
                     ? "(empty)"
                     : String.join(
@@ -42,6 +43,7 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
 
+        c.say("Nothing to list at " + address + ".");
         return ExitCode.INVALID;
     }
 }
