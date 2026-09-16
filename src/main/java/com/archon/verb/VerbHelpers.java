@@ -50,7 +50,8 @@ public final class VerbHelpers {
     }
 
     public static String soleAdjacentHostile(VerbContext c) {
-        List<Entity> adjacentHostiles = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
+        List<Entity> adjacentHostiles =
+                SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
         return adjacentHostiles.size() == 1 ? adjacentHostiles.get(0).id() : null;
     }
 
