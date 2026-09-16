@@ -16,13 +16,20 @@ public sealed interface Address {
             String body = source.substring(1);
             String layer = null;
             int slash = body.indexOf('/');
-            if (slash >= 0) { layer = body.substring(slash + 1); body = body.substring(0, slash); }
-            if (layer != null && !layer.equals("floor") && !layer.equals("ceiling")) throw new IllegalArgumentException("unknown layer \"" + layer + "\" (floor, ceiling)");
+            if (slash >= 0) {
+                layer = body.substring(slash + 1);
+                body = body.substring(0, slash);
+            }
+            if (layer != null && !layer.equals("floor") && !layer.equals("ceiling")) {
+                throw new IllegalArgumentException("unknown layer \"" + layer + "\" (floor, ceiling)");
+            }
             return new TileAddr(body, layer);
         }
         if (source.startsWith("/")) return new InventoryAddr(source.substring(1));
         int slash = source.indexOf('/');
-        return slash < 0 ? new EntityAddr(source, null) : new EntityAddr(source.substring(0, slash), source.substring(slash + 1));
+        return slash < 0
+                ? new EntityAddr(source, null)
+                : new EntityAddr(source.substring(0, slash), source.substring(slash + 1));
     }
 
     static Vec2 resolveTileSpec(String spec, World world) {
@@ -36,10 +43,15 @@ public sealed interface Address {
         Vec2 direction = Vec2.dir(letters);
         if (direction != null) {
             int distance = digits.isEmpty() ? 1 : Integer.parseInt(digits);
-            return new Vec2(world.thrall().pos().x() + direction.x() * distance, world.thrall().pos().y() + direction.y() * distance);
+            return new Vec2(
+                    world.thrall().pos().x() + direction.x() * distance,
+                    world.thrall().pos().y() + direction.y() * distance
+            );
         }
         Entity entity = world.get(spec);
         if (entity != null) return entity.pos();
-        throw new IllegalArgumentException("unknown tile spec \"" + spec + "\" — use @x,y, @self, @e2, or @<entityId>");
+        throw new IllegalArgumentException(
+                "unknown tile spec \"" + spec + "\" — use @x,y, @self, @e2, or @<entityId>"
+        );
     }
 }
