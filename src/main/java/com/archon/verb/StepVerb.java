@@ -2,6 +2,7 @@ package com.archon.verb;
 
 import com.archon.command.Ast;
 import com.archon.model.Vec2;
+import com.archon.service.SpatialService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +23,7 @@ public final class StepVerb implements Verb {
     @Override
     public Check validateState(VerbContext c) {
         Vec2 to = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!c.world.passable(to))
+        if (!SpatialService.passable(c.world, to))
             return Check.blocked("wall or occupant at " + to, "open: " + openDirs(c));
         return Check.ok();
     }
@@ -30,12 +31,12 @@ public final class StepVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         Vec2 to = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!c.world.passable(to)) {
+        if (!SpatialService.passable(c.world, to)) {
             c.say("blocked at " + to);
             return ExitCode.BLOCKED;
         }
         c.thrall.moveTo(to);
-        c.world.thrallMovedThisLine = true;
+        c.world.markThrallMoved();
         c.say("Thrall advances to " + to + ".");
         return ExitCode.SUCCESS;
     }
@@ -43,7 +44,7 @@ public final class StepVerb implements Verb {
     private String openDirs(VerbContext c) {
         List<String> open = new ArrayList<>();
         for (String d : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw")) {
-            if (c.world.passable(c.thrall.pos().plus(Vec2.dir(d)))) {
+            if (SpatialService.passable(c.world, c.thrall.pos().plus(Vec2.dir(d)))) {
                 open.add(d);
             }
         }
