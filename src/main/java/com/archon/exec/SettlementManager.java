@@ -6,6 +6,7 @@ import com.archon.event.GameEvent;
 import com.archon.model.Actor;
 import com.archon.model.World;
 import com.archon.system.combat.ReactionSystem;
+import com.archon.verb.Verb;
 import com.archon.verb.Verbs;
 
 /**
@@ -45,12 +46,23 @@ public final class SettlementManager {
             ));
         } else {
             round.spend(trace.charged());
+
             Actor late = ReactionSystem.pendingInterrupt(world);
             if (late != null) {
-                int dmg = ReactionSystem.resolveInterrupt(world, late);
-                bus.post(new GameEvent.InterruptFired(late.id(), late.readied().description(), dmg));
+                int damage = ReactionSystem.resolveInterrupt(world, late);
+                bus.post(new GameEvent.InterruptFired(
+                        late.id(),
+                        late.readied().description(),
+                        damage
+                ));
             }
-            bus.post(new GameEvent.LineComplete(trace.charged(), tax, allocation - trace.charged(), round.ap()));
+
+            bus.post(new GameEvent.LineComplete(
+                    trace.charged(),
+                    tax,
+                    allocation - trace.charged(),
+                    round.ap()
+            ));
         }
 
         if (!world.thrall().alive()) {
@@ -83,9 +95,12 @@ public final class SettlementManager {
     }
 
     public static boolean endsWithTerminal(Ast.Line line) {
-        if (line.stages().isEmpty()) return false;
+        if (line.stages().isEmpty()) {
+            return false;
+        }
+
         Ast.Stage last = line.stages().get(line.stages().size() - 1);
-        com.archon.verb.Verb v = Verbs.get(last.last().verb());
-        return v != null && v.terminal();
+        Verb verb = Verbs.get(last.last().verb());
+        return verb != null && verb.terminal();
     }
 }
