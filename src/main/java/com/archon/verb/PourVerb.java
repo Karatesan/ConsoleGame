@@ -8,17 +8,40 @@ import com.archon.model.Tag;
 import com.archon.model.Vec2;
 
 public final class PourVerb implements Verb {
-    @Override public String name() { return "pour"; }
-    @Override public String help() { return "pour <liquid> <tile> — 1 AP. Accepts material."; }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
-    @Override public boolean acceptsMaterial() { return true; }
-    @Override public boolean producesMaterial() { return true; }
+    @Override
+    public String name() {
+        return "pour";
+    }
+
+    @Override
+    public String help() {
+        return "pour <liquid> <tile> — 1 AP. Accepts material.";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return 1;
+    }
+
+    @Override
+    public boolean acceptsMaterial() {
+        return true;
+    }
+
+    @Override
+    public boolean producesMaterial() {
+        return true;
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
         boolean piped = c.acceptsPipedMaterial();
-        if (!piped && c.inv.args().size() < 2) return Check.invalid("pour needs a liquid and a tile", null);
-        if (piped && c.inv.arg(0) == null) return Check.invalid("pour needs a destination tile", null);
+        if (!piped && c.inv.args().size() < 2) {
+            return Check.invalid("pour needs a liquid and a tile", null);
+        }
+        if (piped && c.inv.arg(0) == null) {
+            return Check.invalid("pour needs a destination tile", null);
+        }
         return Check.ok();
     }
 
@@ -41,6 +64,7 @@ public final class PourVerb implements Verb {
                 c.say("nothing pourable");
                 return ExitCode.BLOCKED;
             }
+
             substance = item.substance();
             c.thrall.inventory().remove(item);
             item.consumeSubstance();
