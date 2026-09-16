@@ -86,12 +86,12 @@ public final class World {
 
     // ---------- Deterministic interrupts ----------
 
-    public Entity pendingInterrupt() {
+    public Actor pendingInterrupt() {
         return ReactionSystem.pendingInterrupt(this);
     }
 
-    public int resolveInterrupt(Entity e) {
-        return ReactionSystem.resolveInterrupt(this, e);
+    public int resolveInterrupt(Actor actor) {
+        return ReactionSystem.resolveInterrupt(this, actor);
     }
 
     // ---------- World tick ----------
