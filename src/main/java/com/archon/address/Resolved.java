@@ -42,8 +42,8 @@ public sealed interface Resolved {
             return new OnItem(prop.contents(), entity.id() + "/contents");
         }
 
-        if (entity instanceof Actor actor) {
-            Resolved inventory = resolveInventory(actor, path, entity.id());
+        if (entity instanceof Actor) {
+            Resolved inventory = resolveInventory(world.thrall(), path, entity.id());
             if (inventory != null) {
                 return inventory;
             }
