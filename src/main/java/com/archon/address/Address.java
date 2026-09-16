@@ -7,9 +7,11 @@ public sealed interface Address {
         CEILING
     }
 
-    record EntityAddr(String id, String path) implements Address { }
+    record EntityAddr(String id, String path) implements Address {
+    }
 
-    record InventoryAddr(String path) implements Address { }
+    record InventoryAddr(String path) implements Address {
+    }
 
     record TileAddr(String spec, Layer layer) implements Address {
         public TileAddr {
@@ -17,7 +19,7 @@ public sealed interface Address {
         }
     }
 
-    static Address parse(String source) {
+    public static Address parse(String source) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException("empty address");
         }
