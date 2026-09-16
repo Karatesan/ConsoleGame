@@ -1,8 +1,7 @@
 package com.archon.verb;
 
-import com.archon.address.Resolution;
+import com.archon.address.Address;
 import com.archon.address.Resolved;
-import com.archon.world.Layer;
 
 public final class LsVerb extends FreeVerb {
     @Override
@@ -18,8 +17,7 @@ public final class LsVerb extends FreeVerb {
     @Override
     public ExitCode execute(VerbContext c) {
         String address = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
-        Resolution resolution = VerbHelpers.resolve(c, address);
-        Resolved target = VerbHelpers.found(resolution);
+        Resolved target = VerbHelpers.found(VerbHelpers.resolve(c, address));
 
         if (target instanceof Resolved.PackRoot packRoot) {
             c.say(packRoot.owner().inventory().isPackEmpty()
@@ -32,18 +30,19 @@ public final class LsVerb extends FreeVerb {
             return ExitCode.SUCCESS;
         }
 
-        if (target instanceof Resolved.TileTarget tileTarget && tileTarget.layer() == Layer.FLOOR) {
-            c.say(tileTarget.tile().ground().isEmpty()
+        if (target instanceof Resolved.TileTarget tileTarget
+                && tileTarget.layer() == Address.Layer.FLOOR) {
+            c.say(c.world.map().tile(tileTarget.pos()).ground().isEmpty()
                     ? "(empty)"
                     : String.join(
                             "\n",
-                            tileTarget.tile().ground().stream()
+                            c.world.map().tile(tileTarget.pos()).ground().stream()
                                     .map(item -> "  " + item.id() + "  " + item.tags())
                                     .toList()));
             return ExitCode.SUCCESS;
         }
 
-        c.say("Nothing to list at " + address + ".");
+        c.say("nothing to list at " + address);
         return ExitCode.INVALID;
     }
 }
