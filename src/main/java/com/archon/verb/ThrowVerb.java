@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
@@ -36,17 +37,25 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved resolved = VerbHelpers.resolve(c, targetArg);
-        if (resolved == null) {
-            c.say("cannot resolve " + targetArg);
+        Resolution resolution = VerbHelpers.resolve(c, targetArg);
+        if (resolution instanceof Resolution.Failure failure) {
+            c.say("cannot resolve target: " + failure.detail());
             return ExitCode.BLOCKED;
         }
 
+        Resolved resolved = ((Resolution.Success) resolution).resolved();
         Vec2 at = switch (resolved) {
-            case Resolved.OnEntity entity -> entity.entity().pos();
-            case Resolved.OnTile tile -> tile.pos();
-            case Resolved.OnItem ignored -> c.thrall.pos();
+            case Resolved.EntityTarget entity -> entity.entity().pos();
+            case Resolved.BodyTarget body -> body.body().entity().pos();
+            case Resolved.TileTarget tile -> tile.tile().pos();
+            default -> {
+                c.say("cannot throw at " + targetArg);
+                yield null;
+            }
         };
+        if (at == null) {
+            return ExitCode.BLOCKED;
+        }
 
         if (!piped && !c.thrall.inventory().remove(item)) {
             c.say("no such item to throw");
