@@ -1,6 +1,7 @@
 package com.archon.system.combat;
 
 import com.archon.model.Actor;
+import com.archon.model.Entity;
 import com.archon.model.World;
 import com.archon.system.spatial.SpatialService;
 
@@ -17,7 +18,9 @@ public final class ReactionSystem {
     public static Actor pendingInterrupt(World world, boolean thrallMoved) {
         if (world.thrall() == null) return null;
 
-        for (Actor actor : world.entities()) {
+        for (Entity entity : world.entities()) {
+            if (!(entity instanceof Actor actor)) continue;
+
             if (!actor.alive() || actor.readied() == null || actor.isReadiedSpent()) {
                 continue;
             }
