@@ -5,7 +5,6 @@ import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
-import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
 import com.archon.system.spatial.SpatialService;
 
