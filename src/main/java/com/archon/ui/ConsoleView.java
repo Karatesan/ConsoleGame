@@ -138,20 +138,20 @@ public final class ConsoleView implements View {
 
     private String grid(World w) {
         StringBuilder sb = new StringBuilder("    ");
-        for (int x = 0; x < w.w; x++) {
+        for (int x = 0; x < w.width(); x++) {
             sb.append(x % 10).append(' ');
         }
         sb.append('\n');
 
-        for (int y = 0; y < w.h; y++) {
+        for (int y = 0; y < w.height(); y++) {
             sb.append(String.format("%3d ", y));
-            for (int x = 0; x < w.w; x++) {
+            for (int x = 0; x < w.width(); x++) {
                 Vec2 p = new Vec2(x, y);
-                World.Tile t = w.tile(p);
-                Entity e = w.entityAt(p);
+                GameMap.Tile t = w.map().tile(p);
+                Entity e = SpatialService.entityAt(w, p);
                 char c;
 
-                if (t.wall) {
+                if (t.isWall()) {
                     c = '#';
                 } else if (e != null) {
                     c = e.glyph();
@@ -159,7 +159,7 @@ public final class ConsoleView implements View {
                     c = '*';
                 } else if (t.has(Tag.OIL)) {
                     c = '~';
-                } else if (!t.ground.isEmpty()) {
+                } else if (!t.ground().isEmpty()) {
                     c = '%';
                 } else {
                     c = '.';
@@ -174,7 +174,7 @@ public final class ConsoleView implements View {
     }
 
     private String hud(World w, RoundState r) {
-        Thrall t = w.thrall;
+        Thrall t = w.thrall();
         StringBuilder pips = new StringBuilder();
 
         for (int i = 0; i < RoundState.BASE_AP; i++) {
