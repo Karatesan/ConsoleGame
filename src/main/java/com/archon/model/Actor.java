@@ -25,7 +25,7 @@ public class Actor extends Entity {
     }
 
     private final Inventory inventory = new Inventory();
-    private final EnumMap<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
+    private final Map<BodyPart, Boolean> crippled = new EnumMap<>(BodyPart.class);
     private final int strength;
     private Readied readied;
     private boolean readiedSpent;
@@ -33,13 +33,17 @@ public class Actor extends Entity {
     private boolean nocked;
 
     public Actor(String id, String name, char glyph, Vec2 pos, CreatureStats stats) {
+        this(validatedStats(stats), id, name, glyph, pos);
+    }
+
+    private Actor(CreatureStats stats, String id, String name, char glyph, Vec2 pos) {
         super(
                 id,
                 name,
                 glyph,
                 Kind.CREATURE,
                 pos,
-                Objects.requireNonNull(stats, "stats").maxHp(),
+                stats.maxHp(),
                 stats.armor(),
                 stats.evasion());
         this.strength = stats.strength();
@@ -47,6 +51,10 @@ public class Actor extends Entity {
         for (BodyPart bodyPart : BodyPart.values()) {
             crippled.put(bodyPart, false);
         }
+    }
+
+    private static CreatureStats validatedStats(CreatureStats stats) {
+        return Objects.requireNonNull(stats, "creature stats cannot be null");
     }
 
     public Inventory inventory() {
@@ -74,6 +82,14 @@ public class Actor extends Entity {
     }
 
     public Actor ready(Trigger trigger, String description, int damage) {
+        Objects.requireNonNull(trigger, "trigger");
+        if (description == null || description.isBlank()) {
+            throw new IllegalArgumentException("description must not be blank");
+        }
+        if (damage < 0) {
+            throw new IllegalArgumentException("damage must be nonnegative");
+        }
+
         readied = new Readied(trigger, description, damage);
         readiedSpent = false;
         return this;
