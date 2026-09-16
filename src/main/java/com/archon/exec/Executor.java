@@ -5,6 +5,7 @@ import com.archon.command.CommandParser;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.World;
+import com.archon.system.SimulationSystem;
 import com.archon.verb.*;
 
 import java.util.List;
@@ -91,7 +92,7 @@ public final class Executor {
         // ---- 6. commit: tax is charged now and is never refunded ----
         round.spend(tax);
         round.countLine();
-        world.thrallMovedThisLine = false;
+        world.resetThrallMovement();
         bus.post(new GameEvent.LineStart(line.raw(), round.linesUsed(), allocation, tax, line.isChain()));
 
         // ---- 7. execute stages, left to right ----
@@ -103,7 +104,7 @@ public final class Executor {
 
     public void endRound() {
         int wasted = round.ap();
-        List<String> worldLog = world.tick();
+        List<String> worldLog = SimulationSystem.tick(world);
         round.reset();
         bus.post(new GameEvent.RoundEnd(wasted, worldLog));
         bus.post(new GameEvent.RoundStart(round.roundNo(), round.ap()));
