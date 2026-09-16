@@ -54,9 +54,11 @@ public final class World {
         if (this.thrall != null && this.thrall != thrall) {
             throw new IllegalStateException("A different thrall is already installed");
         }
-        if (entities.containsKey(thrall.id())) {
+
+        String id = Objects.requireNonNull(thrall.id(), "thrall.id");
+        if (entities.containsKey(id)) {
             throw new IllegalArgumentException(
-                    "Thrall ID collides with a registered entity: " + thrall.id()
+                    "Thrall ID collides with a registered entity: " + id
             );
         }
 
