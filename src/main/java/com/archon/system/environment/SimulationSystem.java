@@ -9,6 +9,7 @@ import com.archon.model.World;
 import com.archon.system.spatial.SpatialService;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -23,16 +24,21 @@ public final class SimulationSystem {
      * Spills a liquid substance onto a tile, updating tile tags and any occupant.
      */
     public static void spill(World world, Vec2 at, Tag substance) {
-        GameMap.Tile tile = world.map().tile(at);
-        if (tile == null) return;
-
-        world.map().addTag(at, Tag.LIQUID);
-        world.map().addTag(at, substance);
-        if (substance == Tag.OIL) {
-            world.map().addTag(at, Tag.FLAMMABLE);
+        GameMap map = world.map();
+        GameMap.Tile tile = map.tile(at);
+        if (tile == null) {
+            return;
         }
+
+        map.addTag(at, Tag.LIQUID);
+        map.addTag(at, substance);
+
+        if (substance == Tag.OIL) {
+            map.addTag(at, Tag.FLAMMABLE);
+        }
+
         if (substance == Tag.WATER) {
-            world.map().addTag(at, Tag.CONDUCTIVE);
+            map.addTag(at, Tag.CONDUCTIVE);
         }
 
         Entity occupant = SpatialService.entityAt(world, at);
@@ -53,10 +59,12 @@ public final class SimulationSystem {
         List<String> log = new ArrayList<>();
         world.advanceRound();
 
-        for (Entity entity : new ArrayList<>(world.entities())) {
+        Collection<Entity> entitySnapshot = new ArrayList<>(world.entities());
+        for (Entity entity : entitySnapshot) {
             if (entity.alive() && entity.has(Tag.BURNING)) {
                 entity.takeDamage(3);
                 log.add(entity.name() + " burns for 3.");
+
                 if (!entity.alive()) {
                     log.add(entity.name() + " is consumed.");
                 }
@@ -74,11 +82,13 @@ public final class SimulationSystem {
         }
         thrall.resetRoundState();
 
+        GameMap map = world.map();
         List<Vec2> ignite = new ArrayList<>();
+
         for (int y = 0; y < world.height(); y++) {
             for (int x = 0; x < world.width(); x++) {
                 Vec2 position = new Vec2(x, y);
-                GameMap.Tile tile = world.map().tile(position);
+                GameMap.Tile tile = map.tile(position);
                 if (!tile.has(Tag.BURNING)) {
                     continue;
                 }
@@ -89,7 +99,8 @@ public final class SimulationSystem {
                         Vec2.dir("e"),
                         Vec2.dir("w"))) {
                     Vec2 adjacent = position.plus(direction);
-                    GameMap.Tile adjacentTile = world.map().tile(adjacent);
+                    GameMap.Tile adjacentTile = map.tile(adjacent);
+
                     if (adjacentTile != null
                             && adjacentTile.has(Tag.OIL)
                             && !adjacentTile.has(Tag.BURNING)) {
@@ -100,7 +111,7 @@ public final class SimulationSystem {
         }
 
         for (Vec2 position : ignite) {
-            world.map().addTag(position, Tag.BURNING);
+            map.addTag(position, Tag.BURNING);
             log.add("Fire spreads to " + position + ".");
         }
 
