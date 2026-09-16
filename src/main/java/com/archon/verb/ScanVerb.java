@@ -19,7 +19,7 @@ public final class ScanVerb extends FreeVerb {
     public ExitCode execute(VerbContext c) {
         StringBuilder sb = new StringBuilder("VISIBLE:\n");
 
-        for (Entity e : c.world.entities.values()) {
+        for (Entity e : c.world.entities()) {
             if (!e.alive()) {
                 continue;
             }
