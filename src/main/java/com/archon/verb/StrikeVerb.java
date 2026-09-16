@@ -54,6 +54,10 @@ public final class StrikeVerb implements Verb {
         }
 
         Resolution resolution = VerbHelpers.resolve(c, target);
+        if (resolution instanceof Resolution.Failure) {
+            return Check.blocked("target not present", null);
+        }
+
         Resolved found = VerbHelpers.found(resolution);
 
         if (found instanceof Resolved.EntityTarget entityTarget) {
