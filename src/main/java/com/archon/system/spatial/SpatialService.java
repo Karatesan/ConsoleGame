@@ -16,19 +16,19 @@ public final class SpatialService {
     private SpatialService() {}
 
     public static Entity entityAt(World world, Vec2 p) {
-        if (world.thrall != null && world.thrall.pos().equals(p)) return world.thrall;
-        return world.entities.values().stream()
+        if (world.thrall() != null && world.thrall().pos().equals(p)) return world.thrall();
+        return world.entities().values().stream()
                 .filter(e -> e.alive() && e.pos().equals(p))
                 .findFirst().orElse(null);
     }
 
     public static boolean passable(World world, Vec2 p) {
-        World.Tile t = world.tile(p);
-        return t != null && !t.wall && entityAt(world, p) == null;
+        GameMap.Tile t = world.tile(p);
+        return t != null && !t.isWall() && entityAt(world, p) == null;
     }
 
     public static List<Entity> hostilesAdjacentTo(World world, Vec2 p) {
-        return world.entities.values().stream()
+        return world.entities().values().stream()
                 .filter(e -> e.alive() && e.kind() == Entity.Kind.CREATURE)
                 .filter(e -> e.pos().chebyshev(p) <= 1)
                 .toList();
@@ -49,13 +49,13 @@ public final class SpatialService {
                 y += sy;
             }
             if (x == b.x() && y == b.y()) break;
-            World.Tile t = map.tile(new Vec2(x, y));
-            if (t == null || t.wall) return false;
+            GameMap.Tile t = map.tile(new Vec2(x, y));
+            if (t == null || t.isWall()) return false;
         }
         return true;
     }
 
     public static boolean lineOfSight(World world, Vec2 a, Vec2 b) {
-        return lineOfSight(world.map, a, b);
+        return lineOfSight(world.map(), a, b);
     }
 }
