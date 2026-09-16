@@ -3,9 +3,10 @@ package com.archon.verb;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Entity;
+import com.archon.model.GameMap;
+import com.archon.model.SpatialService;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
-import com.archon.model.World;
 
 public final class IgniteVerb implements Verb {
     @Override
@@ -69,17 +70,17 @@ public final class IgniteVerb implements Verb {
         }
 
         if (resolved instanceof Resolved.OnTile onTile) {
-            Vec2 at = onTile.pos();
-            World.Tile tile = c.world.tile(at);
+            final Vec2 at = onTile.pos();
+            final GameMap.Tile tile = c.world.map().tile(at);
 
             if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
                 c.say("nothing to burn at " + at);
                 return ExitCode.MISS;
             }
 
-            tile.tags.add(Tag.BURNING);
+            c.world.map().addTag(at, Tag.BURNING);
 
-            Entity occupant = c.world.entityAt(at);
+            final Entity occupant = SpatialService.entityAt(c.world, at);
             if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
                 occupant.ignite();
             }
