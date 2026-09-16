@@ -28,8 +28,12 @@ public final class SimulationSystem {
 
         world.map().addTag(at, Tag.LIQUID);
         world.map().addTag(at, substance);
-        if (substance == Tag.OIL) world.map().addTag(at, Tag.FLAMMABLE);
-        if (substance == Tag.WATER) world.map().addTag(at, Tag.CONDUCTIVE);
+        if (substance == Tag.OIL) {
+            world.map().addTag(at, Tag.FLAMMABLE);
+        }
+        if (substance == Tag.WATER) {
+            world.map().addTag(at, Tag.CONDUCTIVE);
+        }
 
         Entity occupant = SpatialService.entityAt(world, at);
         if (occupant != null && substance == Tag.OIL) {
@@ -40,8 +44,9 @@ public final class SimulationSystem {
     /**
      * Advances world simulation by one tick:
      * - Increments round number
-     * - Burns entities with BURNING tag (and thrall)
-     * - Resets per-round Actor state
+     * - Burns entities with BURNING tag
+     * - Resets per-round state for actors
+     * - Burns and resets the thrall
      * - Propagates fire to adjacent oil tiles
      */
     public static List<String> tick(World world) {
@@ -56,6 +61,7 @@ public final class SimulationSystem {
                     log.add(entity.name() + " is consumed.");
                 }
             }
+
             if (entity instanceof Actor actor) {
                 actor.resetRoundState();
             }
@@ -68,25 +74,26 @@ public final class SimulationSystem {
         }
         thrall.resetRoundState();
 
-        // Fire spreads across contiguous oil.
         List<Vec2> ignite = new ArrayList<>();
         for (int y = 0; y < world.height(); y++) {
             for (int x = 0; x < world.width(); x++) {
                 Vec2 position = new Vec2(x, y);
                 GameMap.Tile tile = world.map().tile(position);
-                if (tile.has(Tag.BURNING)) {
-                    for (Vec2 direction : List.of(
-                            Vec2.dir("n"),
-                            Vec2.dir("s"),
-                            Vec2.dir("e"),
-                            Vec2.dir("w"))) {
-                        Vec2 adjacent = position.plus(direction);
-                        GameMap.Tile adjacentTile = world.map().tile(adjacent);
-                        if (adjacentTile != null
-                                && adjacentTile.has(Tag.OIL)
-                                && !adjacentTile.has(Tag.BURNING)) {
-                            ignite.add(adjacent);
-                        }
+                if (!tile.has(Tag.BURNING)) {
+                    continue;
+                }
+
+                for (Vec2 direction : List.of(
+                        Vec2.dir("n"),
+                        Vec2.dir("s"),
+                        Vec2.dir("e"),
+                        Vec2.dir("w"))) {
+                    Vec2 adjacent = position.plus(direction);
+                    GameMap.Tile adjacentTile = world.map().tile(adjacent);
+                    if (adjacentTile != null
+                            && adjacentTile.has(Tag.OIL)
+                            && !adjacentTile.has(Tag.BURNING)) {
+                        ignite.add(adjacent);
                     }
                 }
             }
