@@ -56,7 +56,7 @@ public final class CombatEngine {
         int hitChance = 70 + part.hitMod - target.evasion()
                 + ("light".equals(power) ? 20 : "heavy".equals(power) ? -20 : 0);
 
-        if (target instanceof Actor actor && actor.isGuarded() && !force) {
+        if (target instanceof Actor targetActor && targetActor.isGuarded() && !force) {
             hitChance -= 25;
         }
 
