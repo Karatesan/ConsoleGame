@@ -1,5 +1,6 @@
 package com.archon.system.environment;
 
+import com.archon.model.Actor;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
@@ -47,12 +48,15 @@ public final class SimulationSystem {
                 log.add(e.name() + " burns for 3.");
                 if (!e.alive()) log.add(e.name() + " is consumed.");
             }
-            e.resetRoundState();
+            if (e instanceof Actor actor) {
+                actor.resetRoundState();
+            }
         }
         if (world.thrall.has(Tag.BURNING)) {
             world.thrall.takeDamage(3);
             log.add("Thrall burns for 3.");
         }
+        world.thrall.resetRoundState();
 
         // Fire spreads across contiguous oil.
         List<Vec2> ignite = new ArrayList<>();
