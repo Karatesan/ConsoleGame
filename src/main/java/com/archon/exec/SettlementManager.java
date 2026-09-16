@@ -5,7 +5,7 @@ import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.Actor;
 import com.archon.model.World;
-import com.archon.system.ReactionSystem;
+import com.archon.system.combat.ReactionSystem;
 import com.archon.verb.Verbs;
 
 /**
