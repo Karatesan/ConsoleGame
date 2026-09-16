@@ -39,13 +39,20 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
+        String address = c.inv.arg(0);
+        Resolution resolution = VerbHelpers.resolve(c, address);
 
-        if ((resolution instanceof Resolution.Resolved.PackedItem packedItem
-                && packedItem.owner() == c.thrall)
-                || (resolution instanceof Resolution.Resolved.EquippedItem equippedItem
-                && equippedItem.owner() == c.thrall)) {
-            return Check.ok();
+        if (resolution instanceof Resolution.Resolved.PackedItem packedItem) {
+            if (packedItem.owner() == c.thrall) {
+                return Check.ok();
+            }
+        } else if (resolution instanceof Resolution.Resolved.EquippedItem equippedItem) {
+            if (equippedItem.owner() == c.thrall) {
+                return Check.ok();
+            }
+        } else if (!(resolution instanceof Resolution.Resolved.PropContents)
+                && !(resolution instanceof Resolution.Resolved.TileTarget)) {
+            return Check.blocked("cannot take " + address, null);
         }
 
         if (c.thrall.inventory().isPackFull()) {
