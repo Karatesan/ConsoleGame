@@ -8,44 +8,62 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class StepVerb implements Verb {
-    @Override public String name() { return "step"; }
-    @Override public String help() { return "step <dir> [-c] — move 1 tile. 1 AP (2 with -c)."; }
-    @Override public int apCost(Ast.Invocation inv) { return inv.hasFlag("careful") ? 2 : 1; }
+    @Override
+    public String name() {
+        return "step";
+    }
+
+    @Override
+    public String help() {
+        return "step <dir> [-c] — move 1 tile. 1 AP (2 with -c).";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return inv.hasFlag("careful") ? 2 : 1;
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        String d = c.inv.arg(0);
-        if (d == null) return Check.invalid("step needs a direction", "n s e w ne nw se sw");
-        if (Vec2.dir(d) == null) return Check.invalid("unknown direction \"" + d + "\"", "n s e w ne nw se sw");
+        String direction = c.inv.arg(0);
+        if (direction == null) {
+            return Check.invalid("step needs a direction", "n s e w ne nw se sw");
+        }
+        if (Vec2.dir(direction) == null) {
+            return Check.invalid("unknown direction \"" + direction + "\"", "n s e w ne nw se sw");
+        }
         return Check.ok();
     }
 
     @Override
     public Check validateState(VerbContext c) {
-        Vec2 to = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!SpatialService.passable(c.world, to))
-            return Check.blocked("wall or occupant at " + to, "open: " + openDirs(c));
+        Vec2 destination = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
+        if (!SpatialService.passable(c.world, destination)) {
+            return Check.blocked("wall or occupant at " + destination, "open: " + openDirs(c));
+        }
         return Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Vec2 to = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!SpatialService.passable(c.world, to)) {
-            c.say("blocked at " + to);
+        Vec2 destination = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
+        if (!SpatialService.passable(c.world, destination)) {
+            c.say("blocked at " + destination);
             return ExitCode.BLOCKED;
         }
-        c.thrall.moveTo(to);
+
+        c.thrall.moveTo(destination);
         c.world.markThrallMoved();
-        c.say("Thrall advances to " + to + ".");
+        c.say("Thrall advances to " + destination + ".");
         return ExitCode.SUCCESS;
     }
 
     private String openDirs(VerbContext c) {
         List<String> open = new ArrayList<>();
-        for (String d : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw")) {
-            if (SpatialService.passable(c.world, c.thrall.pos().plus(Vec2.dir(d)))) {
-                open.add(d);
+        for (String direction : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw")) {
+            Vec2 destination = c.thrall.pos().plus(Vec2.dir(direction));
+            if (SpatialService.passable(c.world, destination)) {
+                open.add(direction);
             }
         }
         return String.join(", ", open);
