@@ -13,14 +13,6 @@ public sealed interface Address {
     }
 
     record TileAddr(String spec, Layer layer) implements Address {
-        public TileAddr {
-            if (spec == null || spec.isBlank()) {
-                throw new IllegalArgumentException("empty tile spec");
-            }
-            if (layer == null) {
-                throw new IllegalArgumentException("layer is required");
-            }
-        }
     }
 
     public static Address parse(String source) {
@@ -66,17 +58,21 @@ public sealed interface Address {
 
         if (source.startsWith("/")) {
             String path = source.substring(1);
+
             if (path.isBlank()) {
                 throw new IllegalArgumentException("empty inventory path");
             }
+
             return new InventoryAddr(path);
         }
 
         int slash = source.indexOf('/');
+
         if (slash < 0) {
             if (source.isBlank()) {
                 throw new IllegalArgumentException("empty entity id");
             }
+
             return new EntityAddr(source, null);
         }
 
