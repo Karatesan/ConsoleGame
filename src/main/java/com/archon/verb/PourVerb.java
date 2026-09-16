@@ -89,9 +89,19 @@ public final class PourVerb implements Verb {
         } else if (target instanceof Address.BodyTarget bodyTarget) {
             at = bodyTarget.entity().pos();
         } else if (target instanceof Address.TileTarget tileTarget) {
-            at = tileTarget.tile().pos();
+            switch (tileTarget.location()) {
+                case FLOOR -> at = tileTarget.tile().pos();
+                case CEILING -> {
+                    c.say("cannot pour onto ceiling");
+                    return ExitCode.BLOCKED;
+                }
+                default -> {
+                    c.say("cannot pour onto target");
+                    return ExitCode.BLOCKED;
+                }
+            }
         } else {
-            c.say("cannot pour onto " + targetArg);
+            c.say("cannot pour onto target");
             return ExitCode.BLOCKED;
         }
 
