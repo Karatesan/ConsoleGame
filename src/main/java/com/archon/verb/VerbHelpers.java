@@ -24,7 +24,7 @@ public final class VerbHelpers {
 
     public static Resolution resolve(VerbContext c, String raw) {
         try {
-            return Resolved.resolve(Address.parse(raw), c.world);
+            return Resolution.resolve(Address.parse(raw), c.world);
         } catch (IllegalArgumentException exception) {
             return new Failure(
                     Resolution.Reason.INVALID_SYNTAX,
