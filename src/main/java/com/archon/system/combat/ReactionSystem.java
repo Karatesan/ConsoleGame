@@ -1,6 +1,7 @@
 package com.archon.system.combat;
 
 import com.archon.model.Actor;
+import com.archon.model.Entity;
 import com.archon.model.World;
 import com.archon.system.spatial.SpatialService;
 
@@ -17,11 +18,12 @@ public final class ReactionSystem {
     public static Actor pendingInterrupt(World world, boolean thrallMoved) {
         if (world.thrall == null) return null;
 
-        for (var entity : world.entities.values()) {
-            if (!(entity instanceof Actor actor)
-                    || !actor.alive()
-                    || actor.readied() == null
-                    || actor.isReadiedSpent()) {
+        for (Entity entity : world.entities.values()) {
+            if (!(entity instanceof Actor actor)) {
+                continue;
+            }
+
+            if (!actor.alive() || actor.readied() == null || actor.isReadiedSpent()) {
                 continue;
             }
 
@@ -56,8 +58,8 @@ public final class ReactionSystem {
      * Marks reaction as spent, damages the thrall, and returns damage dealt.
      */
     public static int resolveInterrupt(World world, Actor actor) {
-        actor.spendReadied();
         int damage = actor.readied().damage();
+        actor.spendReadied();
         world.thrall.takeDamage(damage);
         return damage;
     }
