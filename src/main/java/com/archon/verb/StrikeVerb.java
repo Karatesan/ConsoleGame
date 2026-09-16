@@ -7,6 +7,7 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
+import com.archon.system.spatial.SpatialService;
 
 import java.util.List;
 
@@ -19,7 +20,7 @@ public final class StrikeVerb implements Verb {
     public Check validateStructural(VerbContext c) {
         String target = c.inv.arg(0);
         if (target == null) {
-            List<Entity> adjacent = c.world.hostilesAdjacentTo(c.thrall.pos());
+            List<Entity> adjacent = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
             if (adjacent.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
             if (adjacent.size() > 1) {
                 return Check.invalid(
@@ -110,7 +111,7 @@ public final class StrikeVerb implements Verb {
                 return ExitCode.BLOCKED;
             }
 
-            CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice, c.world, owner);
+            CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner);
             if (disarm.success()) {
                 c.say("The " + disarm.weapon().name() + " is knocked from " + owner.name() + "'s grip.");
                 return ExitCode.SUCCESS;
@@ -130,7 +131,7 @@ public final class StrikeVerb implements Verb {
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
 
         CombatEngine.MeleeHitResult result = CombatEngine.resolveMelee(
-                c.world.dice,
+                c.world.dice(),
                 c.world,
                 c.thrall,
                 target,
