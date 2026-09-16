@@ -5,7 +5,9 @@ import com.archon.command.CommandParser;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.World;
-import com.archon.system.SimulationSystem;
+import com.archon.system.environment.SimulationSystem;
+import com.archon.verb.Check;
+import com.archon.verb.ExitCode;
 import com.archon.verb.Verb;
 import com.archon.verb.Verbs;
 
