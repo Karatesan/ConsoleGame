@@ -4,6 +4,7 @@ import com.archon.command.Ast;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.system.combat.CombatEngine;
+import com.archon.system.spatial.SpatialService;
 
 public final class ShootVerb implements Verb {
     @Override
@@ -40,7 +41,7 @@ public final class ShootVerb implements Verb {
             return Check.blocked("unknown target", null);
         }
 
-        if (!c.world.lineOfSight(c.thrall.pos(), target.pos())) {
+        if (!SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos())) {
             return Check.blocked("no line of fire", null);
         }
 
@@ -62,7 +63,7 @@ public final class ShootVerb implements Verb {
 
         BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
         CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
-                c.world.dice,
+                c.world.dice(),
                 c.world,
                 c.thrall,
                 target,
