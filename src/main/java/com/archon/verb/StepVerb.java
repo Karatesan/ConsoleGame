@@ -2,7 +2,7 @@ package com.archon.verb;
 
 import com.archon.command.Ast;
 import com.archon.model.Vec2;
-import com.archon.service.SpatialService;
+import com.archon.system.spatial.SpatialService;
 
 import java.util.ArrayList;
 import java.util.List;
