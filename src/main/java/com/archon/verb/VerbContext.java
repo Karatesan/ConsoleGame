@@ -21,7 +21,7 @@ public final class VerbContext {
     public VerbContext(World world, Ast.Invocation inv, EventBus bus,
                        Material materialIn, boolean firstStage) {
         this.world = world;
-        this.thrall = world.thrall;
+        this.thrall = world.thrall();
         this.inv = inv;
         this.bus = bus;
         this.materialIn = materialIn;
