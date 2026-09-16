@@ -68,7 +68,7 @@ public final class TakeVerb implements Verb {
         }
 
         if (resolved instanceof Resolved.OnTile onTile) {
-            return takeGroundItem(c, address, onTile);
+            return takeGroundItem(c, onTile);
         }
 
         c.say("cannot take " + address);
@@ -127,7 +127,6 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takeGroundItem(
             VerbContext c,
-            String address,
             Resolved.OnTile onTile
     ) {
         if (c.thrall.inventory().isPackFull()) {
