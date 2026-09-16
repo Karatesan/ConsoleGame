@@ -1,9 +1,8 @@
 package com.archon.verb;
 
-import com.archon.address.Resolved;
+import com.archon.address.Resolution;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
-import com.archon.model.Entity;
 import com.archon.model.GameMap;
 import com.archon.model.Inventory;
 import com.archon.model.Item;
@@ -40,11 +39,12 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
+        Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
 
-        if (resolved instanceof Resolved.OnItem onItem
-                && onItem.item() != null
-                && isOwnedByThrall(c, onItem.container())) {
+        if ((resolution instanceof Resolution.PackedItem packedItem
+                && packedItem.owner() == c.thrall)
+                || (resolution instanceof Resolution.EquippedItem equippedItem
+                && equippedItem.owner() == c.thrall)) {
             return Check.ok();
         }
 
@@ -61,32 +61,39 @@ public final class TakeVerb implements Verb {
     @Override
     public ExitCode execute(VerbContext c) {
         String address = c.inv.arg(0);
-        Resolved resolved = VerbHelpers.resolve(c, address);
+        Resolution resolution = VerbHelpers.resolve(c, address);
 
-        if (resolved instanceof Resolved.OnItem onItem && onItem.item() != null) {
-            return takeItem(c, address, onItem);
+        if (resolution instanceof Resolution.PackedItem packedItem) {
+            return takeInventoryItem(c, address, packedItem.owner(), packedItem.item());
         }
 
-        if (resolved instanceof Resolved.OnTile onTile) {
-            return takeGroundItem(c, onTile);
+        if (resolution instanceof Resolution.EquippedItem equippedItem) {
+            return takeInventoryItem(c, address, equippedItem.owner(), equippedItem.item());
+        }
+
+        if (resolution instanceof Resolution.PropContents propContents) {
+            return takePropContents(c, address, propContents.prop(), propContents.item());
+        }
+
+        if (resolution instanceof Resolution.TileTarget tileTarget) {
+            return takeGroundItem(c, tileTarget);
         }
 
         c.say("cannot take " + address);
         return ExitCode.BLOCKED;
     }
 
-    private ExitCode takeItem(
+    private ExitCode takeInventoryItem(
             VerbContext c,
             String address,
-            Resolved.OnItem onItem
+            Actor owner,
+            Item item
     ) {
-        Item item = onItem.item();
-
         /*
          * An item already owned by the thrall is a valid pipeline source.
          * Do not move it between inventory locations.
          */
-        if (isOwnedByThrall(c, onItem.container())) {
+        if (owner == c.thrall) {
             c.materialOut = new Material.OfItem(item);
             c.say("Thrall draws " + item.name() + ".");
             return ExitCode.SUCCESS;
@@ -97,27 +104,12 @@ public final class TakeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        String ownerId = ownerOf(onItem.container());
-        Entity owner = c.world.get(ownerId);
+        if (!c.world.dice().chance(35)) {
+            c.say("Snatch fails.");
+            return ExitCode.MISS;
+        }
 
-        if (owner instanceof Actor actor) {
-            if (!c.world.dice().chance(35)) {
-                c.say("Snatch fails.");
-                return ExitCode.MISS;
-            }
-
-            if (!actor.inventory().remove(item)) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-        } else if (owner instanceof Prop prop) {
-            if (prop.contents() != item) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-
-            item = prop.removeContents();
-        } else {
+        if (!owner.inventory().remove(item)) {
             c.say("cannot take " + address);
             return ExitCode.BLOCKED;
         }
@@ -125,22 +117,41 @@ public final class TakeVerb implements Verb {
         return addToThrallPack(c, item);
     }
 
-    private ExitCode takeGroundItem(
+    private ExitCode takePropContents(
             VerbContext c,
-            Resolved.OnTile onTile
+            String address,
+            Prop prop,
+            Item item
     ) {
         if (c.thrall.inventory().isPackFull()) {
             c.say("pack full");
             return ExitCode.BLOCKED;
         }
 
-        GameMap.Tile tile = c.world.map().tile(onTile.pos());
+        if (prop.contents() != item) {
+            c.say("cannot take " + address);
+            return ExitCode.BLOCKED;
+        }
+
+        return addToThrallPack(c, prop.removeContents());
+    }
+
+    private ExitCode takeGroundItem(
+            VerbContext c,
+            Resolution.TileTarget tileTarget
+    ) {
+        if (c.thrall.inventory().isPackFull()) {
+            c.say("pack full");
+            return ExitCode.BLOCKED;
+        }
+
+        GameMap.Tile tile = c.world.map().tile(tileTarget.pos());
         if (tile.ground().isEmpty()) {
             c.say("nothing on the ground there");
             return ExitCode.BLOCKED;
         }
 
-        Item item = c.world.map().removeFirstGroundItem(onTile.pos());
+        Item item = c.world.map().removeFirstGroundItem(tileTarget.pos());
         return addToThrallPack(c, item);
     }
 
@@ -155,23 +166,4 @@ public final class TakeVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static boolean isOwnedByThrall(VerbContext c, String container) {
-        if ("pack".equals(container)) {
-            return true;
-        }
-
-        String ownerId = ownerOf(container);
-        return "self".equals(ownerId) || c.world.actor(ownerId) == c.thrall;
-    }
-
-    private static String ownerOf(String container) {
-        if (container == null || container.isBlank()) {
-            return "";
-        }
-
-        int separator = container.indexOf('/');
-        return separator < 0
-                ? container
-                : container.substring(0, separator);
-    }
 }
