@@ -14,11 +14,13 @@ public interface Dice {
             this.r = new Random(seed);
         }
 
+        @Override
         public boolean chance(int percent) {
             validatePercent(percent);
             return r.nextInt(100) < percent;
         }
 
+        @Override
         public int between(int lo, int hi) {
             validateRange(lo, hi);
             return lo + r.nextInt(hi - lo + 1);
@@ -32,11 +34,13 @@ public interface Dice {
             this.hit = hit;
         }
 
+        @Override
         public boolean chance(int percent) {
             validatePercent(percent);
             return hit;
         }
 
+        @Override
         public int between(int lo, int hi) {
             validateRange(lo, hi);
             return hit ? hi : lo;
