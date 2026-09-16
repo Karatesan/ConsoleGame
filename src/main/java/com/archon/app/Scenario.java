@@ -39,8 +39,8 @@ public final class Scenario {
         w.add(orc);
 
         Actor archer = new Actor("g1", "Goblin Archer", 'G', new Vec2(8, 4), new CreatureStats(12, 0, 10));
-        archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE)
-                .ready(Entity.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement in line of sight", 6);
+        archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
+        archer.ready(Actor.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement in line of sight", 6);
         w.add(archer);
 
         Prop barrel = new Prop("b1", "Oil Barrel", 'B', new Vec2(2, 5), 8);
