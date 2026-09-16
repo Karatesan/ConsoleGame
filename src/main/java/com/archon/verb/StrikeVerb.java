@@ -56,9 +56,17 @@ public final class StrikeVerb implements Verb {
         return false;
     }
 
+    private String targetArg(VerbContext c) {
+        String target = c.inv.arg(0);
+        if (target != null) return target;
+
+        List<Entity> adjacent = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
+        return adjacent.size() == 1 ? adjacent.get(0).id() : null;
+    }
+
     @Override
     public Check validateState(VerbContext c) {
-        String target = c.inv.arg(0) == null ? VerbHelpers.soleAdjacentHostile(c) : c.inv.arg(0);
+        String target = targetArg(c);
         Resolved resolved = VerbHelpers.resolve(c, target);
 
         if (resolved instanceof Resolved.OnEntity onEntity) {
@@ -88,7 +96,7 @@ public final class StrikeVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String targetArg = c.inv.arg(0) == null ? VerbHelpers.soleAdjacentHostile(c) : c.inv.arg(0);
+        String targetArg = targetArg(c);
         if (targetArg == null) {
             c.say("nothing to strike");
             return ExitCode.BLOCKED;
