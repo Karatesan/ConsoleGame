@@ -53,10 +53,11 @@ public final class IgniteVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
+        String argument = c.inv.arg(0);
+        Resolution resolution = VerbHelpers.resolve(c, argument);
         Resolved target = VerbHelpers.found(resolution);
         if (target == null) {
-            c.say("cannot resolve " + c.inv.arg(0) + ": " + VerbHelpers.failureDetail(resolution));
+            c.say("cannot resolve " + argument + ": " + VerbHelpers.failureDetail(resolution));
             return ExitCode.BLOCKED;
         }
 
@@ -69,27 +70,37 @@ public final class IgniteVerb implements Verb {
         }
 
         if (target instanceof Resolved.TileTarget tileTarget) {
-            Vec2 at = tileTarget.pos();
-            GameMap.Tile tile = c.world.tile(at);
-
-            if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
-                c.say("nothing to burn at " + at);
-                return ExitCode.MISS;
+            if (tileTarget.layer() == GameMap.Layer.CEILING) {
+                c.say("cannot ignite " + argument + ": ceiling targets are unsupported");
+                return ExitCode.BLOCKED;
             }
 
-            c.world.map().addTag(at, Tag.BURNING);
-
-            Entity occupant = SpatialService.entityAt(c.world, at);
-            if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
-                occupant.ignite();
+            if (tileTarget.layer() == GameMap.Layer.FLOOR) {
+                return igniteTile(c, tileTarget.pos());
             }
-
-            c.say("Fire takes hold at " + at + ".");
-            return ExitCode.SUCCESS;
         }
 
-        c.say("cannot ignite " + c.inv.arg(0));
+        c.say("cannot ignite " + argument);
         return ExitCode.BLOCKED;
+    }
+
+    private static ExitCode igniteTile(VerbContext c, Vec2 at) {
+        GameMap.Tile tile = c.world.tile(at);
+
+        if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
+            c.say("nothing to burn at " + at);
+            return ExitCode.MISS;
+        }
+
+        c.world.map().addTag(at, Tag.BURNING);
+
+        Entity occupant = SpatialService.entityAt(c.world, at);
+        if (occupant != null && occupant.has(Tag.FLAMMABLE)) {
+            occupant.ignite();
+        }
+
+        c.say("Fire takes hold at " + at + ".");
+        return ExitCode.SUCCESS;
     }
 
     private static ExitCode igniteEntity(VerbContext c, Entity entity) {
