@@ -12,25 +12,23 @@ import com.archon.system.spatial.SpatialService;
 import java.util.List;
 
 public final class StrikeVerb implements Verb {
-    @Override public String name() { return "strike"; }
-    @Override public String help() { return "strike [target] [-a part] [-p light|normal|heavy] [-f] — 1/2/3 AP."; }
-    @Override public int apCost(Ast.Invocation inv) { return VerbHelpers.powerAp(inv, 2); }
+    @Override
+    public String name() {
+        return "strike";
+    }
+
+    @Override
+    public String help() {
+        return "strike [target] [-a part] [-p light|normal|heavy] [-f] — 1/2/3 AP.";
+    }
+
+    @Override
+    public int apCost(Ast.Invocation inv) {
+        return VerbHelpers.powerAp(inv, 2);
+    }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        String target = c.inv.arg(0);
-        if (target == null) {
-            List<Entity> adjacent = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
-            if (adjacent.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
-            if (adjacent.size() > 1) {
-                return Check.invalid(
-                        "ambiguous target: " + adjacent.stream().map(Entity::id).toList(),
-                        "name one explicitly"
-                );
-            }
-            return Check.ok();
-        }
-
         if (aimPartInvalid(c)) {
             return Check.invalid(
                     "no such hit location",
@@ -38,8 +36,8 @@ public final class StrikeVerb implements Verb {
             );
         }
 
-        Resolution resolution = VerbHelpers.resolve(c, target);
-        if (resolution instanceof Resolution.Failure) {
+        String target = targetArg(c);
+        if (target != null && VerbHelpers.resolve(c, target) instanceof Resolution.Failure) {
             return Check.invalid("unknown target \"" + target + "\"", "try: scan");
         }
 
@@ -59,12 +57,15 @@ public final class StrikeVerb implements Verb {
         if (entity.pos().chebyshev(c.thrall.pos()) > 1) {
             return Check.blocked(entity.id() + " out of reach", "step closer first");
         }
+
         return Check.ok();
     }
 
     private String targetArg(VerbContext c) {
         String target = c.inv.arg(0);
-        if (target != null) return target;
+        if (target != null) {
+            return target;
+        }
 
         List<Entity> adjacent = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
         return adjacent.size() == 1 ? adjacent.get(0).id() : null;
@@ -73,23 +74,27 @@ public final class StrikeVerb implements Verb {
     @Override
     public Check validateState(VerbContext c) {
         String target = targetArg(c);
+        if (target == null) {
+            return Check.blocked("target not present", null);
+        }
+
         Resolution resolution = VerbHelpers.resolve(c, target);
 
-        if (resolution instanceof Resolution.EntityTarget entityTarget) {
+        if (resolution instanceof Resolution.Resolved.EntityTarget entityTarget) {
             return validateEntityTarget(c, entityTarget.entity());
         }
 
-        if (resolution instanceof Resolution.BodyTarget bodyTarget) {
+        if (resolution instanceof Resolution.Resolved.BodyTarget bodyTarget) {
             return validateEntityTarget(c, bodyTarget.entity());
         }
 
-        if (resolution instanceof Resolution.EquippedItem equippedItem
+        if (resolution instanceof Resolution.Resolved.EquippedItem equippedItem
                 && equippedItem.owner() instanceof Actor owner
                 && isHandSlot(equippedItem.slot())) {
             return validateEntityTarget(c, owner);
         }
 
-        if (resolution instanceof Resolution.EmptyEquipmentSlot emptySlot
+        if (resolution instanceof Resolution.Resolved.EmptyEquipmentSlot emptySlot
                 && emptySlot.owner() instanceof Actor
                 && isHandSlot(emptySlot.slot())) {
             return Check.blocked("nothing to disarm", null);
@@ -112,14 +117,14 @@ public final class StrikeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        if (resolution instanceof Resolution.EmptyEquipmentSlot emptySlot
+        if (resolution instanceof Resolution.Resolved.EmptyEquipmentSlot emptySlot
                 && emptySlot.owner() instanceof Actor
                 && isHandSlot(emptySlot.slot())) {
             c.say("nothing to disarm");
             return ExitCode.BLOCKED;
         }
 
-        if (resolution instanceof Resolution.EquippedItem equippedItem
+        if (resolution instanceof Resolution.Resolved.EquippedItem equippedItem
                 && equippedItem.owner() instanceof Actor owner
                 && isHandSlot(equippedItem.slot())) {
             CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner);
@@ -134,10 +139,11 @@ public final class StrikeVerb implements Verb {
 
         Entity target;
         BodyPart part;
-        if (resolution instanceof Resolution.EntityTarget entityTarget) {
+
+        if (resolution instanceof Resolution.Resolved.EntityTarget entityTarget) {
             target = entityTarget.entity();
             part = VerbHelpers.aimPart(c.inv, targetArg);
-        } else if (resolution instanceof Resolution.BodyTarget bodyTarget) {
+        } else if (resolution instanceof Resolution.Resolved.BodyTarget bodyTarget) {
             target = bodyTarget.entity();
             part = c.inv.flag("aim") == null
                     ? bodyTarget.bodyPart()
