@@ -3,12 +3,13 @@ package com.archon.model;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 public final class World {
 
     private final GameMap map;
-    private final LinkedHashMap<String, Entity> entities = new LinkedHashMap<>();
+    private final Map<String, Entity> entities = new LinkedHashMap<>();
     private final Dice dice;
     private Thrall thrall;
     private int roundNumber = 1;
