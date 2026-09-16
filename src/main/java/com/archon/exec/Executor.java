@@ -6,7 +6,8 @@ import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.World;
 import com.archon.system.SimulationSystem;
-import com.archon.verb.*;
+import com.archon.verb.Verb;
+import com.archon.verb.Verbs;
 
 import java.util.List;
 
@@ -45,7 +46,9 @@ public final class Executor {
         this.settlementManager = new SettlementManager(world, bus, round);
     }
 
-    public RoundState round() { return round; }
+    public RoundState round() {
+        return round;
+    }
 
     public Outcome submit(String raw) {
         // ---- 1. parse (free on failure) ----
@@ -56,7 +59,9 @@ public final class Executor {
             bus.post(new GameEvent.Rejected(ExitCode.INVALID, e.getMessage(), e.hint));
             return out(Kind.REJECTED, ExitCode.INVALID, 0, 0, 0, 0, false);
         }
-        if (line.stages().isEmpty()) return out(Kind.NOOP, ExitCode.SUCCESS, 0, 0, 0, 0, false);
+        if (line.stages().isEmpty()) {
+            return out(Kind.NOOP, ExitCode.SUCCESS, 0, 0, 0, 0, false);
+        }
 
         // ---- 2. audits are free and never count as a line ----
         if (line.dryRun()) {
@@ -67,7 +72,8 @@ public final class Executor {
         // ---- 3. free-only lines bypass the economy entirely ----
         if (allFree(line)) {
             stageRunner.runFreeLine(line);
-            return out(Kind.FREE, ExitCode.SUCCESS, 0, 0, 0, 0, SettlementManager.endsWithTerminal(line));
+            return out(Kind.FREE, ExitCode.SUCCESS, 0, 0, 0, 0,
+                    SettlementManager.endsWithTerminal(line));
         }
 
         // ---- 4. validate (free on failure, does not consume a line) ----
@@ -82,10 +88,14 @@ public final class Executor {
 
         // ---- 5. affordability (free on failure) ----
         if (allocation + tax > round.ap()) {
-            bus.post(new GameEvent.Rejected(ExitCode.BLOCKED, String.format(
-                    "insufficient AP — line %d this round: %d AP tax + %d AP allocation = %d. Available: %d.",
-                    round.linesUsed() + 1, tax, allocation, allocation + tax, round.ap()),
-                    tax > 0 ? "chaining this onto your previous line would have avoided the tax" : "reduce allocation or use lighter flags"));
+            bus.post(new GameEvent.Rejected(
+                    ExitCode.BLOCKED,
+                    String.format(
+                            "insufficient AP — line %d this round: %d AP tax + %d AP allocation = %d. Available: %d.",
+                            round.linesUsed() + 1, tax, allocation, allocation + tax, round.ap()),
+                    tax > 0
+                            ? "chaining this onto your previous line would have avoided the tax"
+                            : "reduce allocation or use lighter flags"));
             return out(Kind.REJECTED, ExitCode.BLOCKED, tax, allocation, 0, 0, false);
         }
 
@@ -93,7 +103,8 @@ public final class Executor {
         round.spend(tax);
         round.countLine();
         world.resetThrallMovement();
-        bus.post(new GameEvent.LineStart(line.raw(), round.linesUsed(), allocation, tax, line.isChain()));
+        bus.post(new GameEvent.LineStart(
+                line.raw(), round.linesUsed(), allocation, tax, line.isChain()));
 
         // ---- 7. execute stages, left to right ----
         StageRunner.ExecutionTrace trace = stageRunner.execute(line, round);
@@ -113,8 +124,8 @@ public final class Executor {
     // ---- cost model ----
 
     public static int stageCost(Ast.Stage stage) {
-        Verb v = Verbs.get(stage.last().verb());
-        return v == null ? 0 : v.apCost(stage.last());
+        Verb verb = Verbs.get(stage.last().verb());
+        return verb == null ? 0 : verb.apCost(stage.last());
     }
 
     public static int allocationOf(Ast.Line line) {
@@ -122,14 +133,32 @@ public final class Executor {
     }
 
     private static boolean allFree(Ast.Line line) {
-        return line.stages().stream().flatMap(s -> s.pipeline().stream()).allMatch(i -> {
-            Verb v = Verbs.get(i.verb());
-            return v != null && v.free();
-        });
+        return line.stages().stream()
+                .flatMap(stage -> stage.pipeline().stream())
+                .allMatch(invocation -> {
+                    Verb verb = Verbs.get(invocation.verb());
+                    return verb != null && verb.free();
+                });
     }
 
-    private Outcome out(Kind k, ExitCode c, int tax, int alloc, int charged, int forfeited, boolean roundOver) {
-        return new Outcome(k, c, tax, alloc, charged, forfeited, round.ap(), round.linesUsed(), roundOver);
+    private Outcome out(
+            Kind kind,
+            ExitCode code,
+            int tax,
+            int allocation,
+            int charged,
+            int forfeited,
+            boolean roundOver) {
+        return new Outcome(
+                kind,
+                code,
+                tax,
+                allocation,
+                charged,
+                forfeited,
+                round.ap(),
+                round.linesUsed(),
+                roundOver);
     }
 
     public static boolean endsWithTerminal(Ast.Line line) {
