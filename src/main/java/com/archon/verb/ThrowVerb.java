@@ -1,6 +1,6 @@
 package com.archon.verb;
 
-import com.archon.address.Resolution;
+import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
@@ -37,18 +37,19 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolution found = VerbHelpers.resolve(c, targetArg);
-        if (found instanceof Resolution.Failure failure) {
-            c.say("cannot resolve target: " + failure.detail());
+        Address resolution = VerbHelpers.resolve(c, targetArg);
+        Resolved target = VerbHelpers.found(resolution);
+        if (target == null) {
+            c.say("cannot resolve target: " + targetArg);
             return ExitCode.BLOCKED;
         }
 
         Vec2 at;
-        if (found instanceof Resolved.EntityTarget entity) {
+        if (target instanceof Resolved.EntityTarget entity) {
             at = entity.entity().pos();
-        } else if (found instanceof Resolved.BodyTarget body) {
-            at = body.body().entity().pos();
-        } else if (found instanceof Resolved.TileTarget tile) {
+        } else if (target instanceof Resolved.BodyTarget body) {
+            at = body.entity().pos();
+        } else if (target instanceof Resolved.TileTarget tile) {
             switch (tile.destination()) {
                 case FLOOR -> at = tile.pos();
                 case CEILING -> {
