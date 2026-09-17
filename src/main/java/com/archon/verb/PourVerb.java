@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
@@ -35,11 +36,12 @@ public final class PourVerb implements Verb {
             item.consumeSubstance();
             targetArg = c.inv.arg(0);
         } else {
-            Item item = c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
+            Item item = c.itemFromMaterialOrArg(0);
             if (item == null || item.substance() == null) {
                 c.say("nothing pourable");
                 return ExitCode.BLOCKED;
             }
+
             substance = item.substance();
             c.thrall.inventory().remove(item);
             item.consumeSubstance();
@@ -51,15 +53,29 @@ public final class PourVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved resolved = VerbHelpers.resolve(c, targetArg);
-        if (resolved == null) {
-            c.say("cannot resolve " + targetArg);
+        Resolution resolution = VerbHelpers.resolve(c, targetArg);
+        if (resolution == null || resolution.target() == null) {
+            c.say(resolution == null ? "cannot resolve " + targetArg : resolution.detail());
             return ExitCode.BLOCKED;
         }
 
-        Vec2 at = resolved instanceof Resolved.OnEntity onEntity
-                ? onEntity.entity().pos()
-                : c.thrall.pos();
+        Resolved target = resolution.target();
+        Vec2 at;
+
+        if (target instanceof Resolved.EntityTarget entityTarget) {
+            at = entityTarget.entity().pos();
+        } else if (target instanceof Resolved.BodyTarget bodyTarget) {
+            at = bodyTarget.body().pos();
+        } else if (target instanceof Resolved.TileTarget tileTarget) {
+            if (tileTarget.ceiling()) {
+                c.say("cannot pour onto a ceiling");
+                return ExitCode.BLOCKED;
+            }
+            at = tileTarget.pos();
+        } else {
+            c.say("cannot pour there");
+            return ExitCode.BLOCKED;
+        }
 
         VerbHelpers.spill(c, at, substance);
         c.materialOut = new Material.OfSubstance(substance);
