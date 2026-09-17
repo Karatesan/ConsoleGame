@@ -110,6 +110,7 @@ public final class StrikeVerb implements Verb {
                 && equippedItem.owner() instanceof Actor owner
                 && isHandSlot(equippedItem.slot())) {
             CombatEngine.DisarmResult disarm = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner);
+
             if (disarm.success()) {
                 c.say("The " + disarm.weapon().name() + " is knocked from " + owner.name() + "'s grip.");
                 return ExitCode.SUCCESS;
