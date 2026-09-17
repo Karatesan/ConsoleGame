@@ -38,9 +38,9 @@ public final class StrikeVerb implements Verb {
             );
         }
 
-        String target = targetArg(c);
-        if (target != null && VerbHelpers.resolve(c, target) instanceof Resolution.Failure) {
-            return Check.invalid("unknown target \"" + target + "\"", "try: scan");
+        String explicitTarget = c.inv.arg(0);
+        if (explicitTarget != null && VerbHelpers.resolve(c, explicitTarget) instanceof Resolution.Failure) {
+            return Check.invalid("unknown target \"" + explicitTarget + "\"", "try: scan");
         }
 
         return Check.ok();
@@ -85,15 +85,15 @@ public final class StrikeVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String targetArg = targetArg(c);
-        if (targetArg == null) {
+        String target = targetArg(c);
+        if (target == null) {
             c.say("nothing to strike");
             return ExitCode.BLOCKED;
         }
 
-        Resolution resolution = VerbHelpers.resolve(c, targetArg);
+        Resolution resolution = VerbHelpers.resolve(c, target);
         if (resolution instanceof Resolution.Failure) {
-            c.say(targetArg + " is no longer there");
+            c.say(target + " is no longer there");
             return ExitCode.BLOCKED;
         }
 
@@ -119,17 +119,17 @@ public final class StrikeVerb implements Verb {
             return ExitCode.MISS;
         }
 
-        Entity target;
+        Entity entity;
         BodyPart part;
 
         if (found instanceof Resolved.EntityTarget entityTarget) {
-            target = entityTarget.entity();
-            part = VerbHelpers.aimPart(c.inv, targetArg);
+            entity = entityTarget.entity();
+            part = VerbHelpers.aimPart(c.inv);
         } else if (found instanceof Resolved.BodyTarget bodyTarget) {
-            target = bodyTarget.entity();
+            entity = bodyTarget.entity();
             part = c.inv.flag("aim") == null
                     ? bodyTarget.bodyPart()
-                    : VerbHelpers.aimPart(c.inv, targetArg);
+                    : VerbHelpers.aimPart(c.inv);
         } else {
             c.say("target not present");
             return ExitCode.BLOCKED;
@@ -141,27 +141,27 @@ public final class StrikeVerb implements Verb {
                 c.world.dice(),
                 c.world,
                 c.thrall,
-                target,
+                entity,
                 part,
                 power,
                 c.inv.hasFlag("force")
         );
 
         if (!result.hit()) {
-            c.say("Strike at " + target.name() + "'s " + part.path + " — MISS.");
+            c.say("Strike at " + entity.name() + "'s " + part.path + " — MISS.");
             return ExitCode.MISS;
         }
 
         c.say(String.format(
                 "%s strikes %s's %s. %d dmg.",
                 result.weapon() == null ? "Bare limb" : result.weapon().name(),
-                target.name(),
+                entity.name(),
                 part.path,
                 result.damage()
         ));
 
         if (result.killed()) {
-            c.say(target.name() + " falls.");
+            c.say(entity.name() + " falls.");
             return ExitCode.SUCCESS;
         }
 
