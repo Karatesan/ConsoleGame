@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
@@ -60,7 +61,7 @@ public final class PourVerb implements Verb {
             targetArg = c.inv.arg(0);
         } else {
             Item item = c.itemFromMaterialOrArg(0);
-            if (item == null || !c.thrall.inventory().contains(item) || item.substance() == null) {
+            if (item == null || item.substance() == null) {
                 c.say("nothing pourable");
                 return ExitCode.BLOCKED;
             }
@@ -89,16 +90,14 @@ public final class PourVerb implements Verb {
         } else if (target instanceof Resolved.BodyTarget bodyTarget) {
             at = bodyTarget.entity().pos();
         } else if (target instanceof Resolved.TileTarget tileTarget) {
-            switch (tileTarget.location()) {
-                case FLOOR -> at = tileTarget.pos();
-                case CEILING -> {
-                    c.say("cannot pour onto ceiling");
-                    return ExitCode.BLOCKED;
-                }
-                default -> {
-                    c.say("cannot pour onto target");
-                    return ExitCode.BLOCKED;
-                }
+            if (tileTarget.layer() == Address.Layer.FLOOR) {
+                at = tileTarget.pos();
+            } else if (tileTarget.layer() == Address.Layer.CEILING) {
+                c.say("cannot pour onto ceiling");
+                return ExitCode.BLOCKED;
+            } else {
+                c.say("cannot pour onto target");
+                return ExitCode.BLOCKED;
             }
         } else {
             c.say("cannot pour onto target");
