@@ -2,7 +2,7 @@ package com.archon.verb;
 
 import com.archon.address.Address;
 import com.archon.address.Resolution;
-import com.archon.address.Resolution.Resolved;
+import com.archon.address.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
