@@ -1,7 +1,7 @@
 package com.archon.verb;
 
-import com.archon.address.Address;
 import com.archon.address.Resolution;
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
 import com.archon.model.Tag;
@@ -59,8 +59,8 @@ public final class PourVerb implements Verb {
             item.consumeSubstance();
             targetArg = c.inv.arg(0);
         } else {
-            Item item = c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
-            if (item == null || item.substance() == null) {
+            Item item = c.itemFromMaterialOrArg(0);
+            if (item == null || !c.thrall.inventory().contains(item) || item.substance() == null) {
                 c.say("nothing pourable");
                 return ExitCode.BLOCKED;
             }
@@ -77,20 +77,20 @@ public final class PourVerb implements Verb {
         }
 
         Resolution resolution = VerbHelpers.resolve(c, targetArg);
-        Address target = VerbHelpers.found(resolution);
+        Resolved target = VerbHelpers.found(resolution);
         if (target == null) {
             c.say("cannot resolve " + targetArg + ": " + VerbHelpers.failureDetail(resolution));
             return ExitCode.BLOCKED;
         }
 
         Vec2 at;
-        if (target instanceof Address.EntityTarget entityTarget) {
+        if (target instanceof Resolved.EntityTarget entityTarget) {
             at = entityTarget.entity().pos();
-        } else if (target instanceof Address.BodyTarget bodyTarget) {
+        } else if (target instanceof Resolved.BodyTarget bodyTarget) {
             at = bodyTarget.entity().pos();
-        } else if (target instanceof Address.TileTarget tileTarget) {
+        } else if (target instanceof Resolved.TileTarget tileTarget) {
             switch (tileTarget.location()) {
-                case FLOOR -> at = tileTarget.tile().pos();
+                case FLOOR -> at = tileTarget.pos();
                 case CEILING -> {
                     c.say("cannot pour onto ceiling");
                     return ExitCode.BLOCKED;
