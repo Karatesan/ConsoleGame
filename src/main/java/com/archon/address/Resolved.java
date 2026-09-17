@@ -84,33 +84,33 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
     }
   }
 
-  public static Resolution resolve(Address address, World world) {
+  static com.archon.address.Resolution resolve(Address address, World world) {
     Objects.requireNonNull(address, "address");
     Objects.requireNonNull(world, "world");
 
     return switch (address) {
       case Address.TileAddr tileAddress -> resolveTile(tileAddress, world);
-      case Address.InventoryAddr inventoryAddress -> resolveInventory(world.thrall(),
-          inventoryAddress.path());
+      case Address.InventoryAddr inventoryAddress -> resolveInventory(
+          world.thrall(), inventoryAddress.path());
       case Address.EntityAddr entityAddress -> resolveEntity(entityAddress, world);
     };
   }
 
-  private static Resolution resolveTile(Address.TileAddr address, World world) {
+  private static com.archon.address.Resolution resolveTile(Address.TileAddr address, World world) {
     String spec = address.spec();
     if (spec == null || spec.isBlank()) {
-      return failure(Resolution.FailureReason.INVALID_TILE_SPEC,
+      return failure(Resolution.Reason.INVALID_TILE_SPEC,
           "A tile specification is required.");
     }
 
     if (spec.equals("self")) {
       Actor thrall = world.thrall();
       if (thrall == null) {
-        return failure(Resolution.FailureReason.UNKNOWN_ENTITY,
+        return failure(Resolution.Reason.UNKNOWN_ENTITY,
             "No thrall is available to resolve self.");
       }
       if (!thrall.alive()) {
-        return failure(Resolution.FailureReason.DEAD_ENTITY,
+        return failure(Resolution.Reason.DEAD_ENTITY,
             "The thrall is dead and cannot resolve self.");
       }
       return tileAt(thrall.pos(), address.layer(), world,
@@ -126,15 +126,18 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         return tileAt(pos, address.layer(), world,
             "The coordinate does not resolve to a valid tile position.");
       } catch (NumberFormatException ignored) {
-        return failure(Resolution.FailureReason.INVALID_TILE_SPEC,
+        return failure(Resolution.Reason.INVALID_TILE_SPEC,
             "The coordinate values are outside the supported range.");
       }
     }
 
-    if (spec.indexOf(',') >= 0 || spec.indexOf('\n') >= 0 || spec.indexOf('\r') >= 0
-        || spec.indexOf('\t') >= 0 || spec.indexOf(' ') >= 0
+    if (spec.indexOf(',') >= 0
+        || spec.indexOf('\n') >= 0
+        || spec.indexOf('\r') >= 0
+        || spec.indexOf('\t') >= 0
+        || spec.indexOf(' ') >= 0
         || MALFORMED_DIRECTION_PATTERN.matcher(spec).matches()) {
-      return failure(Resolution.FailureReason.INVALID_TILE_SPEC,
+      return failure(Resolution.Reason.INVALID_TILE_SPEC,
           "The tile specification is malformed.");
     }
 
@@ -142,15 +145,15 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
     if (directionMatcher.matches()) {
       Actor thrall = world.thrall();
       if (thrall == null) {
-        return failure(Resolution.FailureReason.UNKNOWN_ENTITY,
+        return failure(Resolution.Reason.UNKNOWN_ENTITY,
             "No thrall is available to resolve a relative tile.");
       }
       if (!thrall.alive()) {
-        return failure(Resolution.FailureReason.DEAD_ENTITY,
+        return failure(Resolution.Reason.DEAD_ENTITY,
             "The thrall is dead and cannot resolve a relative tile.");
       }
       if (thrall.pos() == null) {
-        return failure(Resolution.FailureReason.INVALID_TILE_SPEC,
+        return failure(Resolution.Reason.INVALID_TILE_SPEC,
             "The thrall does not have a valid tile position.");
       }
 
@@ -159,7 +162,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         String distanceText = directionMatcher.group(2);
         distance = distanceText == null ? 1 : Integer.parseInt(distanceText);
       } catch (NumberFormatException ignored) {
-        return failure(Resolution.FailureReason.INVALID_TILE_SPEC,
+        return failure(Resolution.Reason.INVALID_TILE_SPEC,
             "The direction distance is outside the supported range.");
       }
 
@@ -171,18 +174,18 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         return tileAt(pos, address.layer(), world,
             "The relative tile position is outside the supported range.");
       } catch (ArithmeticException ignored) {
-        return failure(Resolution.FailureReason.INVALID_TILE_SPEC,
+        return failure(Resolution.Reason.INVALID_TILE_SPEC,
             "The relative tile position is outside the supported range.");
       }
     }
 
     Entity entity = world.get(spec);
     if (entity == null) {
-      return failure(Resolution.FailureReason.UNKNOWN_ENTITY,
+      return failure(Resolution.Reason.UNKNOWN_ENTITY,
           "No entity exists with ID '" + spec + "'.");
     }
     if (!entity.alive()) {
-      return failure(Resolution.FailureReason.DEAD_ENTITY,
+      return failure(Resolution.Reason.DEAD_ENTITY,
           "The entity with ID '" + spec + "' is dead.");
     }
 
@@ -190,31 +193,33 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         "The entity with ID '" + spec + "' does not have a valid tile position.");
   }
 
-  private static Resolution tileAt(Vec2 pos, Address.Layer layer, World world, String invalidDetail) {
+  private static com.archon.address.Resolution tileAt(
+      Vec2 pos, Address.Layer layer, World world, String invalidDetail) {
     if (pos == null) {
-      return failure(Resolution.FailureReason.INVALID_TILE_SPEC, invalidDetail);
+      return failure(Resolution.Reason.INVALID_TILE_SPEC, invalidDetail);
     }
     if (!world.inBounds(pos)) {
-      return failure(Resolution.FailureReason.OUT_OF_BOUNDS,
+      return failure(Resolution.Reason.OUT_OF_BOUNDS,
           "The resolved tile position is outside the world bounds.");
     }
     return new Resolution.Found(new TileTarget(pos, layer));
   }
 
-  private static Resolution resolveEntity(Address.EntityAddr address, World world) {
+  private static com.archon.address.Resolution resolveEntity(
+      Address.EntityAddr address, World world) {
     String id = address.id();
     if (id == null || id.isBlank()) {
-      return failure(Resolution.FailureReason.UNKNOWN_ENTITY,
+      return failure(Resolution.Reason.UNKNOWN_ENTITY,
           "An entity ID is required.");
     }
 
     Entity entity = world.get(id);
     if (entity == null) {
-      return failure(Resolution.FailureReason.UNKNOWN_ENTITY,
+      return failure(Resolution.Reason.UNKNOWN_ENTITY,
           "No entity exists with ID '" + id + "'.");
     }
     if (!entity.alive()) {
-      return failure(Resolution.FailureReason.DEAD_ENTITY,
+      return failure(Resolution.Reason.DEAD_ENTITY,
           "The entity with ID '" + id + "' is dead.");
     }
 
@@ -231,7 +236,8 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
     }
 
     if (entity instanceof Actor actor) {
-      Resolution inventoryResolution = resolveActorInventoryPath(actor, path);
+      com.archon.address.Resolution inventoryResolution =
+          resolveActorInventoryPath(actor, path);
       if (inventoryResolution != null) {
         return inventoryResolution;
       }
@@ -242,28 +248,28 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
       return new Resolution.Found(new BodyTarget(entity, bodyPart));
     }
 
-    return failure(Resolution.FailureReason.INVALID_PATH,
+    return failure(Resolution.Reason.INVALID_PATH,
         "The path '" + path + "' is not valid for this entity.");
   }
 
-  private static Resolution resolveInventory(Actor actor, String path) {
+  private static com.archon.address.Resolution resolveInventory(Actor actor, String path) {
     if (actor == null) {
-      return failure(Resolution.FailureReason.UNKNOWN_ENTITY,
+      return failure(Resolution.Reason.UNKNOWN_ENTITY,
           "No thrall is available to resolve the inventory address.");
     }
     if (!actor.alive()) {
-      return failure(Resolution.FailureReason.DEAD_ENTITY,
+      return failure(Resolution.Reason.DEAD_ENTITY,
           "The thrall is dead and cannot resolve the inventory address.");
     }
 
-    Resolution resolution = resolveActorInventoryPath(actor, path);
+    com.archon.address.Resolution resolution = resolveActorInventoryPath(actor, path);
     return resolution != null
         ? resolution
-        : failure(Resolution.FailureReason.INVALID_PATH,
+        : failure(Resolution.Reason.INVALID_PATH,
             "The inventory path is invalid.");
   }
 
-  private static Resolution resolveActorInventoryPath(Actor actor, String path) {
+  private static com.archon.address.Resolution resolveActorInventoryPath(Actor actor, String path) {
     if (path == null || path.isEmpty()) {
       return null;
     }
@@ -275,19 +281,19 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
     if (path.startsWith("pack/")) {
       String itemPath = path.substring("pack/".length());
       if (itemPath.isEmpty()) {
-        return failure(Resolution.FailureReason.INVALID_PATH,
+        return failure(Resolution.Reason.INVALID_PATH,
             "An item path is required after 'pack/'.");
       }
 
       Item item = actor.inventory().find(itemPath).orElse(null);
       return item == null
-          ? failure(Resolution.FailureReason.INVALID_PATH,
+          ? failure(Resolution.Reason.INVALID_PATH,
               "No packed item matches the requested item path.")
           : new Resolution.Found(new PackedItem(actor, item));
     }
 
     return EquipmentSlot.parse(path)
-        .<Resolution>map(slot -> {
+        .<com.archon.address.Resolution>map(slot -> {
           Item item = actor.inventory().equipped(slot);
           return item == null
               ? new Resolution.Found(new EmptyEquipmentSlot(actor, slot))
@@ -296,8 +302,7 @@ public sealed interface Resolved permits Resolved.EntityTarget, Resolved.BodyTar
         .orElse(null);
   }
 
-  private static Resolution.Failure failure(
-      Resolution.FailureReason reason, String detail) {
+  private static Resolution.Failure failure(Resolution.Reason reason, String detail) {
     return new Resolution.Failure(
         Objects.requireNonNull(reason, "reason"),
         Objects.requireNonNull(detail, "detail"));
