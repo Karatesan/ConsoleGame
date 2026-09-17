@@ -10,7 +10,7 @@ public sealed interface Address {
     record InventoryAddr(String path) implements Address { }
     record TileAddr(String spec, String layer) implements Address { }
 
-    static Address parse(String source) {
+    public static Address parse(String source) {
         if (source == null || source.isBlank()) throw new IllegalArgumentException("empty address");
         if (source.startsWith("@")) {
             String body = source.substring(1);
