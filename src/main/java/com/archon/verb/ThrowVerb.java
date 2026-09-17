@@ -1,9 +1,9 @@
 package com.archon.verb;
 
 import com.archon.address.Resolution;
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
-import com.archon.model.Tile;
 import com.archon.model.Vec2;
 
 public final class ThrowVerb implements Verb {
@@ -29,7 +29,7 @@ public final class ThrowVerb implements Verb {
         boolean piped = c.materialIn instanceof Material.OfItem;
         Item item = piped
                 ? ((Material.OfItem) c.materialIn).item()
-                : c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
+                : c.itemFromMaterialOrArg(0);
         String targetArg = piped ? c.inv.arg(0) : c.inv.arg(1);
 
         if (item == null) {
@@ -44,17 +44,22 @@ public final class ThrowVerb implements Verb {
         }
 
         Vec2 at;
-        if (found instanceof Resolution.Resolved.EntityTarget entity) {
+        if (found instanceof Resolved.EntityTarget entity) {
             at = entity.entity().pos();
-        } else if (found instanceof Resolution.Resolved.BodyTarget body) {
+        } else if (found instanceof Resolved.BodyTarget body) {
             at = body.body().entity().pos();
-        } else if (found instanceof Resolution.Resolved.TileTarget tile
-                && tile.tile().type() == Tile.Type.FLOOR) {
-            at = tile.tile().pos();
-        } else if (found instanceof Resolution.Resolved.TileTarget tile
-                && tile.tile().type() == Tile.Type.CEILING) {
-            c.say("cannot throw at ceiling");
-            return ExitCode.BLOCKED;
+        } else if (found instanceof Resolved.TileTarget tile) {
+            switch (tile.destination()) {
+                case FLOOR -> at = tile.pos();
+                case CEILING -> {
+                    c.say("cannot throw at ceiling");
+                    return ExitCode.BLOCKED;
+                }
+                default -> {
+                    c.say("cannot throw at " + targetArg);
+                    return ExitCode.BLOCKED;
+                }
+            }
         } else {
             c.say("cannot throw at " + targetArg);
             return ExitCode.BLOCKED;
