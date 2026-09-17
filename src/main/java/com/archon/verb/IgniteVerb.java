@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
@@ -70,12 +71,12 @@ public final class IgniteVerb implements Verb {
         }
 
         if (target instanceof Resolved.TileTarget tileTarget) {
-            if (tileTarget.layer() == GameMap.Layer.CEILING) {
+            if (tileTarget.layer() == Address.Layer.CEILING) {
                 c.say("cannot ignite " + argument + ": ceiling targets are unsupported");
                 return ExitCode.BLOCKED;
             }
 
-            if (tileTarget.layer() == GameMap.Layer.FLOOR) {
+            if (tileTarget.layer() == Address.Layer.FLOOR) {
                 return igniteTile(c, tileTarget.pos());
             }
         }
