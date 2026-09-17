@@ -1,6 +1,8 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolution;
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.GameMap;
@@ -39,22 +41,23 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        String address = c.inv.arg(0);
+        Address address = c.inv.arg(0);
         Resolution resolution = VerbHelpers.resolve(c, address);
+        Resolved resolved = VerbHelpers.found(resolution);
 
-        if (resolution instanceof Resolution.Resolved.PackedItem packedItem
+        if (resolved instanceof Resolved.PackedItem packedItem
                 && packedItem.owner() == c.thrall) {
             return Check.ok();
         }
 
-        if (resolution instanceof Resolution.Resolved.EquippedItem equippedItem
+        if (resolved instanceof Resolved.EquippedItem equippedItem
                 && equippedItem.owner() == c.thrall) {
             return Check.ok();
         }
 
-        if (!(resolution instanceof Resolution.Resolved.PropContents)
-                && !(resolution instanceof Resolution.Resolved.TileTarget tileTarget
-                && tileTarget.location() == Resolution.Location.FLOOR)) {
+        if (!(resolved instanceof Resolved.PropContents)
+                && !(resolved instanceof Resolved.TileTarget tileTarget
+                && isFloor(tileTarget))) {
             return Check.blocked("cannot take " + address, null);
         }
 
@@ -70,23 +73,23 @@ public final class TakeVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String address = c.inv.arg(0);
+        Address address = c.inv.arg(0);
         Resolution resolution = VerbHelpers.resolve(c, address);
+        Resolved resolved = VerbHelpers.found(resolution);
 
-        if (resolution instanceof Resolution.Resolved.PackedItem packedItem) {
+        if (resolved instanceof Resolved.PackedItem packedItem) {
             return takeInventoryItem(c, address, packedItem.owner(), packedItem.item());
         }
 
-        if (resolution instanceof Resolution.Resolved.EquippedItem equippedItem) {
+        if (resolved instanceof Resolved.EquippedItem equippedItem) {
             return takeInventoryItem(c, address, equippedItem.owner(), equippedItem.item());
         }
 
-        if (resolution instanceof Resolution.Resolved.PropContents propContents) {
+        if (resolved instanceof Resolved.PropContents propContents) {
             return takePropContents(c, address, propContents.prop(), propContents.item());
         }
 
-        if (resolution instanceof Resolution.Resolved.TileTarget tileTarget
-                && tileTarget.location() == Resolution.Location.FLOOR) {
+        if (resolved instanceof Resolved.TileTarget tileTarget && isFloor(tileTarget)) {
             return takeGroundItem(c, tileTarget);
         }
 
@@ -96,7 +99,7 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takeInventoryItem(
             VerbContext c,
-            String address,
+            Address address,
             Actor owner,
             Item item
     ) {
@@ -126,7 +129,7 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takePropContents(
             VerbContext c,
-            String address,
+            Address address,
             Prop prop,
             Item item
     ) {
@@ -145,7 +148,7 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takeGroundItem(
             VerbContext c,
-            Resolution.Resolved.TileTarget tileTarget
+            Resolved.TileTarget tileTarget
     ) {
         if (c.thrall.inventory().isPackFull()) {
             c.say("pack full");
@@ -171,5 +174,12 @@ public final class TakeVerb implements Verb {
         c.materialOut = new Material.OfItem(item);
         c.say("Thrall takes " + item.name() + ".");
         return ExitCode.SUCCESS;
+    }
+
+    private boolean isFloor(Resolved.TileTarget tileTarget) {
+        return switch (tileTarget.location()) {
+            case FLOOR -> true;
+            default -> false;
+        };
     }
 }
