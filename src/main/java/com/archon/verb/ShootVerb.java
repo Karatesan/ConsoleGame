@@ -61,7 +61,7 @@ public final class ShootVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        BodyPart part = VerbHelpers.aimPart(c.inv, c.inv.arg(0));
+        BodyPart part = VerbHelpers.aimPart(c.inv);
         CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
                 c.world.dice(),
                 c.world,

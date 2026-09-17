@@ -1,12 +1,11 @@
 package com.archon.verb;
 
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.model.Item;
 import com.archon.model.Thrall;
 import com.archon.model.World;
-
-import java.util.Optional;
 
 public final class VerbContext {
     public final World world;
@@ -41,22 +40,17 @@ public final class VerbContext {
             return item;
         }
 
-        String arg = inv.arg(argIndex);
-        if (arg == null) {
-            return null;
+        Resolved resolved = VerbHelpers.found(VerbHelpers.resolve(this, inv.arg(argIndex)));
+        if (resolved instanceof Resolved.PackedItem packedItem
+                && packedItem.owner() == thrall) {
+            return packedItem.item();
         }
 
-        String name = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
-        Optional<Item> item = thrall.inventory().find(name);
-        if (item.isPresent()) {
-            return item.get();
+        if (resolved instanceof Resolved.EquippedItem equippedItem
+                && equippedItem.owner() == thrall) {
+            return equippedItem.item();
         }
 
-        return thrall.inventory().equipment().values().stream()
-                .filter(itemValue -> itemValue != null
-                        && (itemValue.id().equalsIgnoreCase(name)
-                        || itemValue.name().equalsIgnoreCase(name)))
-                .findFirst()
-                .orElse(null);
+        return null;
     }
 }

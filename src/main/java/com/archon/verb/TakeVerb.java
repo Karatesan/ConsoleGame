@@ -1,9 +1,10 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
-import com.archon.model.Entity;
 import com.archon.model.GameMap;
 import com.archon.model.Inventory;
 import com.archon.model.Item;
@@ -40,12 +41,24 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
+        Address address = c.inv.arg(0);
+        Resolution resolution = VerbHelpers.resolve(c, address);
+        Resolved resolved = VerbHelpers.found(resolution);
 
-        if (resolved instanceof Resolved.OnItem onItem
-                && onItem.item() != null
-                && isOwnedByThrall(c, onItem.container())) {
+        if (resolved instanceof Resolved.PackedItem packedItem
+                && packedItem.owner() == c.thrall) {
             return Check.ok();
+        }
+
+        if (resolved instanceof Resolved.EquippedItem equippedItem
+                && equippedItem.owner() == c.thrall) {
+            return Check.ok();
+        }
+
+        if (!(resolved instanceof Resolved.PropContents)
+                && !(resolved instanceof Resolved.TileTarget tileTarget
+                && isFloor(tileTarget))) {
+            return Check.blocked("cannot take " + address, null);
         }
 
         if (c.thrall.inventory().isPackFull()) {
@@ -60,33 +73,37 @@ public final class TakeVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String address = c.inv.arg(0);
-        Resolved resolved = VerbHelpers.resolve(c, address);
+        Address address = c.inv.arg(0);
+        Resolution resolution = VerbHelpers.resolve(c, address);
+        Resolved resolved = VerbHelpers.found(resolution);
 
-        if (resolved instanceof Resolved.OnItem onItem && onItem.item() != null) {
-            return takeItem(c, address, onItem);
+        if (resolved instanceof Resolved.PackedItem packedItem) {
+            return takeInventoryItem(c, address, packedItem.owner(), packedItem.item());
         }
 
-        if (resolved instanceof Resolved.OnTile onTile) {
-            return takeGroundItem(c, onTile);
+        if (resolved instanceof Resolved.EquippedItem equippedItem) {
+            return takeInventoryItem(c, address, equippedItem.owner(), equippedItem.item());
+        }
+
+        if (resolved instanceof Resolved.PropContents propContents) {
+            return takePropContents(c, address, propContents.prop(), propContents.item());
+        }
+
+        if (resolved instanceof Resolved.TileTarget tileTarget && isFloor(tileTarget)) {
+            return takeGroundItem(c, tileTarget);
         }
 
         c.say("cannot take " + address);
         return ExitCode.BLOCKED;
     }
 
-    private ExitCode takeItem(
+    private ExitCode takeInventoryItem(
             VerbContext c,
-            String address,
-            Resolved.OnItem onItem
+            Address address,
+            Actor owner,
+            Item item
     ) {
-        Item item = onItem.item();
-
-        /*
-         * An item already owned by the thrall is a valid pipeline source.
-         * Do not move it between inventory locations.
-         */
-        if (isOwnedByThrall(c, onItem.container())) {
+        if (owner == c.thrall) {
             c.materialOut = new Material.OfItem(item);
             c.say("Thrall draws " + item.name() + ".");
             return ExitCode.SUCCESS;
@@ -97,27 +114,12 @@ public final class TakeVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        String ownerId = ownerOf(onItem.container());
-        Entity owner = c.world.get(ownerId);
+        if (!c.world.dice().chance(35)) {
+            c.say("Snatch fails.");
+            return ExitCode.MISS;
+        }
 
-        if (owner instanceof Actor actor) {
-            if (!c.world.dice().chance(35)) {
-                c.say("Snatch fails.");
-                return ExitCode.MISS;
-            }
-
-            if (!actor.inventory().remove(item)) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-        } else if (owner instanceof Prop prop) {
-            if (prop.contents() != item) {
-                c.say("cannot take " + address);
-                return ExitCode.BLOCKED;
-            }
-
-            item = prop.removeContents();
-        } else {
+        if (!owner.inventory().remove(item)) {
             c.say("cannot take " + address);
             return ExitCode.BLOCKED;
         }
@@ -125,22 +127,41 @@ public final class TakeVerb implements Verb {
         return addToThrallPack(c, item);
     }
 
-    private ExitCode takeGroundItem(
+    private ExitCode takePropContents(
             VerbContext c,
-            Resolved.OnTile onTile
+            Address address,
+            Prop prop,
+            Item item
     ) {
         if (c.thrall.inventory().isPackFull()) {
             c.say("pack full");
             return ExitCode.BLOCKED;
         }
 
-        GameMap.Tile tile = c.world.map().tile(onTile.pos());
+        if (prop.contents() != item) {
+            c.say("cannot take " + address);
+            return ExitCode.BLOCKED;
+        }
+
+        return addToThrallPack(c, prop.removeContents());
+    }
+
+    private ExitCode takeGroundItem(
+            VerbContext c,
+            Resolved.TileTarget tileTarget
+    ) {
+        if (c.thrall.inventory().isPackFull()) {
+            c.say("pack full");
+            return ExitCode.BLOCKED;
+        }
+
+        GameMap.Tile tile = c.world.map().tile(tileTarget.pos());
         if (tile.ground().isEmpty()) {
             c.say("nothing on the ground there");
             return ExitCode.BLOCKED;
         }
 
-        Item item = c.world.map().removeFirstGroundItem(onTile.pos());
+        Item item = c.world.map().removeFirstGroundItem(tileTarget.pos());
         return addToThrallPack(c, item);
     }
 
@@ -155,23 +176,10 @@ public final class TakeVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static boolean isOwnedByThrall(VerbContext c, String container) {
-        if ("pack".equals(container)) {
-            return true;
-        }
-
-        String ownerId = ownerOf(container);
-        return "self".equals(ownerId) || c.world.actor(ownerId) == c.thrall;
-    }
-
-    private static String ownerOf(String container) {
-        if (container == null || container.isBlank()) {
-            return "";
-        }
-
-        int separator = container.indexOf('/');
-        return separator < 0
-                ? container
-                : container.substring(0, separator);
+    private boolean isFloor(Resolved.TileTarget tileTarget) {
+        return switch (tileTarget.location()) {
+            case FLOOR -> true;
+            default -> false;
+        };
     }
 }

@@ -1,57 +1,89 @@
 package com.archon.address;
 
-import com.archon.model.Entity;
-import com.archon.model.Vec2;
-import com.archon.model.World;
-
 /** Parsed, unresolved reference. Everything addressable is a path. */
 public sealed interface Address {
-    record EntityAddr(String id, String path) implements Address { }
-    record InventoryAddr(String path) implements Address { }
-    record TileAddr(String spec, String layer) implements Address { }
+  enum Layer {
+    FLOOR,
+                    CEILING
+  }
 
-    static Address parse(String source) {
-        if (source == null || source.isBlank()) throw new IllegalArgumentException("empty address");
-        if (source.startsWith("@")) {
-            String body = source.substring(1);
-            String layer = null;
-            int slash = body.indexOf('/');
-            if (slash >= 0) {
-                layer = body.substring(slash + 1);
-                body = body.substring(0, slash);
-            }
-            if (layer != null && !layer.equals("floor") && !layer.equals("ceiling")) {
-                throw new IllegalArgumentException("unknown layer \"" + layer + "\" (floor, ceiling)");
-            }
-            return new TileAddr(body, layer);
-        }
-        if (source.startsWith("/")) return new InventoryAddr(source.substring(1));
-        int slash = source.indexOf('/');
-        return slash < 0
-                ? new EntityAddr(source, null)
-                : new EntityAddr(source.substring(0, slash), source.substring(slash + 1));
+  record EntityAddr(String id, String path) implements Address { }
+
+  record InventoryAddr(String path) implements Address { }
+
+  record TileAddr(String spec, Layer layer) implements Address {
+    public TileAddr {
+      java.util.Objects.requireNonNull(layer, "layer");
+    }
+  }
+
+  public static Address parse(String source) {
+    if (source == null || source.isBlank()) {
+      throw new IllegalArgumentException("empty address");
     }
 
-    static Vec2 resolveTileSpec(String spec, World world) {
-        if (spec.equalsIgnoreCase("self")) return world.thrall().pos();
-        if (spec.contains(",")) {
-            String[] parts = spec.split(",");
-            return new Vec2(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()));
+    if (source.startsWith("@")) {
+      String body = source.substring(1);
+      int slash = body.indexOf('/');
+
+      if (slash < 0) {
+        if (body.isBlank()) {
+          throw new IllegalArgumentException("empty tile spec");
         }
-        String letters = spec.replaceAll("[0-9]", "");
-        String digits = spec.replaceAll("[^0-9]", "");
-        Vec2 direction = Vec2.dir(letters);
-        if (direction != null) {
-            int distance = digits.isEmpty() ? 1 : Integer.parseInt(digits);
-            return new Vec2(
-                    world.thrall().pos().x() + direction.x() * distance,
-                    world.thrall().pos().y() + direction.y() * distance
-            );
-        }
-        Entity entity = world.get(spec);
-        if (entity != null) return entity.pos();
-        throw new IllegalArgumentException(
-                "unknown tile spec \"" + spec + "\" — use @x,y, @self, @e2, or @<entityId>"
-        );
+        return new TileAddr(body, Layer.FLOOR);
+      }
+
+      if (body.indexOf('/', slash + 1) >= 0) {
+        throw new IllegalArgumentException("invalid tile layer syntax");
+      }
+
+      String spec = body.substring(0, slash);
+      String layerName = body.substring(slash + 1);
+
+      if (spec.isBlank()) {
+        throw new IllegalArgumentException("empty tile spec");
+      }
+      if (layerName.isBlank()) {
+        throw new IllegalArgumentException("invalid tile layer syntax");
+      }
+
+      Layer layer = switch (layerName) {
+        case "floor" -> Layer.FLOOR;
+        case "ceiling" -> Layer.CEILING;
+        default -> throw new IllegalArgumentException(
+                                    "unknown layer \"" + layerName + "\" (floor, ceiling)"
+                                );
+      };
+
+      return new TileAddr(spec, layer);
     }
+
+    if (source.startsWith("/")) {
+      String path = source.substring(1);
+      if (path.isBlank()) {
+        throw new IllegalArgumentException("empty inventory path");
+      }
+      return new InventoryAddr(path);
+    }
+
+    int slash = source.indexOf('/');
+    if (slash < 0) {
+      if (source.isBlank()) {
+        throw new IllegalArgumentException("empty entity id");
+      }
+      return new EntityAddr(source, null);
+    }
+
+    String id = source.substring(0, slash);
+    String path = source.substring(slash + 1);
+
+    if (id.isBlank()) {
+      throw new IllegalArgumentException("empty entity id");
+    }
+    if (path.isBlank()) {
+      throw new IllegalArgumentException("empty entity path");
+    }
+
+    return new EntityAddr(id, path);
+  }
 }

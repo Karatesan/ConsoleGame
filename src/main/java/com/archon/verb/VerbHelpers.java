@@ -1,6 +1,7 @@
 package com.archon.verb;
 
 import com.archon.address.Address;
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.BodyPart;
@@ -17,26 +18,43 @@ public final class VerbHelpers {
 
     private VerbHelpers() {}
 
-    public static Resolved resolve(VerbContext c, String raw) {
-        return Resolved.resolve(Address.parse(raw), c.world);
+    public static Resolution resolve(VerbContext c, String raw) {
+        try {
+            return Resolved.resolve(Address.parse(raw), c.world);
+        } catch (IllegalArgumentException exception) {
+            return new Resolution.Failure(
+                    Resolution.Reason.INVALID_SYNTAX,
+                    exception.getMessage());
+        }
+    }
+
+    public static Resolved found(Resolution resolution) {
+        return resolution instanceof Resolution.Found found ? found.target() : null;
+    }
+
+    public static String failureDetail(Resolution resolution) {
+        return resolution instanceof Resolution.Failure failure ? failure.detail() : null;
     }
 
     public static Entity targetEntity(VerbContext c, String raw) {
-        Resolved r = resolve(c, raw);
-        return (r instanceof Resolved.OnEntity oe) ? oe.entity() : null;
+        Resolved target = found(resolve(c, raw));
+        if (target instanceof Resolved.EntityTarget entityTarget) {
+            return entityTarget.entity();
+        }
+        if (target instanceof Resolved.BodyTarget bodyTarget) {
+            return bodyTarget.entity();
+        }
+        return null;
     }
 
-    public static BodyPart aimPart(Ast.Invocation inv, String targetArg) {
-        String aim = inv.flag("aim");
-        if (aim != null) {
-            BodyPart p = BodyPart.parse(aim);
-            if (p != null) return p;
+    public static BodyPart aimPart(Ast.Invocation inv) {
+        String value = inv.flag("aim");
+        try {
+            BodyPart aim = BodyPart.parse(value);
+            return aim != null ? aim : BodyPart.TORSO;
+        } catch (IllegalArgumentException exception) {
+            return BodyPart.TORSO;
         }
-        if (targetArg != null && targetArg.contains("/")) {
-            BodyPart p = BodyPart.parse(targetArg.substring(targetArg.indexOf('/') + 1));
-            if (p != null) return p;
-        }
-        return BodyPart.TORSO;
     }
 
     public static int powerAp(Ast.Invocation inv, int base) {

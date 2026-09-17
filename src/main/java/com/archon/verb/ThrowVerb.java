@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Resolution;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
@@ -28,7 +29,7 @@ public final class ThrowVerb implements Verb {
         boolean piped = c.materialIn instanceof Material.OfItem;
         Item item = piped
                 ? ((Material.OfItem) c.materialIn).item()
-                : c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
+                : c.itemFromMaterialOrArg(0);
         String targetArg = piped ? c.inv.arg(0) : c.inv.arg(1);
 
         if (item == null) {
@@ -36,17 +37,33 @@ public final class ThrowVerb implements Verb {
             return ExitCode.BLOCKED;
         }
 
-        Resolved resolved = VerbHelpers.resolve(c, targetArg);
-        if (resolved == null) {
-            c.say("cannot resolve " + targetArg);
+        Resolution found = VerbHelpers.resolve(c, targetArg);
+        if (found instanceof Resolution.Failure failure) {
+            c.say("cannot resolve target: " + failure.detail());
             return ExitCode.BLOCKED;
         }
 
-        Vec2 at = switch (resolved) {
-            case Resolved.OnEntity entity -> entity.entity().pos();
-            case Resolved.OnTile tile -> tile.pos();
-            case Resolved.OnItem ignored -> c.thrall.pos();
-        };
+        Vec2 at;
+        if (found instanceof Resolved.EntityTarget entity) {
+            at = entity.entity().pos();
+        } else if (found instanceof Resolved.BodyTarget body) {
+            at = body.body().entity().pos();
+        } else if (found instanceof Resolved.TileTarget tile) {
+            switch (tile.destination()) {
+                case FLOOR -> at = tile.pos();
+                case CEILING -> {
+                    c.say("cannot throw at ceiling");
+                    return ExitCode.BLOCKED;
+                }
+                default -> {
+                    c.say("cannot throw at " + targetArg);
+                    return ExitCode.BLOCKED;
+                }
+            }
+        } else {
+            c.say("cannot throw at " + targetArg);
+            return ExitCode.BLOCKED;
+        }
 
         if (!piped && !c.thrall.inventory().remove(item)) {
             c.say("no such item to throw");

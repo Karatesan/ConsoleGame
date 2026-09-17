@@ -1,26 +1,48 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolved;
 
 public final class LsVerb extends FreeVerb {
-    @Override public String name() { return "ls"; }
-    @Override public String help() { return "ls <address> — list contents. 0 AP."; }
+    @Override
+    public String name() {
+        return "ls";
+    }
+
+    @Override
+    public String help() {
+        return "ls <address> — list contents. 0 AP.";
+    }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String a = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
-        Resolved r = VerbHelpers.resolve(c, a);
-        if (r instanceof Resolved.OnItem oi && "pack".equals(oi.container())) {
-            c.say(c.thrall.inventory().isPackEmpty() ? "(empty)" :
-                    String.join("\n", c.thrall.inventory().pack().stream()
-                            .map(i -> "  " + i.id() + "  " + i.tags()).toList()));
+        String address = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
+        Resolved target = VerbHelpers.found(VerbHelpers.resolve(c, address));
+
+        if (target instanceof Resolved.PackRoot packRoot) {
+            c.say(packRoot.owner().inventory().isPackEmpty()
+                    ? "(empty)"
+                    : String.join(
+                            "\n",
+                            packRoot.owner().inventory().pack().stream()
+                                    .map(item -> "  " + item.id() + "  " + item.tags())
+                                    .toList()));
             return ExitCode.SUCCESS;
         }
-        if (r instanceof Resolved.OnTile ot) {
-            c.say(c.world.tile(ot.pos()).ground().toString());
+
+        if (target instanceof Resolved.TileTarget tileTarget
+                && tileTarget.layer() == Address.Layer.FLOOR) {
+            c.say(c.world.map().tile(tileTarget.pos()).ground().isEmpty()
+                    ? "(empty)"
+                    : String.join(
+                            "\n",
+                            c.world.map().tile(tileTarget.pos()).ground().stream()
+                                    .map(item -> "  " + item.id() + "  " + item.tags())
+                                    .toList()));
             return ExitCode.SUCCESS;
         }
-        c.say("nothing to list at " + a);
+
+        c.say("nothing to list at " + address);
         return ExitCode.INVALID;
     }
 }
