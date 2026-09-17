@@ -38,9 +38,9 @@ public final class InspectVerb extends FreeVerb {
         switch (target) {
             case Resolved.EntityTarget entityTarget -> inspectEntity(c, entityTarget.entity());
             case Resolved.BodyTarget bodyTarget -> inspectEntity(c, bodyTarget.entity());
-            case Resolved.PackedItem packedItem -> inspectItemTarget(c, packedItem.item());
-            case Resolved.EquippedItem equippedItem -> inspectItemTarget(c, equippedItem.item());
-            case Resolved.PropContents propContents -> inspectItemTarget(c, propContents.item());
+            case Resolved.PackedItem packedItem -> inspectItem(c, packedItem.item());
+            case Resolved.EquippedItem equippedItem -> inspectItem(c, equippedItem.item());
+            case Resolved.PropContents propContents -> inspectItem(c, propContents.item());
             case Resolved.PackRoot ignored -> c.say("pack root");
             case Resolved.EmptyEquipmentSlot ignored -> c.say("nothing there");
             case Resolved.EmptyPropContents ignored -> c.say("nothing there");
@@ -98,15 +98,6 @@ public final class InspectVerb extends FreeVerb {
         }
 
         c.say(output.toString());
-    }
-
-    private void inspectItemTarget(VerbContext c, Item item) {
-        if (item == null) {
-            c.say("nothing there");
-            return;
-        }
-
-        inspectItem(c, item);
     }
 
     private void inspectItem(VerbContext c, Item item) {
