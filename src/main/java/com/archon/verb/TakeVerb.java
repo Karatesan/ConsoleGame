@@ -41,17 +41,17 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateState(VerbContext c) {
-        Address address = c.inv.arg(0);
+        String address = c.inv.arg(0);
         Resolution resolution = VerbHelpers.resolve(c, address);
         Resolved resolved = VerbHelpers.found(resolution);
 
         if (resolved instanceof Resolved.PackedItem packedItem
-                && packedItem.owner() == c.thrall) {
+                && packedItem.actor() == c.thrall) {
             return Check.ok();
         }
 
         if (resolved instanceof Resolved.EquippedItem equippedItem
-                && equippedItem.owner() == c.thrall) {
+                && equippedItem.actor() == c.thrall) {
             return Check.ok();
         }
 
@@ -73,16 +73,16 @@ public final class TakeVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Address address = c.inv.arg(0);
+        String address = c.inv.arg(0);
         Resolution resolution = VerbHelpers.resolve(c, address);
         Resolved resolved = VerbHelpers.found(resolution);
 
         if (resolved instanceof Resolved.PackedItem packedItem) {
-            return takeInventoryItem(c, address, packedItem.owner(), packedItem.item());
+            return takeInventoryItem(c, address, packedItem.actor(), packedItem.item());
         }
 
         if (resolved instanceof Resolved.EquippedItem equippedItem) {
-            return takeInventoryItem(c, address, equippedItem.owner(), equippedItem.item());
+            return takeInventoryItem(c, address, equippedItem.actor(), equippedItem.item());
         }
 
         if (resolved instanceof Resolved.PropContents propContents) {
@@ -99,7 +99,7 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takeInventoryItem(
             VerbContext c,
-            Address address,
+            String address,
             Actor owner,
             Item item
     ) {
@@ -129,7 +129,7 @@ public final class TakeVerb implements Verb {
 
     private ExitCode takePropContents(
             VerbContext c,
-            Address address,
+            String address,
             Prop prop,
             Item item
     ) {
@@ -177,9 +177,6 @@ public final class TakeVerb implements Verb {
     }
 
     private boolean isFloor(Resolved.TileTarget tileTarget) {
-        return switch (tileTarget.location()) {
-            case FLOOR -> true;
-            default -> false;
-        };
+        return tileTarget.layer() == Address.Layer.FLOOR;
     }
 }
