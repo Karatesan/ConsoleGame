@@ -1,7 +1,6 @@
 package com.archon.verb;
 
-import com.archon.address.Resolution;
-import com.archon.address.Resolution.Resolved;
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.Entity;
@@ -42,8 +41,7 @@ public final class SiphonVerb implements Verb {
     @Override
     public Check validateState(VerbContext c) {
         String source = c.inv.arg(0);
-        Resolution resolution = VerbHelpers.resolve(c, source);
-        Resolved target = VerbHelpers.found(resolution);
+        Resolved target = VerbHelpers.found(VerbHelpers.resolve(c, source));
 
         if (target == null) {
             return Check.blocked(
@@ -60,19 +58,7 @@ public final class SiphonVerb implements Verb {
             );
         }
 
-        Entity holder = null;
-        if (target instanceof Resolved.PackedItem packedItem) {
-            holder = packedItem.owner();
-        } else if (target instanceof Resolved.EquippedItem equippedItem) {
-            holder = equippedItem.owner();
-        } else if (target instanceof Resolved.PropContents propContents) {
-            holder = propContents.prop();
-        } else if (target instanceof Resolved.EntityTarget entityTarget) {
-            holder = entityTarget.entity();
-        } else if (target instanceof Resolved.BodyTarget bodyTarget) {
-            holder = bodyTarget.entity();
-        }
-
+        Entity holder = holderOf(target);
         if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
             return Check.blocked(holder.id() + " out of reach", "step closer");
         }
@@ -82,8 +68,7 @@ public final class SiphonVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Resolution resolution = VerbHelpers.resolve(c, c.inv.arg(0));
-        Resolved target = VerbHelpers.found(resolution);
+        Resolved target = VerbHelpers.found(VerbHelpers.resolve(c, c.inv.arg(0)));
 
         if (target == null) {
             c.say("nothing to siphon");
@@ -99,6 +84,30 @@ public final class SiphonVerb implements Verb {
         c.materialOut = new Material.OfSubstance(substance);
         c.say("Thrall draws " + substance.name().toLowerCase() + ".");
         return ExitCode.SUCCESS;
+    }
+
+    private static Entity holderOf(Resolved target) {
+        if (target instanceof Resolved.PackedItem packedItem) {
+            return packedItem.owner();
+        }
+
+        if (target instanceof Resolved.EquippedItem equippedItem) {
+            return equippedItem.owner();
+        }
+
+        if (target instanceof Resolved.PropContents propContents) {
+            return propContents.prop();
+        }
+
+        if (target instanceof Resolved.EntityTarget entityTarget) {
+            return entityTarget.entity();
+        }
+
+        if (target instanceof Resolved.BodyTarget bodyTarget) {
+            return bodyTarget.entity();
+        }
+
+        return null;
     }
 
     private static Tag sourceSubstance(VerbContext c, Resolved target) {
@@ -122,7 +131,8 @@ public final class SiphonVerb implements Verb {
             return substanceOfEntity(bodyTarget.entity());
         }
 
-        if (target instanceof Resolved.TileTarget tileTarget) {
+        if (target instanceof Resolved.TileTarget tileTarget
+                && tileTarget.surface() == Resolved.TileTarget.Surface.FLOOR) {
             GameMap.Tile tile = c.world.tile(tileTarget.pos());
 
             if (tile.has(Tag.OIL)) {
