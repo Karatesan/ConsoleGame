@@ -6,52 +6,54 @@ import com.archon.model.World;
 
 /** Parsed, unresolved reference. Everything addressable is a path. */
 public sealed interface Address {
+    enum Layer { TILE, FLOOR, CEILING }
+
     record EntityAddr(String id, String path) implements Address { }
     record InventoryAddr(String path) implements Address { }
-    record TileAddr(String spec, String layer) implements Address { }
+    record TileAddr(String spec, Layer layer) implements Address { }
+    record Invalid(String reason) implements Address { }
 
     static Address parse(String source) {
-        if (source == null || source.isBlank()) throw new IllegalArgumentException("empty address");
-        if (source.startsWith("@")) {
-            String body = source.substring(1);
-            String layer = null;
-            int slash = body.indexOf('/');
-            if (slash >= 0) {
-                layer = body.substring(slash + 1);
-                body = body.substring(0, slash);
-            }
-            if (layer != null && !layer.equals("floor") && !layer.equals("ceiling")) {
-                throw new IllegalArgumentException("unknown layer \"" + layer + "\" (floor, ceiling)");
-            }
-            return new TileAddr(body, layer);
+        if (source == null || source.isBlank()) {
+            return new Invalid("empty address");
         }
-        if (source.startsWith("/")) return new InventoryAddr(source.substring(1));
-        int slash = source.indexOf('/');
-        return slash < 0
-                ? new EntityAddr(source, null)
-                : new EntityAddr(source.substring(0, slash), source.substring(slash + 1));
-    }
+        if (source.endsWith("/") || source.contains("//")) {
+            return new Invalid("address contains an empty path segment");
+        }
 
-    static Vec2 resolveTileSpec(String spec, World world) {
-        if (spec.equalsIgnoreCase("self")) return world.thrall().pos();
-        if (spec.contains(",")) {
-            String[] parts = spec.split(",");
-            return new Vec2(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()));
+        if (source.startsWith("@")) {
+            int slash = source.indexOf('/');
+            String spec = slash < 0
+                    ? source.substring(1)
+                    : source.substring(1, slash);
+            String suffix = slash < 0 ? "" : source.substring(slash + 1);
+
+            if (spec.isBlank()) {
+                return new Invalid("empty tile specification");
+            }
+
+            Layer layer = switch (suffix) {
+                case "" -> Layer.TILE;
+                case "floor" -> Layer.FLOOR;
+                case "ceiling" -> Layer.CEILING;
+                default -> null;
+            };
+
+            return layer == null
+                    ? new Invalid("unknown layer \"" + suffix + "\" (floor, ceiling)")
+                    : new TileAddr(spec, layer);
         }
-        String letters = spec.replaceAll("[0-9]", "");
-        String digits = spec.replaceAll("[^0-9]", "");
-        Vec2 direction = Vec2.dir(letters);
-        if (direction != null) {
-            int distance = digits.isEmpty() ? 1 : Integer.parseInt(digits);
-            return new Vec2(
-                    world.thrall().pos().x() + direction.x() * distance,
-                    world.thrall().pos().y() + direction.y() * distance
-            );
+
+        if (source.startsWith("/")) {
+            return new InventoryAddr(source.substring(1));
         }
-        Entity entity = world.get(spec);
-        if (entity != null) return entity.pos();
-        throw new IllegalArgumentException(
-                "unknown tile spec \"" + spec + "\" — use @x,y, @self, @e2, or @<entityId>"
-        );
+
+        int slash = source.indexOf('/');
+        String id = slash < 0 ? source : source.substring(0, slash);
+        if (id.isBlank()) {
+            return new Invalid("empty entity ID");
+        }
+
+        return new EntityAddr(id, slash < 0 ? "" : source.substring(slash + 1));
     }
 }

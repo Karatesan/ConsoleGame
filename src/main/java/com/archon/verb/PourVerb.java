@@ -1,5 +1,6 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.Item;
@@ -8,61 +9,59 @@ import com.archon.model.Vec2;
 
 public final class PourVerb implements Verb {
     @Override public String name() { return "pour"; }
-    @Override public String help() { return "pour <liquid> <tile> — 1 AP. Accepts material."; }
+    @Override public String help() {
+        return "pour <liquid> <tile|entity> — 1 AP. Consumes liquid; keeps the container.";
+    }
     @Override public int apCost(Ast.Invocation inv) { return 1; }
     @Override public boolean acceptsMaterial() { return true; }
-    @Override public boolean producesMaterial() { return true; }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        boolean piped = c.acceptsPipedMaterial();
-        if (!piped && c.inv.args().size() < 2) return Check.invalid("pour needs a liquid and a tile", null);
-        if (piped && c.inv.arg(0) == null) return Check.invalid("pour needs a destination tile", null);
-        return Check.ok();
+        int required = c.acceptsPipedMaterial() ? 1 : 2;
+        return c.inv.args().size() < required
+                ? Check.invalid("pour needs a liquid source and destination", null)
+                : Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Tag substance;
-        String targetArg;
+        Check syntax = validateStructural(c);
+        if (!syntax.valid()) return VerbTargets.reject(c, syntax);
 
-        if (c.materialIn instanceof Material.OfSubstance os) {
-            substance = os.substance();
-            targetArg = c.inv.arg(0);
-        } else if (c.materialIn instanceof Material.OfItem oi) {
-            Item item = oi.item();
-            substance = item.substance();
-            item.consumeSubstance();
-            targetArg = c.inv.arg(0);
+        String address = c.inv.arg(c.acceptsPipedMaterial() ? 0 : 1);
+        Resolved destination = VerbHelpers.resolve(c, address);
+        Check resolution = VerbTargets.resolution(destination);
+        if (!resolution.valid()) return VerbTargets.reject(c, resolution);
+        if (!(destination instanceof Resolved.OnEntity
+                || destination instanceof Resolved.OnTile tile
+                && tile.layer() != Address.Layer.CEILING)) {
+            return VerbTargets.reject(c, Check.invalid("pour needs an entity or floor tile", null));
+        }
+
+        Resolved.Target target = (Resolved.Target) destination;
+        Check reach = VerbTargets.reachable(c, target);
+        if (!reach.valid()) return VerbTargets.reject(c, reach);
+
+        Item container = null;
+        Tag substance;
+        if (c.materialIn instanceof Material.OfSubstance material) {
+            substance = material.substance();
         } else {
-            Item item = c.thrall.inventory().find(c.inv.arg(0)).orElse(null);
-            if (item == null || item.substance() == null) {
-                c.say("nothing pourable");
-                return ExitCode.BLOCKED;
+            ItemInput input = ItemInput.select(c, 0);
+            if (input instanceof ItemInput.Rejected rejected) {
+                return VerbTargets.reject(c, rejected.check());
             }
-            substance = item.substance();
-            c.thrall.inventory().remove(item);
-            item.consumeSubstance();
-            targetArg = c.inv.arg(1);
+            container = ((ItemInput.Selected) input).target().item();
+            substance = container.substance();
         }
 
         if (substance == null) {
-            c.say("nothing pourable");
-            return ExitCode.BLOCKED;
+            return VerbTargets.reject(c, Check.blocked("nothing pourable", null));
         }
-
-        Resolved resolved = VerbHelpers.resolve(c, targetArg);
-        if (resolved == null) {
-            c.say("cannot resolve " + targetArg);
-            return ExitCode.BLOCKED;
+        if (container != null) {
+            substance = container.consumeSubstance();
         }
-
-        Vec2 at = resolved instanceof Resolved.OnEntity onEntity
-                ? onEntity.entity().pos()
-                : c.thrall.pos();
-
-        VerbHelpers.spill(c, at, substance);
-        c.materialOut = new Material.OfSubstance(substance);
+        VerbHelpers.spill(c, target.pos(), substance);
         return ExitCode.SUCCESS;
     }
 }

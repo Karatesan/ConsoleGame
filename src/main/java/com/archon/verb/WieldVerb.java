@@ -1,67 +1,49 @@
 package com.archon.verb;
 
+import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.EquipmentSlot;
+import com.archon.model.Inventory;
 import com.archon.model.Item;
+import com.archon.model.ItemLocation;
 
 public final class WieldVerb implements Verb {
-    @Override
-    public String name() {
-        return "wield";
-    }
-
-    @Override
-    public String help() {
-        return "wield <item> — equip to hand. 1 AP. Accepts material.";
-    }
-
-    @Override
-    public int apCost(Ast.Invocation inv) {
-        return 1;
-    }
-
-    @Override
-    public boolean acceptsMaterial() {
-        return true;
-    }
+    @Override public String name() { return "wield"; }
+    @Override public String help() { return "wield <item> — equip from pack to hand. 1 AP. Accepts material."; }
+    @Override public int apCost(Ast.Invocation inv) { return 1; }
+    @Override public boolean acceptsMaterial() { return true; }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        if (c.inv.arg(0) == null && !c.acceptsPipedMaterial()) {
-            return Check.invalid("wield what?", null);
-        }
-        return Check.ok();
+        return c.inv.arg(0) == null && !c.acceptsPipedMaterial()
+                ? Check.invalid("wield what?", null)
+                : Check.ok();
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Item item = c.itemFromMaterialOrArg(0);
-        if (item == null) {
-            c.say("no such item");
-            return ExitCode.BLOCKED;
+        ItemInput input = ItemInput.select(c, 0);
+        if (input instanceof ItemInput.Rejected rejected) {
+            return VerbTargets.reject(c, rejected.check());
         }
 
-        EquipmentSlot slot = c.thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT) == null
+        Resolved.OnItem selected = ((ItemInput.Selected) input).target();
+        if (!(selected.location() instanceof ItemLocation.Pack)) {
+            return VerbTargets.reject(c, Check.blocked("item is already equipped", null));
+        }
+
+        Inventory inventory = c.thrall.inventory();
+        EquipmentSlot slot = inventory.equipped(EquipmentSlot.HAND_RIGHT) == null
                 ? EquipmentSlot.HAND_RIGHT
                 : EquipmentSlot.HAND_LEFT;
-        if (c.thrall.inventory().equipped(slot) != null) {
-            c.say("both hands full");
-            return ExitCode.BLOCKED;
+        if (inventory.equipped(slot) != null) {
+            return VerbTargets.reject(c, Check.blocked("both hands full", null));
+        }
+        if (!inventory.equipFromPack(selected.item(), slot)) {
+            return VerbTargets.reject(c, Check.blocked("item is no longer in the pack", null));
         }
 
-        if (!c.thrall.inventory().pack().contains(item)) {
-            if (!c.thrall.inventory().addToPack(item)) {
-                c.say("cannot carry " + item.name());
-                return ExitCode.BLOCKED;
-            }
-        }
-
-        if (!c.thrall.inventory().equipFromPack(item, slot)) {
-            c.say("cannot wield " + item.name());
-            return ExitCode.BLOCKED;
-        }
-
-        c.say("Thrall grips " + item.name() + " (" + slot.path + ").");
+        c.say("Thrall grips " + selected.item().name() + " (" + slot.path + ").");
         return ExitCode.SUCCESS;
     }
 }

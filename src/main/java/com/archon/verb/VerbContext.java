@@ -15,11 +15,17 @@ public final class VerbContext {
     public final EventBus bus;
     public final Material materialIn;
     public Material materialOut;
+
     /** True only for the first stage of a line: full state validation applies. */
     public final boolean firstStage;
 
-    public VerbContext(World world, Ast.Invocation inv, EventBus bus,
-                       Material materialIn, boolean firstStage) {
+    public VerbContext(
+            World world,
+            Ast.Invocation inv,
+            EventBus bus,
+            Material materialIn,
+            boolean firstStage
+    ) {
         this.world = world;
         this.thrall = world.thrall();
         this.inv = inv;
@@ -34,29 +40,5 @@ public final class VerbContext {
 
     public boolean acceptsPipedMaterial() {
         return materialIn != null;
-    }
-
-    public Item itemFromMaterialOrArg(int argIndex) {
-        if (materialIn instanceof Material.OfItem(Item item)) {
-            return item;
-        }
-
-        String arg = inv.arg(argIndex);
-        if (arg == null) {
-            return null;
-        }
-
-        String name = arg.startsWith("/") ? arg.substring(arg.lastIndexOf('/') + 1) : arg;
-        Optional<Item> item = thrall.inventory().find(name);
-        if (item.isPresent()) {
-            return item.get();
-        }
-
-        return thrall.inventory().equipment().values().stream()
-                .filter(itemValue -> itemValue != null
-                        && (itemValue.id().equalsIgnoreCase(name)
-                        || itemValue.name().equalsIgnoreCase(name)))
-                .findFirst()
-                .orElse(null);
     }
 }

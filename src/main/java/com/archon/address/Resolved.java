@@ -1,79 +1,69 @@
 package com.archon.address;
 
-import com.archon.model.Actor;
-import com.archon.model.BodyPart;
-import com.archon.model.Entity;
-import com.archon.model.EquipmentSlot;
-import com.archon.model.Item;
-import com.archon.model.Prop;
-import com.archon.model.Vec2;
-import com.archon.model.World;
+import com.archon.model.*;
+
+import java.util.Objects;
 
 public sealed interface Resolved {
-    record OnEntity(Entity entity, BodyPart part) implements Resolved { }
+    enum Problem {
+        BAD_SYNTAX, UNKNOWN_ENTITY, DEAD_ENTITY, INVALID_PATH,
+        ITEM_NOT_FOUND, INVALID_TILE, OUT_OF_BOUNDS
+    }
 
-    record OnItem(Item item, String container) implements Resolved { }
+    sealed interface Target extends Resolved { Vec2 pos(); }
 
-    record OnTile(Vec2 pos, String layer) implements Resolved { }
+    sealed interface ItemTarget extends Target {
+        ItemLocation location();
+        default Vec2 pos() { return location().pos(); }
+    }
+
+    record OnEntity(Entity entity) implements Target {
+        public OnEntity { Objects.requireNonNull(entity, "entity"); }
+        public Vec2 pos() { return entity.pos(); }
+    }
+
+    record OnBody(Actor actor, BodyPart part) implements Target {
+        public OnBody {
+            Objects.requireNonNull(actor, "actor");
+            Objects.requireNonNull(part, "part");
+        }
+        public Vec2 pos() { return actor.pos(); }
+    }
+
+    record OnItem(Item item, ItemLocation location) implements ItemTarget {
+        public OnItem {
+            Objects.requireNonNull(item, "item");
+            Objects.requireNonNull(location, "location");
+        }
+    }
+
+    record OnLocation(ItemLocation location) implements ItemTarget {
+        public OnLocation { Objects.requireNonNull(location, "location"); }
+    }
+
+    record OnTile(Vec2 pos, Address.Layer layer) implements Target {
+        public OnTile {
+            Objects.requireNonNull(pos, "pos");
+            Objects.requireNonNull(layer, "layer");
+        }
+    }
+
+    record Failure(Problem problem, String reason) implements Resolved {
+        public Failure {
+            Objects.requireNonNull(problem, "problem");
+            Objects.requireNonNull(reason, "reason");
+        }
+    }
 
     static Resolved resolve(Address address, World world) {
-        return switch (address) {
-            case Address.TileAddr tile -> {
-                Vec2 pos = Address.resolveTileSpec(tile.spec(), world);
-                yield world.inBounds(pos) ? new OnTile(pos, tile.layer()) : null;
-            }
+        Objects.requireNonNull(world.thrall(), "install a thrall before resolving addresses");
+        return switch (Objects.requireNonNull(address, "address")) {
+            case Address.Invalid invalid ->
+                    new Failure(Problem.BAD_SYNTAX, invalid.reason());
+            case Address.EntityAddr entity -> PathResolver.entity(entity, world);
             case Address.InventoryAddr inventory ->
-                    resolveInventory(world.thrall(), inventory.path(), "self");
-            case Address.EntityAddr entityAddress -> resolveEntity(entityAddress, world);
+                    PathResolver.inventory(world.thrall(), inventory.path());
+            case Address.TileAddr tile -> TileResolver.resolve(tile, world);
         };
-    }
-
-    private static Resolved resolveEntity(Address.EntityAddr address, World world) {
-        Entity entity = world.get(address.id());
-        if (entity == null || !entity.alive()) {
-            return null;
-        }
-
-        String path = address.path();
-        if (path == null) {
-            return new OnEntity(entity, null);
-        }
-
-        if (entity instanceof Prop prop && path.equals("contents")) {
-            return new OnItem(prop.contents(), entity.id() + "/contents");
-        }
-
-        if (entity instanceof Actor actor) {
-            Resolved inventory = resolveInventory(actor, path, entity.id());
-            if (inventory != null) {
-                return inventory;
-            }
-        }
-
-        BodyPart part = BodyPart.parse(path);
-        return part == null ? null : new OnEntity(entity, part);
-    }
-
-    private static Resolved resolveInventory(Actor actor, String path, String ownerId) {
-        if (path == null) {
-            return null;
-        }
-
-        if (path.equals("pack")) {
-            return new OnItem(null, ownerId.equals("self") ? "pack" : ownerId + "/pack");
-        }
-
-        if (path.startsWith("pack/")) {
-            Item item = actor.inventory().find(path.substring("pack/".length())).orElse(null);
-            return item == null
-                    ? null
-                    : new OnItem(item, ownerId.equals("self") ? "pack" : ownerId + "/pack");
-        }
-
-        return EquipmentSlot.parse(path)
-                .<Resolved>map(slot -> new OnItem(
-                        actor.inventory().equipped(slot),
-                        ownerId + "/" + slot.path))
-                .orElse(null);
     }
 }

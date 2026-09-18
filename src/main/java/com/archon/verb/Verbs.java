@@ -6,7 +6,7 @@ import java.util.*;
  * Verb registry.
  * Maps command verbs to their respective Verb implementations.
  */
-public final class Verbs {
+public final class  Verbs {
 
     private static final Map<String, Verb> REGISTRY = new LinkedHashMap<>();
 

@@ -11,61 +11,54 @@ import com.archon.model.Prop;
 import com.archon.model.Tag;
 
 public final class SiphonVerb implements Verb {
-    @Override
-    public String name() {
-        return "siphon";
+    @Override public String name() { return "siphon"; }
+    @Override public String help() {
+        return "siphon <source> — extract one liquid portion. 1 AP. Produces material.";
     }
-
-    @Override
-    public String help() {
-        return "siphon <source> — draw liquid. 1 AP. Produces material.";
-    }
-
-    @Override
-    public int apCost(Ast.Invocation inv) {
-        return 1;
-    }
-
-    @Override
-    public boolean producesMaterial() {
-        return true;
-    }
+    @Override public int apCost(Ast.Invocation inv) { return 1; }
+    @Override public boolean producesMaterial() { return true; }
 
     @Override
     public Check validateStructural(VerbContext c) {
-        if (c.inv.arg(0) == null) {
-            return Check.invalid("siphon from what?", null);
+        return c.inv.arg(0) == null
+                ? Check.invalid("siphon from what?", null)
+                : Check.ok();
+    }
+
+    private Check check(VerbContext c, Resolved resolved) {
+        Check resolution = VerbTargets.resolution(resolved);
+        if (!resolution.valid()) return resolution;
+        if (resolved instanceof Resolved.OnTile tile
+                && tile.layer() == Address.Layer.CEILING) {
+            return Check.invalid("cannot siphon from the ceiling", null);
         }
-        return Check.ok();
+
+        Check reach = VerbTargets.reachable(c, (Resolved.Target) resolved);
+        if (!reach.valid()) return reach;
+        return sourceSubstance(c, resolved) == null
+                ? Check.blocked("nothing to siphon", "try: inspect " + c.inv.arg(0))
+                : Check.ok();
     }
 
     @Override
     public Check validateState(VerbContext c) {
-        String source = c.inv.arg(0);
-        Tag substance = sourceSubstance(c, source);
-
-        if (substance == null) {
-            return Check.blocked(
-                    "nothing to siphon from " + source,
-                    "try: inspect " + source
-            );
-        }
-
-        Entity holder = holderOf(c, source);
-        if (holder != null && holder.pos().chebyshev(c.thrall.pos()) > 1) {
-            return Check.blocked(holder.id() + " out of reach", "step closer");
-        }
-
-        return Check.ok();
+        return check(c, VerbHelpers.resolve(c, c.inv.arg(0)));
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Tag substance = sourceSubstance(c, c.inv.arg(0));
+        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
+        Check check = check(c, resolved);
+        if (!check.valid()) return VerbTargets.reject(c, check);
 
-        if (substance == null) {
-            c.say("nothing to siphon");
-            return ExitCode.BLOCKED;
+        Item item = sourceItem(resolved);
+        Tag substance;
+        if (item != null) {
+            substance = item.consumeSubstance();
+        } else {
+            Resolved.OnTile tile = (Resolved.OnTile) resolved;
+            substance = sourceSubstance(c, resolved);
+            c.world.map().removeTag(tile.pos(), substance);
         }
 
         c.materialOut = new Material.OfSubstance(substance);
@@ -73,51 +66,31 @@ public final class SiphonVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static Tag sourceSubstance(VerbContext c, String address) {
-        Resolved resolved = VerbHelpers.resolve(c, address);
+    private static Tag sourceSubstance(VerbContext c, Resolved resolved) {
+        Item item = sourceItem(resolved);
+        if (item != null) return item.substance();
 
-        if (resolved instanceof Resolved.OnItem onItem) {
-            return substanceOf(onItem.item());
+        if (resolved instanceof Resolved.OnTile target
+                && target.layer() != Address.Layer.CEILING) {
+            GameMap.Tile tile = c.world.tile(target.pos());
+            if (tile.has(Tag.OIL)) return Tag.OIL;
+            if (tile.has(Tag.WATER)) return Tag.WATER;
         }
-
-        if (resolved instanceof Resolved.OnEntity onEntity) {
-            Entity entity = onEntity.entity();
-
-            if (entity instanceof Actor actor) {
-                return substanceOf(actor.mainHand());
-            }
-
-            if (entity instanceof Prop prop) {
-                return substanceOf(prop.contents());
-            }
-        }
-
-        if (resolved instanceof Resolved.OnTile onTile) {
-            GameMap.Tile tile = c.world.tile(onTile.pos());
-
-            if (tile.has(Tag.OIL)) {
-                return Tag.OIL;
-            }
-
-            if (tile.has(Tag.WATER)) {
-                return Tag.WATER;
-            }
-        }
-
         return null;
     }
 
-    private static Tag substanceOf(Item item) {
-        return item == null ? null : item.substance();
-    }
-
-    private static Entity holderOf(VerbContext c, String address) {
-        Address parsed = Address.parse(address);
-
-        if (parsed instanceof Address.EntityAddr entityAddress) {
-            return c.world.get(entityAddress.id());
+    private static Item sourceItem(Resolved resolved) {
+        if (resolved instanceof Resolved.OnItem target) {
+            return target.item();
         }
-
+        if (resolved instanceof Resolved.OnEntity target) {
+            if (target.entity() instanceof Actor actor) {
+                return actor.mainHand();
+            }
+            if (target.entity() instanceof Prop prop) {
+                return prop.contents();
+            }
+        }
         return null;
     }
 }

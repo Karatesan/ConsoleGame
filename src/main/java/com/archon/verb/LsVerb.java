@@ -1,26 +1,32 @@
 package com.archon.verb;
 
+import com.archon.address.Address;
 import com.archon.address.Resolved;
+import com.archon.model.ItemLocation;
 
 public final class LsVerb extends FreeVerb {
     @Override public String name() { return "ls"; }
     @Override public String help() { return "ls <address> — list contents. 0 AP."; }
-
-    @Override
-    public ExitCode execute(VerbContext c) {
-        String a = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
-        Resolved r = VerbHelpers.resolve(c, a);
-        if (r instanceof Resolved.OnItem oi && "pack".equals(oi.container())) {
-            c.say(c.thrall.inventory().isPackEmpty() ? "(empty)" :
-                    String.join("\n", c.thrall.inventory().pack().stream()
-                            .map(i -> "  " + i.id() + "  " + i.tags()).toList()));
-            return ExitCode.SUCCESS;
+    @Override public ExitCode execute(VerbContext c) {
+        String address = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
+        Resolved resolved = VerbHelpers.resolve(c, address);
+        if (resolved instanceof Resolved.Failure failure) {
+            c.say(failure.reason());
+            return ExitCode.INVALID;
         }
-        if (r instanceof Resolved.OnTile ot) {
-            c.say(c.world.tile(ot.pos()).ground().toString());
-            return ExitCode.SUCCESS;
-        }
-        c.say("nothing to list at " + a);
-        return ExitCode.INVALID;
+        String listing = switch (resolved) {
+            case Resolved.OnLocation target when target.location() instanceof ItemLocation.Pack pack ->
+                    pack.owner().inventory().isPackEmpty() ? "(empty)" :
+                            String.join("\n", pack.owner().inventory().pack().stream()
+                                    .map(item -> "  " + item.id() + "  " + item.tags()).toList());
+            case Resolved.OnLocation ignored -> "(empty)";
+            case Resolved.OnItem target -> "  " + target.item().id() + "  " + target.item().tags();
+            case Resolved.OnTile target -> target.layer() == Address.Layer.CEILING
+                    ? "ceiling — tags " + c.world.tile(target.pos()).ceiling()
+                    : c.world.tile(target.pos()).ground().toString();
+            default -> null;
+        };
+        c.say(listing == null ? "nothing to list at " + address : listing);
+        return listing == null ? ExitCode.INVALID : ExitCode.SUCCESS;
     }
 }

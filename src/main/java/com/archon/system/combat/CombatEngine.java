@@ -13,10 +13,10 @@ import com.archon.model.World;
  * Domain service encapsulating combat calculations and state mutations
  * for melee strikes, ranged attacks, and disarm maneuvers.
  */
-public final class CombatEngine {
+import java.util.Objects;
 
-    private CombatEngine() {
-    }
+public final class CombatEngine {
+    private CombatEngine() { }
 
     public record MeleeHitResult(
             boolean hit,
@@ -26,14 +26,9 @@ public final class CombatEngine {
             Item weapon,
             boolean killed,
             boolean weaponDegraded
-    ) {
-    }
+    ) { }
 
-    public record DisarmResult(
-            boolean success,
-            Item weapon
-    ) {
-    }
+    public record DisarmResult(boolean success, Item weapon) { }
 
     public record RangedHitResult(
             boolean hit,
@@ -41,8 +36,7 @@ public final class CombatEngine {
             int damage,
             BodyPart part,
             boolean killed
-    ) {
-    }
+    ) { }
 
     public static MeleeHitResult resolveMelee(
             Dice dice,
@@ -53,16 +47,15 @@ public final class CombatEngine {
             String power,
             boolean force
     ) {
+        Objects.requireNonNull(world, "world");
         int hitChance = 70 + part.hitMod - target.evasion()
                 + ("light".equals(power) ? 20 : "heavy".equals(power) ? -20 : 0);
-
-        if (target instanceof Actor targetActor && targetActor.isGuarded() && !force) {
+        if (target instanceof Actor actor && actor.isGuarded() && !force) {
             hitChance -= 25;
         }
 
         hitChance = clampHitChance(hitChance);
         Item weapon = attacker.mainHand();
-
         if (!dice.chance(hitChance)) {
             return new MeleeHitResult(false, hitChance, 0, part, weapon, false, false);
         }
@@ -71,7 +64,6 @@ public final class CombatEngine {
         double multiplier = part.damageMult
                 * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
         int damage = Math.max(1, (int) Math.round(baseDamage * multiplier) - target.armor());
-
         target.takeDamage(damage);
 
         boolean weaponDegraded = force && weapon != null;
@@ -83,25 +75,32 @@ public final class CombatEngine {
         if (killed) {
             dropMainHand(world, target);
         }
-
         return new MeleeHitResult(true, hitChance, damage, part, weapon, killed, weaponDegraded);
     }
 
-    public static DisarmResult attemptDisarm(Dice dice, World world, Actor owner) {
-        if (owner == null || owner.mainHand() == null) {
+    public static DisarmResult attemptDisarm(
+            Dice dice,
+            World world,
+            Actor owner,
+            EquipmentSlot slot
+    ) {
+        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(owner, "owner");
+        if (slot != EquipmentSlot.HAND_LEFT && slot != EquipmentSlot.HAND_RIGHT) {
+            throw new IllegalArgumentException("disarm requires a hand slot");
+        }
+
+        Item weapon = owner.inventory().equipped(slot);
+        if (weapon == null) {
             return new DisarmResult(false, null);
         }
-
         if (!dice.chance(45)) {
-            return new DisarmResult(false, owner.mainHand());
+            return new DisarmResult(false, weapon);
         }
 
-        Item dropped = disarmMainHand(owner);
-        if (dropped != null && world != null) {
-            world.map().placeGroundItem(owner.pos(), dropped);
-        }
-
-        return new DisarmResult(dropped != null, dropped);
+        Item dropped = owner.disarm(slot);
+        world.map().placeGroundItem(owner.pos(), dropped);
+        return new DisarmResult(true, dropped);
     }
 
     public static RangedHitResult resolveRanged(
@@ -111,6 +110,7 @@ public final class CombatEngine {
             Entity target,
             BodyPart part
     ) {
+        Objects.requireNonNull(world, "world");
         int distance = target.pos().chebyshev(attacker.pos());
         int rangeModifier = distance <= 1 ? -20 : distance <= 4 ? 0 : distance <= 8 ? -10 : -25;
         int hitChance = clampHitChance(70 + part.hitMod + rangeModifier - target.evasion());
@@ -126,17 +126,7 @@ public final class CombatEngine {
         if (killed) {
             dropMainHand(world, target);
         }
-
         return new RangedHitResult(true, hitChance, damage, part, killed);
-    }
-
-    public static RangedHitResult resolveRanged(
-            Dice dice,
-            Thrall attacker,
-            Entity target,
-            BodyPart part
-    ) {
-        return resolveRanged(dice, null, attacker, target, part);
     }
 
     private static int clampHitChance(int hitChance) {
@@ -144,9 +134,7 @@ public final class CombatEngine {
     }
 
     private static void dropMainHand(World world, Entity target) {
-        if (world == null || !(target instanceof Actor actor)) {
-            return;
-        }
+        if (!(target instanceof Actor actor)) return;
 
         Item dropped = disarmMainHand(actor);
         if (dropped != null) {

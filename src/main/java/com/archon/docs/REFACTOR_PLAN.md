@@ -17,8 +17,8 @@ When an API changes, all callers must be migrated directly. No compatibility shi
 The following types are treated as the application's core API boundaries:
 
 - Model: `World`, `Entity`, `Actor`, `Thrall`, `Prop`, `Door`, `Inventory`, `Item`, `CreatureStats`, `EquipmentSlot`, `Tag`, `BodyPart`, `Vec2`, `Dice`.
-- Command/gameplay: `Verb`, `VerbContext`, `Verbs`, `Material`, `Check`, `ExitCode`.
-- Parsing/addressing: `CommandParser`, `Ast`, `Address`, `Resolved`.
+- Command/gameplay: `Verb`, `VerbContext`, `Verbs`, `Material`, `Check`, `ExitCode`, `VerbTargets`, `ItemInput`.
+- Parsing/addressing: `CommandParser`, `Ast`, `Address`, `Resolved`,`PathResolver`, `TileResolver`, .
 - Execution economy: `Executor`, `Validator`, `PipelineRunner`, `StageRunner`, `SettlementManager`, `RoundState`, `Auditor`.
 - Game systems: `CombatEngine`, `ReactionSystem`, `SimulationSystem`, `SpatialService`.
 - Presentation seam: `EventBus`, `GameEvent`, `View`, `ConsoleView`.
@@ -224,8 +224,52 @@ The following work was deliberately not folded into Priority 1:
 - Immutable presentation snapshots — Priority 6.
 - Comprehensive automated test coverage — Priority 7.
 
+### Priority 2 status: implemented; final verification pending
+Priority 2 was split into three stages to establish authoritative addressing and migrate consumers without compatibility shims.
+
+#### Stage 1 — syntax and interpretation boundaries
+Completed work:
+
+- Removed world-relative interpretation from Address.
+- Added explicit invalid-syntax results and typed tile layers.
+- Moved entity/inventory path interpretation into PathResolver and world-relative tile interpretation into TileResolver, behind Resolved.
+- Added strict coordinate/direction parsing, numeric validation, overflow-safe relative calculations, and bounds checks.
+- Removed body/equipment ambiguity: body targets use entity/body/head; equipment retains paths such as entity/head and entity/hand/left.
+
+#### Stage 2 — typed resolution and ownership
+Completed work:
+
+- Replaced nullable resolution with explicit successful targets and structured failures.
+- Added distinct entity, actor-body, item, location, and tile targets.
+- Removed nullable successful item values: empty slots, empty prop contents, and pack roots resolve as locations.
+- Added typed pack, equipment, prop-contents, and ground locations instead of encoded container strings.
+- Exposed owner and position information directly through resolved targets.
+- Preserved actor-specific inventory lookup and made dead-entity rejection consistent for entity targets and named tile anchors.
+
+#### Stage 3 — consumer migration
+Completed work:
+
+- Migrated supplied address-consuming verbs to typed targets, locations, layers, and failures.
+- Removed body-path reparsing from VerbHelpers and owner reconstruction from verbs.
+- Removed VerbContext.itemFromMaterialOrArg(); centralized carried-item selection and piped-item ownership checks in ItemInput.
+- Added shared failure and reach handling through VerbTargets.
+- Changed disarm to target the addressed hand explicitly; migrated CombatEngine and removed its world-less ranged overload.
+- Added execution-time checks where submission-time validation could become stale.
+- Added no legacy addressing wrappers or compatibility overloads.
+- Related correctness fixes
+- Invalid shooting no longer consumes nocking.
+- Throwing removes piped items from inventory.
+- Pouring honors resolved destinations, preserves empty containers, and no longer duplicates material output.
+- Siphoning consumes item substance or the selected tile liquid tag under a simple finite-portion rule.
+- Taking uses typed sources and handles placement/removal failure without losing the item.
+
+### Scope intentionally deferred
+Shared atomic transfer and environment systems — Priority 5.
+Injectable verb catalog and unified metadata — Priority 3.
+Unified pipeline/material validation and settlement — Priority 4.
+Immutable presentation snapshots — Priority 6.
+Comprehensive automated tests — Priority 7.
+
 ## Current next step
 
-Proceed with **Priority 2: typed and authoritative addressing**. This should happen before implementing an atomic transfer system, because transfers need typed source and destination locations rather than nullable items and encoded container strings.
-
-Before merging the branch, compile the complete workspace and run available smoke tests. After Priority 2, add focused address and inventory tests before beginning broad feature development.
+Proceed with **Priority 3: 
