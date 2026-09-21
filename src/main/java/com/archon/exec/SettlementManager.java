@@ -3,26 +3,30 @@ package com.archon.exec;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
-import com.archon.model.Actor;
 import com.archon.model.World;
-import com.archon.system.combat.ReactionSystem;
-import com.archon.verb.Verb;
-import com.archon.verb.Verbs;
 
-/**
- * Handles AP deduction, break penalty forfeiture, late interrupt triggers,
- * and round-end condition determination.
- */
+import java.util.Objects;
+
 public final class SettlementManager {
 
     private final World world;
     private final EventBus bus;
     private final RoundState round;
+    private final ExecutionPolicy policy;
+    private final Interrupts interrupts;
 
-    public SettlementManager(World world, EventBus bus, RoundState round) {
-        this.world = world;
-        this.bus = bus;
-        this.round = round;
+    public SettlementManager(
+            World world,
+            EventBus bus,
+            RoundState round,
+            ExecutionPolicy policy,
+            Interrupts interrupts
+    ) {
+        this.world = Objects.requireNonNull(world, "world");
+        this.bus = Objects.requireNonNull(bus, "bus");
+        this.round = Objects.requireNonNull(round, "round");
+        this.policy = Objects.requireNonNull(policy, "policy");
+        this.interrupts = Objects.requireNonNull(interrupts, "interrupts");
     }
 
     public Executor.Outcome settle(
@@ -33,29 +37,20 @@ public final class SettlementManager {
     ) {
         int forfeited = 0;
         if (trace.broke()) {
-            forfeited = Math.min(allocation + RoundState.BREAK_PENALTY, round.ap());
+            forfeited = round.rules().breakCharge(allocation, round.ap());
             round.spend(forfeited);
             bus.post(new GameEvent.LineBroke(
                     trace.breakStage(),
                     trace.breakReason(),
                     allocation,
-                    RoundState.BREAK_PENALTY,
+                    round.rules().breakPenalty(),
                     forfeited,
                     round.ap(),
                     trace.breakHint()
             ));
         } else {
             round.spend(trace.charged());
-
-            Actor late = ReactionSystem.pendingInterrupt(world);
-            if (late != null) {
-                int damage = ReactionSystem.resolveInterrupt(world, late);
-                bus.post(new GameEvent.InterruptFired(
-                        late.id(),
-                        late.readied().description(),
-                        damage
-                ));
-            }
+            interrupts.fire();
 
             bus.post(new GameEvent.LineComplete(
                     trace.charged(),
@@ -80,7 +75,7 @@ public final class SettlementManager {
             );
         }
 
-        boolean roundOver = round.ap() <= 0 || (!trace.broke() && endsWithTerminal(line));
+        boolean roundOver = round.ap() <= 0 || (!trace.broke() && policy.endsWithTerminal(line));
         return new Executor.Outcome(
                 trace.broke() ? Executor.Kind.BROKE : Executor.Kind.COMPLETE,
                 trace.lastCode(),
@@ -92,15 +87,5 @@ public final class SettlementManager {
                 round.linesUsed(),
                 roundOver
         );
-    }
-
-    public static boolean endsWithTerminal(Ast.Line line) {
-        if (line.stages().isEmpty()) {
-            return false;
-        }
-
-        Ast.Stage last = line.stages().get(line.stages().size() - 1);
-        Verb verb = Verbs.get(last.last().verb());
-        return verb != null && verb.terminal();
     }
 }

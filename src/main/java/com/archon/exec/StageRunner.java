@@ -4,16 +4,11 @@ import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.model.Actor;
-import com.archon.model.World;
-import com.archon.system.combat.ReactionSystem;
 import com.archon.verb.ExitCode;
 
 import java.util.List;
+import java.util.Objects;
 
-/**
- * Executes stages of a line left to right, evaluating operators (AND, OR, SEQ),
- * detecting boundary interrupts, and tracking execution trace.
- */
 public final class StageRunner {
 
     public record ExecutionTrace(
@@ -25,19 +20,21 @@ public final class StageRunner {
             String breakHint
     ) {}
 
-    private final World world;
     private final EventBus bus;
     private final PipelineRunner pipelineRunner;
+    private final ExecutionPolicy policy;
+    private final Interrupts interrupts;
 
-    public StageRunner(World world, EventBus bus, PipelineRunner pipelineRunner) {
-        this.world = world;
-        this.bus = bus;
-        this.pipelineRunner = pipelineRunner;
+    public StageRunner(EventBus bus, PipelineRunner pipelineRunner, ExecutionPolicy policy, Interrupts interrupts) {
+        this.bus = Objects.requireNonNull(bus, "bus");
+        this.pipelineRunner = Objects.requireNonNull(pipelineRunner, "pipelineRunner");
+        this.policy = Objects.requireNonNull(policy, "policy");
+        this.interrupts = Objects.requireNonNull(interrupts, "interrupts");
     }
 
     public void runFreeLine(Ast.Line line) {
-        for (Ast.Stage st : line.stages()) {
-            pipelineRunner.runFreePipeline(st);
+        for (Ast.Stage stage : line.stages()) {
+            pipelineRunner.runFreePipeline(stage);
         }
     }
 
@@ -52,9 +49,9 @@ public final class StageRunner {
 
         for (int i = 0; i < stages.size(); i++) {
             Ast.Stage stage = stages.get(i);
-            int cost = Executor.stageCost(stage);
+            int cost = policy.stageCost(stage);
 
-            // 7a. operator branching — never a break
+            // Operator branching — never a break.
             if (i > 0) {
                 boolean run = switch (stage.op()) {
                     case AND -> last == ExitCode.SUCCESS;
@@ -70,12 +67,10 @@ public final class StageRunner {
                     continue;
                 }
 
-                // 7b. interrupt check at the stage boundary
-                Actor source = ReactionSystem.pendingInterrupt(world);
+                // Interrupt check at the stage boundary.
+                Actor source = interrupts.fire();
                 if (source != null) {
-                    int dmg = ReactionSystem.resolveInterrupt(world, source);
-                    bus.post(new GameEvent.InterruptFired(source.id(), source.readied().description(), dmg));
-                    charged += cost / 2;
+                    charged += round.rules().interruptedCharge(cost);
                     breakStage = i + 1;
                     breakReason = source.name() + " (READIED) interrupted the sequence";
                     breakHint = "it was flagged READIED in your last scan";
@@ -95,7 +90,7 @@ public final class StageRunner {
                 break;
             }
             if (code == ExitCode.INTERRUPT) {
-                charged += cost / 2;
+                charged += round.rules().interruptedCharge(cost);
                 breakStage = i + 1;
                 breakReason = "interrupted during stage " + (i + 1);
                 broke = true;

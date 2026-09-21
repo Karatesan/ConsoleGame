@@ -1,27 +1,27 @@
 package com.archon.exec;
 
 public final class RoundState {
-    public static final int BASE_AP       = 5;
-    public static final int LINE_TAX      = 1;
-    public static final int FREE_LINES    = 1;
-    public static final int BREAK_PENALTY = 1;
-
-    private int ap = BASE_AP;
+    private final EconomyRules rules;
+    private int ap;
     private int linesUsed = 0;
     private int roundNo = 1;
 
-    public int ap()        { return ap; }
-    public int linesUsed() { return linesUsed; }
-    public int roundNo()   { return roundNo; }
+    public RoundState(EconomyRules rules) {
+        this.rules = java.util.Objects.requireNonNull(rules, "rules");
+        ap = rules.roundAp();
+    }
 
-    public int taxForNextLine() { return linesUsed < FREE_LINES ? 0 : LINE_TAX; }
+    public EconomyRules rules() { return rules; }
+    public int ap() {return ap;}
+    public int linesUsed() {return linesUsed;}
+    public int roundNo() {return roundNo;}
 
     public void spend(int n)   { ap = Math.max(0, ap - n); }
     public void countLine()    { linesUsed++; }
 
     public int reset() {
         int wasted = ap;
-        ap = BASE_AP;
+        ap = rules.roundAp();
         linesUsed = 0;
         roundNo++;
         return wasted;

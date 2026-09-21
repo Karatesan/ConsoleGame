@@ -1,8 +1,6 @@
 package com.archon.verb;
 
-public final class MapVerb extends FreeVerb {
-    @Override public String name() { return "map"; }
-    @Override public String help() { return "map — redraw grid. 0 AP."; }
+public final class MapVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {

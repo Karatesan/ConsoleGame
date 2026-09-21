@@ -1,30 +1,9 @@
 package com.archon.verb;
 
-import com.archon.command.Ast;
-
 public final class NockVerb implements Verb {
-    @Override
-    public String name() {
-        return "nock";
-    }
 
     @Override
-    public String help() {
-        return "nock — load a missile. 1 AP. Persists across rounds.";
-    }
-
-    @Override
-    public int apCost(Ast.Invocation inv) {
-        return 1;
-    }
-
-    @Override
-    public Check validateStructural(VerbContext c) {
-        return Check.ok();
-    }
-
-    @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         if (c.thrall.isNocked()) {
             return Check.blocked("already nocked", null);
         }

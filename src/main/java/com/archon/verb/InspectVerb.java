@@ -4,9 +4,7 @@ import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.model.*;
 
-public final class InspectVerb extends FreeVerb {
-    @Override public String name() { return "inspect"; }
-    @Override public String help() { return "inspect <address> — tags, HP, hit locations. 0 AP."; }
+public final class InspectVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {

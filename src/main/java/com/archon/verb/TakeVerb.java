@@ -6,17 +6,13 @@ import com.archon.command.Ast;
 import com.archon.model.*;
 
 public final class TakeVerb implements Verb {
-    @Override public String name() { return "take"; }
-    @Override public String help() { return "take <address> — pick up. 1 AP. Produces material."; }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
-    @Override public boolean producesMaterial() { return true; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         return c.inv.arg(0) == null ? Check.invalid("take what?", null) : Check.ok();
     }
 
-    private Resolved resolveItem(VerbContext c) {
+    private Resolved resolveItem(ValidationContext c) {
         Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
         if (resolved instanceof Resolved.OnTile tile
                 && tile.layer() != Address.Layer.CEILING) {
@@ -31,7 +27,7 @@ public final class TakeVerb implements Verb {
         return resolved;
     }
 
-    private Check check(VerbContext c, Resolved resolved) {
+    private Check check(ValidationContext c, Resolved resolved) {
         Check resolution = VerbTargets.resolution(resolved);
         if (!resolution.valid()) return resolution;
 
@@ -60,7 +56,7 @@ public final class TakeVerb implements Verb {
     }
 
     @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         return check(c, resolveItem(c));
     }
 

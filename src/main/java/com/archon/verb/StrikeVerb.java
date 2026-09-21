@@ -13,14 +13,9 @@ import java.util.List;
 import java.util.List;
 
 public final class StrikeVerb implements Verb {
-    @Override public String name() { return "strike"; }
-    @Override public String help() {
-        return "strike [target] [-a part] [-p light|normal|heavy] [-f] — 1/2/3 AP.";
-    }
-    @Override public int apCost(Ast.Invocation inv) { return VerbHelpers.powerAp(inv, 2); }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         if (c.inv.arg(0) == null) {
             List<Entity> adjacent = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
             if (adjacent.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
@@ -35,7 +30,7 @@ public final class StrikeVerb implements Verb {
         return check.valid() ? check : Check.invalid(check.reason(), check.hint());
     }
 
-    private Resolved resolveTarget(VerbContext c) {
+    private Resolved resolveTarget(ValidationContext c) {
         String address = c.inv.arg(0);
         if (address == null) address = VerbHelpers.soleAdjacentHostile(c);
         return address == null
@@ -53,7 +48,7 @@ public final class StrikeVerb implements Verb {
                 || equipment.slot() == EquipmentSlot.HAND_RIGHT);
     }
 
-    private Check targetCheck(VerbContext c, Resolved resolved) {
+    private Check targetCheck(ValidationContext c, Resolved resolved) {
         Check resolution = VerbTargets.resolution(resolved);
         if (!resolution.valid()) return resolution;
         if (VerbHelpers.aimPart(c.inv, resolved).isEmpty()) {
@@ -69,7 +64,7 @@ public final class StrikeVerb implements Verb {
                 : Check.invalid("strike needs an entity, body part, or hand slot", null);
     }
 
-    private Check check(VerbContext c, Resolved resolved) {
+    private Check check(ValidationContext c, Resolved resolved) {
         Check target = targetCheck(c, resolved);
         if (!target.valid()) return target;
         if (isHandTarget(resolved) && resolved instanceof Resolved.OnLocation) {
@@ -79,7 +74,7 @@ public final class StrikeVerb implements Verb {
     }
 
     @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         return check(c, resolveTarget(c));
     }
 
@@ -120,8 +115,7 @@ public final class StrikeVerb implements Verb {
         ));
         if (result.killed()) {
             c.say(target.name() + " falls.");
-            return ExitCode.SUCCESS;
         }
-        return ExitCode.PARTIAL;
+        return ExitCode.SUCCESS;
     }
 }

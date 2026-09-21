@@ -4,10 +4,10 @@ import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.model.ItemLocation;
 
-public final class LsVerb extends FreeVerb {
-    @Override public String name() { return "ls"; }
-    @Override public String help() { return "ls <address> — list contents. 0 AP."; }
-    @Override public ExitCode execute(VerbContext c) {
+public final class LsVerb implements Verb {
+
+    @Override
+    public ExitCode execute(VerbContext c) {
         String address = c.inv.arg(0) == null ? "/pack" : c.inv.arg(0);
         Resolved resolved = VerbHelpers.resolve(c, address);
         if (resolved instanceof Resolved.Failure failure) {

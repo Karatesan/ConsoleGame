@@ -1,618 +1,358 @@
 package com.archon.verb;
 
-import java.util.*;
+import com.archon.command.FlagSpec;
+import com.archon.exec.EconomyRules;
 
-/**
- * Central repository and formatter for game command manuals and reference guides.
- */
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/** Renders catalog metadata and authored cross-command reference topics. */
 public final class CommandManual {
 
-    private static final Map<String, VerbDoc> VERBS = new LinkedHashMap<>();
-    private static final Map<String, String> TOPICS = new LinkedHashMap<>();
+    private static final List<String> TOPICS =
+            List.of("operators", "address", "economy", "flags");
 
-    private static void reg(VerbDoc doc) {
-        VERBS.put(doc.name(), doc);
+    private final EconomyRules rules;
+    private VerbCatalog catalog;
+
+    public CommandManual(EconomyRules rules) {
+        this.rules = Objects.requireNonNull(rules, "rules");
     }
 
-    private static void topic(String name, String content) {
-        TOPICS.put(name.toLowerCase(), content);
+    /** Composition-only initialization, before this manual is published for use. */
+    public void bind(VerbCatalog catalog) {
+        Objects.requireNonNull(catalog, "catalog");
+        if (this.catalog != null) {
+            throw new IllegalStateException("command manual is already bound");
+        }
+        this.catalog = catalog;
     }
 
-    static {
-        // --- Combat ---
-        reg(new VerbDoc(
-                "strike",
-                "Melee attack or disarm attempt",
-                "COMBAT",
-                "strike [target] [-a part] [-p light|normal|heavy] [-f]",
-                "1 AP (light), 2 AP (normal), 3 AP (heavy)",
-                "Strikes an adjacent enemy with the wielded weapon or bare limbs.\n"
-                        + "If target is omitted, automatically strikes the sole adjacent hostile.\n"
-                        + "Targeting an item held in an enemy's hand (e.g. 'strike o1/hand/right') executes\n"
-                        + "a disarm attempt, knocking the weapon to the ground.",
-                List.of(
-                        new VerbDoc.FlagDoc("-a, --aim <part>", "Aim for a body part: head, torso, arm.l, arm.r, legs."),
-                        new VerbDoc.FlagDoc("-p, --power <level>", "Strike power: light (1 AP), normal (2 AP), heavy (3 AP)."),
-                        new VerbDoc.FlagDoc("-f, --force", "Brute-force attack attempting to punch through armor."),
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                false,
-                List.of(
-                        "strike o1",
-                        "strike o1 -a head -p heavy",
-                        "strike o1/hand/right",
-                        "strike o1 || guard"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "guard",
-                "Raise defense (+30% armor until next round)",
-                "COMBAT",
-                "guard",
-                "1 AP",
-                "Raises guard, increasing the thrall's armor rating by +30% until the start\n"
-                        + "of the next round. Excellent fallback stage in conditional chains.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                false,
-                List.of(
-                        "guard",
-                        "strike o1 || guard"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "nock",
-                "Load arrow into ranged weapon",
-                "COMBAT",
-                "nock",
-                "1 AP",
-                "Loads an arrow into the ranged weapon. Nocked status persists across\n"
-                        + "rounds until fired or dropped.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                false,
-                List.of(
-                        "nock",
-                        "nock ; shoot g1"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "shoot",
-                "Ranged attack against visible target in line-of-sight",
-                "COMBAT",
-                "shoot <target> [-a part]",
-                "2 AP (Requires nocked arrow)",
-                "Fires a nocked arrow at a target creature. Requires unobstructed line of sight\n"
-                        + "and an already nocked arrow. Consumes the nocked arrow upon firing.",
-                List.of(
-                        new VerbDoc.FlagDoc("-a, --aim <part>", "Aim for a body part: head, torso, arm.l, arm.r, legs."),
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                false,
-                List.of(
-                        "shoot g1",
-                        "shoot o1 -a head",
-                        "nock ; shoot g1"
-                )
-        ));
-
-        // --- Movement ---
-        reg(new VerbDoc(
-                "step",
-                "Advance 1 tile in a cardinal or diagonal direction",
-                "MOVEMENT",
-                "step <dir> [-c]",
-                "1 AP (2 AP with -c / --careful)",
-                "Moves the thrall 1 tile in the specified direction: n, s, e, w, ne, nw, se, sw.\n"
-                        + "Fails statically if targeting a wall or occupied tile.\n"
-                        + "May trigger enemy movement reactions (e.g. archers readied with ON_MOVEMENT_IN_LOS).",
-                List.of(
-                        new VerbDoc.FlagDoc("-c, --careful", "Move carefully at increased AP cost (2 AP)."),
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                false,
-                List.of(
-                        "step e",
-                        "step nw -c",
-                        "step w ; strike o1"
-                )
-        ));
-
-        // --- Items & Pipeline ---
-        reg(new VerbDoc(
-                "take",
-                "Pick up item from ground, pack, or target",
-                "ITEMS & PIPELINE",
-                "take <address>",
-                "1 AP (Produces material)",
-                "Takes an item into inventory. Can take from ground (@self, @x,y), from pack\n"
-                        + "(/pack/item), or attempt to snatch a weapon held by an adjacent enemy (35% chance).\n"
-                        + "Produces the item as piped material for downstream pipeline verbs.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                true,
-                List.of(
-                        "take blade",
-                        "take @self",
-                        "take /pack/flask_oil | throw o1",
-                        "take o1/hand/right"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "drop",
-                "Drop item onto current tile",
-                "ITEMS & PIPELINE",
-                "drop [item]",
-                "1 AP (Accepts material)",
-                "Drops the specified item (or material piped in from previous stage) from the thrall's\n"
-                        + "hands or pack onto the current tile.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                true,
-                false,
-                List.of(
-                        "drop blade",
-                        "take /pack/stone | drop"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "wield",
-                "Equip item into hand slot",
-                "ITEMS & PIPELINE",
-                "wield [item]",
-                "1 AP (Accepts material)",
-                "Equips an item from the thrall's pack (or material piped in) into an empty hand slot\n"
-                        + "(right hand preferred, left hand secondary). Fails if both hands are occupied.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                true,
-                false,
-                List.of(
-                        "wield sword",
-                        "take /pack/torch | wield"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "throw",
-                "Hurl an item or flask at a target or tile",
-                "ITEMS & PIPELINE",
-                "throw [item] <target>",
-                "2 AP (Accepts material)",
-                "Hurls an item or flask at a target entity or tile. If piped material is received,\n"
-                        + "only the destination argument is required. Shatters flasks and spills their contents.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                true,
-                false,
-                List.of(
-                        "throw flask_oil o1",
-                        "take /pack/flask_oil | throw @3,5"
-                )
-        ));
-
-        // --- Environment & Elemental ---
-        reg(new VerbDoc(
-                "siphon",
-                "Extract liquid from flask, creature, or ground puddle",
-                "ENVIRONMENT & ELEMENTAL",
-                "siphon <source>",
-                "1 AP (Produces material)",
-                "Extracts liquid (OIL or WATER) from an item in pack, an entity's held container,\n"
-                        + "or a ground tile. Produces the substance as material for downstream pipeline verbs.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                false,
-                true,
-                List.of(
-                        "siphon b1/contents",
-                        "siphon @self",
-                        "siphon b1/contents | pour @o1/floor"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "pour",
-                "Pour liquid onto a tile or creature",
-                "ENVIRONMENT & ELEMENTAL",
-                "pour [liquid] <tile>",
-                "1 AP (Accepts and produces material)",
-                "Spills liquid substance onto a target tile or entity. If liquid is supplied via pipe,\n"
-                        + "only destination tile is required. Spreads liquid and flammable/conductive tags across the tile.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                true,
-                true,
-                List.of(
-                        "pour oil @3,4",
-                        "siphon b1/contents | pour @o1/floor"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "ignite",
-                "Ignite flammable target or tile",
-                "ENVIRONMENT & ELEMENTAL",
-                "ignite <target>",
-                "1 AP (Requires lit source in hand)",
-                "Ignites a flammable creature or tile (such as an oil puddle). Requires holding a lit\n"
-                        + "item (e.g. lit torch) in hand. Fire deals periodic burn damage and spreads across\n"
-                        + "adjacent oil puddles.",
-                List.of(
-                        new VerbDoc.FlagDoc("-n, --dry-run", "Validate syntax and cost without executing (0 AP).")
-                ),
-                true,
-                false,
-                List.of(
-                        "ignite o1",
-                        "ignite @o1/floor",
-                        "siphon b1/contents | pour @o1/floor | ignite @o1/floor"
-                )
-        ));
-
-        // --- Free Utilities ---
-        reg(new VerbDoc(
-                "help",
-                "Command manual and reference guides",
-                "FREE UTILITIES",
-                "help [verb | topic]",
-                "0 AP (Free action, never counts as a line)",
-                "With no arguments, displays the command manual overview and available topics.\n"
-                        + "Given a verb name, displays the full manual page for that verb.\n"
-                        + "Given a topic name (operators, address, economy, flags), displays the corresponding reference guide.",
-                List.of(),
-                false,
-                false,
-                List.of(
-                        "help",
-                        "help strike",
-                        "help operators",
-                        "help economy"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "scan",
-                "List perceived entities and vital statistics",
-                "FREE UTILITIES",
-                "scan",
-                "0 AP (Free action, never counts as a line)",
-                "Perceives all living entities currently in the dungeon. Displays entity ID,\n"
-                        + "name, position, HP, burning status, readied reactions, and distance relative to the thrall.",
-                List.of(),
-                false,
-                false,
-                List.of("scan")
-        ));
-
-        reg(new VerbDoc(
-                "inspect",
-                "Detailed inspection of entity, item, or tile",
-                "FREE UTILITIES",
-                "inspect <address>",
-                "0 AP (Free action, never counts as a line)",
-                "Deeply inspects an addressable target:\n"
-                        + "- Entity: shows HP, armor, held weapon, readied reactions, and hit probabilities / damage multipliers for each body part (head, torso, arm.l, arm.r, legs).\n"
-                        + "- Item: reveals item tags and contained substances.\n"
-                        + "- Tile: reveals wall/floor status, tile tags (e.g. OIL, BURNING), and ground items.",
-                List.of(),
-                false,
-                false,
-                List.of(
-                        "inspect o1",
-                        "inspect o1/hand/right",
-                        "inspect @3,4",
-                        "inspect /pack/torch"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "status",
-                "Display thrall vitals, held equipment, and pack",
-                "FREE UTILITIES",
-                "status",
-                "0 AP (Free action, never counts as a line)",
-                "Reports the thrall's current HP, active tags, items held in right and left hands,\n"
-                        + "pack inventory capacity, and whether a missile is nocked.",
-                List.of(),
-                false,
-                false,
-                List.of("status")
-        ));
-
-        reg(new VerbDoc(
-                "ls",
-                "List contents of pack or ground tile",
-                "FREE UTILITIES",
-                "ls [address]",
-                "0 AP (Free action, never counts as a line)",
-                "Lists items at the given address. Defaults to '/pack' if no argument is provided.\n"
-                        + "Can also list ground items at a tile address (e.g. '@self' or '@3,5').",
-                List.of(),
-                false,
-                false,
-                List.of(
-                        "ls",
-                        "ls /pack",
-                        "ls @self"
-                )
-        ));
-
-        reg(new VerbDoc(
-                "map",
-                "Redraw dungeon map and HUD",
-                "FREE UTILITIES",
-                "map",
-                "0 AP (Free action, never counts as a line)",
-                "Triggers a full redraw of the dungeon map and HUD display.",
-                List.of(),
-                false,
-                false,
-                List.of("map")
-        ));
-
-        reg(new VerbDoc(
-                "pass",
-                "Forfeit remaining AP and end current round",
-                "FREE UTILITIES",
-                "pass",
-                "0 AP (Free action, terminal verb)",
-                "Forfeits all remaining AP for the round and ends the thrall's turn immediately.\n"
-                        + "Must appear as the terminal (final) stage of a line.",
-                List.of(),
-                false,
-                false,
-                List.of(
-                        "pass",
-                        "strike o1 ; pass"
-                )
-        ));
-
-        // --- Topic Guides ---
-        topic("operators", """
-                TOPIC: COMMAND OPERATORS
-                Operators allow combining individual actions into pipelines and tactical chains.
-                Chaining stages into a single line avoids the +1 AP Line Tax!
-
-                OPERATORS:
-                  ;    Sequential execution: executes stage 1, then stage 2 regardless of outcome.
-                       Example: 'step e ; strike o1'
-
-                  &&   Conditional AND: executes the next stage ONLY if the previous SUCCEEDED.
-                       If the first stage returns PARTIAL, MISS, or BLOCKED, subsequent stages are skipped.
-                       Skipped stages refund their allocated AP!
-                       Example: 'strike d1 -p heavy && step n' (retreat only if dummy destroyed)
-
-                  ||   Conditional OR (Fallback): executes the next stage ONLY on MISS or failure.
-                       If the first stage succeeds, the fallback stage is skipped for 0 AP cost.
-                       Example: 'strike o1 || guard' (defend if the swing fails)
-
-                  |    Material Pipeline: feeds the item or substance from the left verb into the right.
-                       Pipelined verbs only charge the AP of the final stage!
-                       Example: 'siphon b1/contents | pour @o1/floor | ignite @o1/floor'
-                """);
-
-        topic("address", """
-                TOPIC: ADDRESSING SYNTAX
-                Everything addressable in the dungeon is referenced using structured path syntax.
-
-                TILES (prefix '@'):
-                  @x,y            Absolute coordinate tile. Example: '@3,4'
-                  @self           Current tile where thrall is standing.
-                  @<entityId>     Tile occupied by an entity. Example: '@o1', '@g1'
-                  @x,y/floor      Explicit floor layer of tile.
-                  @x,y/ceiling    Ceiling layer of tile.
-                  @<dir><n>       Relative tile offset from thrall. Example: '@e2', '@n1', '@sw1'
-
-                INVENTORY (prefix '/'):
-                  /pack/<item>    Item in thrall pack. Example: '/pack/torch', '/pack/flask_oil'
-
-                ENTITIES & BODY PARTS:
-                  <entityId>      Target creature. Example: 'o1', 'g1', 'd1'
-                  <entity>/<part> Target hit location: head, torso, arm.l, arm.r, legs.
-                                  Example: 'o1/head' (high crit), 'o1/legs' (evasion penalty)
-                  <entity>/hand/right
-                  <entity>/hand/left
-                                  Target held item for a disarm attack or snatch attempt.
-                                  Example: 'strike o1/hand/right', 'take o1/hand/right'
-                """);
-
-        topic("economy", """
-                TOPIC: ACTION ECONOMY
-                Combat in Archon is managed by the Action Economy Model (Spec v3.0).
-
-                ACTION POINTS (AP):
-                  The thrall receives 5 AP at the start of each round.
-                  Unspent AP is destroyed when the round ends—it cannot be banked.
-
-                LINE TAX:
-                  - 1st command line submitted in a round: +0 AP tax (tax-free).
-                  - 2nd command line submitted:            +1 AP line tax.
-                  - 3rd command line submitted:            +2 AP line tax.
-                  (Tax is charged up front upon line submission and is never refunded).
-
-                WHY CHAIN ACTIONS?
-                  By combining multiple stages on one line using operators (;, &&, ||, |),
-                  you execute entire combos while paying ZERO line tax!
-
-                BREAK PENALTIES:
-                  If a chain is interrupted by an enemy reaction or blocked mid-flight:
-                  - Execution stops immediately.
-                  - All remaining allocated AP is forfeited.
-                  - An additional +1 AP break penalty is charged (capped at remaining AP).
-
-                FREE ACTIONS (0 AP):
-                  Free verbs (scan, inspect, status, ls, map, help, pass) never cost AP,
-                  never consume a line, and never incur line tax.
-
-                TERMINAL ACTIONS:
-                  The 'pass' verb ends the round immediately, forfeiting unspent AP without penalty.
-                  It may only appear as the final stage of a line.
-                """);
-
-        topic("flags", """
-                TOPIC: COMMAND FLAGS
-                Flags modify command behavior, AP costs, targeting, or execution modes.
-
-                GLOBAL FLAGS:
-                  -n, --dry-run          Chain audit. Validates syntax, computes AP allocation,
-                                         checks affordability, and reports exposed enemy reactions
-                                         without spending AP or committing a line.
-
-                COMBAT & TARGETING FLAGS:
-                  -a, --aim <part>       Aim strike or shoot at a specific body part.
-                                         Valid parts: head, torso, arm.l, arm.r, legs.
-                  -p, --power <level>    Strike power level:
-                                         light  (1 AP, lower damage)
-                                         normal (2 AP, standard damage)
-                                         heavy  (3 AP, maximum damage)
-                  -f, --force            Brute-force melee attack attempting to punch through armor.
-
-                MOVEMENT FLAGS:
-                  -c, --careful          Careful movement. 'step' costs 2 AP instead of 1 AP.
-                """);
-    }
-
-    private CommandManual() {}
-
-    public static String renderIndex() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("ARCHON COMMAND MANUAL\n");
-        sb.append("Type 'help <verb>' for detailed manual page, or 'help <topic>' for reference guides.\n\n");
-
-        List<String> categories = List.of(
-                "COMBAT",
-                "MOVEMENT",
-                "ITEMS & PIPELINE",
-                "ENVIRONMENT & ELEMENTAL",
-                "FREE UTILITIES"
-        );
-
-        for (String cat : categories) {
-            sb.append(cat);
-            if (cat.equals("FREE UTILITIES")) {
-                sb.append(" (0 AP, unlimited use, never count as a line)");
-            }
-            sb.append(":\n");
-
-            for (VerbDoc doc : VERBS.values()) {
-                if (doc.category().equals(cat)) {
-                    sb.append(String.format("  %-20s %-8s %s%n",
-                            shortSynopsis(doc),
-                            shortCost(doc),
-                            doc.summary()));
-                }
-            }
-            sb.append('\n');
+    /** Null or blank selects the index. Unknown queries return a diagnostic. */
+    public String render(String query) {
+        if (catalog == null) {
+            throw new IllegalStateException("command manual has not been bound");
+        }
+        if (query == null || query.isBlank()) {
+            return renderIndex();
         }
 
-        sb.append("REFERENCE TOPICS:\n");
-        sb.append("  help operators   |   help address   |   help economy   |   help flags");
-        return sb.toString();
-    }
-
-    private static String shortSynopsis(VerbDoc doc) {
-        String syn = doc.synopsis();
-        int firstBracket = syn.indexOf('[');
-        int firstDash = syn.indexOf(" -");
-        int cutoff = -1;
-        if (firstBracket >= 0 && firstDash >= 0) cutoff = Math.min(firstBracket, firstDash);
-        else if (firstBracket >= 0) cutoff = firstBracket;
-        else if (firstDash >= 0) cutoff = firstDash;
-
-        return (cutoff > 0 ? syn.substring(0, cutoff).trim() : syn);
-    }
-
-    private static String shortCost(VerbDoc doc) {
-        String c = doc.apCostDesc();
-        if (c.startsWith("0 AP")) return "0 AP";
-        if (c.startsWith("1 AP (2 AP")) return "1-2 AP";
-        if (c.startsWith("1 AP (light)")) return "1-3 AP";
-        if (c.startsWith("1 AP")) return "1 AP";
-        if (c.startsWith("2 AP")) return "2 AP";
-        if (c.startsWith("3 AP")) return "3 AP";
-        return c.split(" ")[0] + " AP";
-    }
-
-    public static String renderVerb(VerbDoc doc) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("NAME:\n  ").append(doc.name()).append(" — ").append(doc.summary()).append("\n\n");
-        sb.append("SYNOPSIS:\n  ").append(doc.synopsis()).append("\n\n");
-        sb.append("AP COST:\n  ").append(doc.apCostDesc()).append("\n\n");
-        sb.append("CATEGORY:\n  ").append(doc.category()).append("\n\n");
-        sb.append("DESCRIPTION:\n");
-        for (String line : doc.description().split("\n")) {
-            sb.append("  ").append(line).append('\n');
+        String name = query.strip().toLowerCase(Locale.ROOT);
+        VerbDefinition definition = catalog.get(name);
+        if (definition != null) {
+            return renderVerb(definition);
         }
-        sb.append("\nPIPELINE:\n");
-        sb.append("  Accepts material : ").append(doc.acceptsMaterial() ? "yes" : "no").append('\n');
-        sb.append("  Produces material: ").append(doc.producesMaterial() ? "yes" : "no").append('\n');
 
-        if (!doc.flags().isEmpty()) {
-            sb.append("\nOPTIONS & FLAGS:\n");
-            for (VerbDoc.FlagDoc f : doc.flags()) {
-                sb.append(String.format("  %-22s %s%n", f.flag(), f.description()));
+        String topic = switch (name) {
+            case "operators" -> operators();
+            case "address" -> addressing();
+            case "economy" -> economy();
+            case "flags" -> flags();
+            default -> null;
+        };
+        return topic == null
+                ? "no such command or topic: " + query
+                : topic.stripTrailing();
+    }
+
+    private String renderIndex() {
+        StringBuilder out = new StringBuilder("""
+                ARCHON COMMAND MANUAL
+                Type 'help <verb>' for a command page, or 'help <topic>' for a reference guide.
+
+                """);
+
+        Map<String, List<VerbDefinition>> categories = new LinkedHashMap<>();
+        for (VerbDefinition definition : catalog.all()) {
+            categories.computeIfAbsent(
+                    definition.documentation().category(),
+                    ignored -> new ArrayList<>()
+            ).add(definition);
+        }
+
+        for (Map.Entry<String, List<VerbDefinition>> category : categories.entrySet()) {
+            out.append(category.getKey()).append(":\n");
+            for (VerbDefinition definition : category.getValue()) {
+                out.append("  ").append(synopsis(definition))
+                        .append(" — ").append(definition.documentation().summary()).append('\n');
+                out.append("    ").append(definition.price().describe());
+                if (definition.free()) out.append("; free");
+                if (definition.terminal()) out.append("; terminal");
+                out.append('\n');
             }
+            out.append('\n');
         }
+
+        out.append("REFERENCE TOPICS:\n  ");
+        out.append(TOPICS.stream()
+                .map(topic -> "help " + topic)
+                .collect(Collectors.joining(" | ")));
+        return out.toString();
+    }
+
+    private String renderVerb(VerbDefinition definition) {
+        VerbDefinition.Documentation doc = definition.documentation();
+        StringBuilder out = new StringBuilder();
+
+        out.append("NAME:\n  ").append(definition.name())
+                .append(" — ").append(doc.summary()).append("\n\n");
+        out.append("SYNOPSIS:\n  ").append(synopsis(definition));
+        for (FlagSpec option : definition.options()) {
+            out.append(" [").append(optionSyntax(option)).append(']');
+        }
+        out.append(" [").append(optionSyntax(FlagSpec.AUDIT)).append("]\n\n");
+
+        out.append("AP COST:\n  ").append(definition.price().describe()).append('\n');
+        out.append("  Free: ").append(definition.free() ? "yes" : "no").append('\n');
+        out.append("  Terminal: ").append(definition.terminal() ? "yes" : "no").append("\n\n");
+        out.append("CATEGORY:\n  ").append(doc.category()).append("\n\n");
+
+        out.append("DESCRIPTION:\n");
+        for (String line : doc.description().split("\\R")) {
+            out.append("  ").append(line).append('\n');
+        }
+
+        out.append("\nPIPELINE:\n");
+        out.append("  Accepted kinds: ").append(kinds(definition.input())).append('\n');
+        out.append("  Possible output kinds: ").append(kinds(definition.output())).append('\n');
+        if (!definition.output().isEmpty()) {
+            out.append("  Output is possible, not guaranteed on every invocation.\n");
+        }
+
+        out.append("\nOPTIONS:\n");
+        for (FlagSpec option : definition.options()) {
+            appendOption(out, option);
+        }
+        appendOption(out, FlagSpec.AUDIT);
 
         if (!doc.examples().isEmpty()) {
-            sb.append("\nEXAMPLES:\n");
-            for (String ex : doc.examples()) {
-                sb.append("  ").append(ex).append('\n');
+            out.append("\nEXAMPLES:\n");
+            for (String example : doc.examples()) {
+                out.append("  ").append(example).append('\n');
             }
         }
-        return sb.toString().stripTrailing();
+
+        return out.toString().stripTrailing();
     }
 
-    public static String renderTopic(String topic) {
-        return TOPICS.get(topic.toLowerCase().trim());
+    private static String synopsis(VerbDefinition definition) {
+        String operands = definition.documentation().operands();
+        return definition.name() + (operands.isBlank() ? "" : " " + operands);
     }
 
-    public static String lookup(String query) {
-        if (query == null || query.isBlank()) return null;
-        String q = query.toLowerCase().trim();
+    private static String optionSyntax(FlagSpec option) {
+        String name = option.shortName() == null
+                ? "--" + option.name()
+                : "-" + option.shortName();
+        if (!option.takesValue()) {
+            return name;
+        }
 
-        VerbDoc doc = VERBS.get(q);
-        if (doc != null) return renderVerb(doc);
-
-        String topicDoc = TOPICS.get(q);
-        if (topicDoc != null) return topicDoc.stripTrailing();
-
-        return null;
+        String value = "<" + option.valueName() + ">";
+        return name + " " + (option.bareDefault() == null ? value : "[" + value + "]");
     }
 
-    public static VerbDoc getVerbDoc(String name) {
-        return VERBS.get(name.toLowerCase().trim());
+    private static void appendOption(StringBuilder out, FlagSpec option) {
+        out.append("  ");
+        if (option.shortName() != null) {
+            out.append('-').append(option.shortName()).append(", ");
+        }
+        out.append("--").append(option.name());
+        if (option.takesValue()) {
+            out.append(option.bareDefault() == null ? " <" : " [<")
+                    .append(option.valueName())
+                    .append(option.bareDefault() == null ? ">" : ">]");
+        }
+        out.append("\n    ").append(option.description());
+        if (option.bareDefault() != null) {
+            out.append(" Bare option value: ").append(option.bareDefault()).append('.');
+        }
+        out.append('\n');
     }
 
-    public static Collection<VerbDoc> allVerbs() {
-        return Collections.unmodifiableCollection(VERBS.values());
+    private static String kinds(Set<MaterialKind> kinds) {
+        return kinds.isEmpty()
+                ? "none"
+                : kinds.stream()
+                .sorted()
+                .map(kind -> kind.name().toLowerCase(Locale.ROOT))
+                .collect(Collectors.joining(", "));
     }
 
-    public static Set<String> verbNames() {
-        return Collections.unmodifiableSet(VERBS.keySet());
+    private String flags() {
+        StringBuilder out = new StringBuilder("""
+                TOPIC: COMMAND FLAGS
+                Options belong to individual commands. An option supported by one command
+                is not automatically accepted by another.
+
+                GLOBAL LINE OPTION:
+                """);
+        appendOption(out, FlagSpec.AUDIT);
+
+        for (VerbDefinition definition : catalog.all()) {
+            if (definition.options().isEmpty()) continue;
+            out.append('\n').append(definition.name()).append(":\n");
+            for (FlagSpec option : definition.options()) {
+                appendOption(out, option);
+            }
+            out.append("  Pricing: ").append(definition.price().describe()).append('\n');
+        }
+
+        out.append("""
+                
+                PARSING:
+                  Short boolean options may be grouped.
+                  An option taking a value must be last in a short-option group.
+                  Repeated options use the final value.
+                  --name=value supplies an inline value.
+
+                CURRENT LIMITATIONS:
+                  There is no end-of-options '--' marker.
+                  A separated value beginning with '-' is not consumed as an option value.
+                  Boolean options are enabled by presence; '--careful=false' still enables it.
+                """);
+        return out.toString();
     }
 
-    public static Set<String> topicNames() {
-        return Collections.unmodifiableSet(TOPICS.keySet());
+    private static String operators() {
+        return """
+                TOPIC: COMMAND OPERATORS
+
+                PAID OR MIXED LINES:
+                  ;    Execute the next stage unless execution has broken.
+                       Example: step e ; strike o1
+
+                  &&   Execute the next stage when the preceding result is SUCCESS.
+                       Successful melee and ranged hits count as SUCCESS, not only kills.
+                       Example: strike o1 && step n
+
+                  ||   Execute the next stage when the preceding result is not SUCCESS.
+                       Example: strike o1 || guard
+
+                  |    Pass item or substance output to the next command in one stage.
+                       The stage costs only its final invocation.
+                       Example: siphon b1/contents | pour @o1/floor
+
+                PIPELINES:
+                  Every non-final command must declare material output.
+                  Every receiving command must declare a material input slot.
+                  An unsuccessful upstream command stops the pipeline.
+                  Effects already performed upstream are not rolled back.
+                  Pour emits no material, and Ignite accepts none. Sequence them instead:
+                    siphon b1/contents | pour @o1/floor && ignite @o1/floor
+
+                CURRENT RECOVERY LIMITATIONS:
+                  BLOCKED and INVALID still break paid execution before a fallback can run.
+                  A blocked first stage may also be rejected during submission validation.
+                  Thus '||' currently handles outcomes such as MISS, but is not yet general
+                  recovery from a blocked action.
+                  An actual interruption breaks execution.
+
+                FREE-ONLY LINES:
+                  Currently use a separate path: every stage executes without evaluating
+                  && or ||, and no material is forwarded between commands.
+
+                TERMINAL DETECTION:
+                  The final invocation in the submitted syntax determines terminal status.
+                  On a completed paid line, a terminal command can end the round even if
+                  its stage was skipped. Terminal validation is bypassed on free-only lines.
+                """;
+    }
+
+    private static String addressing() {
+        return """
+                TOPIC: ADDRESSING SYNTAX
+
+                TILES:
+                  @x,y                 Absolute tile, for example @3,4.
+                  @self                The thrall's current tile.
+                  @<entityId>          The tile occupied by an entity, for example @o1.
+                  @x,y/floor           Explicit floor layer.
+                  @x,y/ceiling         Explicit ceiling layer.
+                  @<dir><distance>     Relative tile, for example @e2 or @sw1.
+
+                THRALL INVENTORY:
+                  /pack                The pack location, not a selected item.
+                  /pack/<item>         A selected packed item, for example /pack/torch.
+
+                ENTITIES, BODY PARTS, AND EQUIPMENT:
+                  <entityId>           The entity itself.
+                  <entity>/body/head   An explicit body-part target.
+                  <entity>/body/torso
+                  <entity>/body/arm.l
+                  <entity>/body/arm.r
+                  <entity>/body/legs
+
+                  <entity>/head        Equipment location, not the head body part.
+                  <entity>/hand/right  Right-hand equipment.
+                  <entity>/hand/left   Left-hand equipment.
+
+                EXAMPLES:
+                  inspect o1/body/head
+                  strike o1/body/head
+                  strike o1/hand/right
+                  take o1/hand/right
+
+                EMPTY LOCATIONS:
+                  An empty equipment slot, empty prop contents, or pack root is a location,
+                  not an item. Commands requiring an item may reject those targets.
+                  Address resolution does not imply that a command can reach or use a target.
+                """;
+    }
+
+    private String economy() {
+        return """
+                TOPIC: ACTION ECONOMY
+
+                ROUND BUDGET:
+                  Each round begins with %d AP.
+                  Unspent AP is discarded when the round ends.
+
+                LINE TAX:
+                  Untaxed paid lines per round: %d.
+                  Tax on each subsequent paid line: %d AP.
+                  This is a fixed tax, not an escalating tax.
+                  Tax is charged at commitment and is not refunded.
+                  A chained line still pays tax if its submission is taxable.
+
+                ALLOCATION:
+                  A pipeline allocates the cost of its final invocation.
+                  A line allocates the sum of its stage costs.
+                  Conditional stages contribute to affordability even if later skipped.
+
+                COMPLETION:
+                  Executed stages are charged their stage costs.
+                  Skipped stages are not charged.
+                  Rejected submissions do not spend AP or consume a paid line.
+
+                BREAKS:
+                  After commitment, a broken line forfeits its allocation plus %d AP.
+                  Forfeiture is capped by AP remaining after the submission tax.
+                  This replaces ordinary completed-line charging; it is not an additional
+                  charge on top of the trace's executed-stage total.
+                  Interrupt accounting records half the interrupted stage cost, rounded down,
+                  but broken-line settlement still uses allocation forfeiture.
+
+                FREE COMMANDS AND AUDITS:
+                  Entirely free lines bypass paid-line accounting.
+                  A free command inside a paid line does not make the whole line tax-free.
+                  Audit never spends AP. Its report is not yet identical to execution in
+                  every case, particularly free-only lines and the post-tax forfeiture cap.
+
+                PASS:
+                  A terminal ending requests the end of the round.
+                  Remaining AP is discarded when the application advances the round.
+                """.formatted(
+                rules.roundAp(),
+                rules.untaxedLines(),
+                rules.lineTax(),
+                rules.breakPenalty()
+        );
     }
 }

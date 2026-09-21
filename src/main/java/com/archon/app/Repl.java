@@ -2,6 +2,7 @@ package com.archon.app;
 
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
+import com.archon.exec.EconomyRules;
 import com.archon.exec.Executor;
 import com.archon.exec.RoundState;
 import com.archon.model.Dice;
@@ -23,10 +24,10 @@ public final class Repl {
         ConsoleView view = new ConsoleView();
         bus.subscribe(view::handle);
 
-        RoundState round = new RoundState();
-        Executor exec = new Executor(world, bus, round);
+        RoundState round = new RoundState(EconomyRules.prototype());
+        Executor exec = ExecutionSetup.create(world, bus, round);
 
-        bus.post(new GameEvent.RoundStart(1, RoundState.BASE_AP));
+        bus.post(new GameEvent.RoundStart(round.roundNo(), round.ap()));
         bus.narrate("Type 'help'. Free commands never cost AP or count as a line.");
         view.frame(world, round);
 
@@ -37,7 +38,7 @@ public final class Repl {
             String raw = in.nextLine().trim();
 
             if (raw.equalsIgnoreCase("quit") || raw.equalsIgnoreCase("exit")) break;
-            if (raw.isEmpty() || raw.equals("!!")) raw = lastLine;                 // bare Enter repeats
+            if (raw.isEmpty() || raw.equals("!!")) raw = lastLine;
             if (raw.isEmpty()) continue;
 
             if (raw.startsWith("alias ")) {
@@ -57,7 +58,7 @@ public final class Repl {
             }
 
             if (o.roundOver()) {
-                exec.endRound();               // world tick + AP reset happen here
+                exec.endRound();
             }
             view.frame(world, round);
         }

@@ -8,9 +8,6 @@ import com.archon.exec.RoundState;
 import com.archon.model.Dice;
 import com.archon.model.World;
 import com.archon.verb.CommandManual;
-import com.archon.verb.ExitCode;
-import com.archon.verb.VerbDoc;
-import com.archon.verb.Verbs;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

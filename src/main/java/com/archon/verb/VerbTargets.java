@@ -20,7 +20,7 @@ final class VerbTargets {
         };
     }
 
-    static Check reachable(VerbContext c, Resolved.Target target) {
+    static Check reachable(ValidationContext c, Resolved.Target target) {
         return target.pos().chebyshev(c.thrall.pos()) <= 1
                 ? Check.ok()
                 : Check.blocked(

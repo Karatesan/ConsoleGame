@@ -2,26 +2,20 @@ package com.archon.verb;
 
 import com.archon.address.Address;
 import com.archon.address.Resolved;
-import com.archon.command.Ast;
 import com.archon.model.*;
 import com.archon.system.spatial.SpatialService;
 
 public final class IgniteVerb implements Verb {
-    @Override public String name() { return "ignite"; }
-    @Override public String help() {
-        return "ignite <entity|tile> — 1 AP. Requires a lit source in hand.";
-    }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         if (c.acceptsPipedMaterial()) {
             return Check.invalid("ignite does not consume piped material", "sequence it with &&");
         }
         return c.inv.arg(0) == null ? Check.invalid("ignite what?", null) : Check.ok();
     }
 
-    private Check check(VerbContext c, Resolved resolved) {
+    private Check check(ValidationContext c, Resolved resolved) {
         Check syntax = validateStructural(c);
         if (!syntax.valid()) return syntax;
 
@@ -40,7 +34,7 @@ public final class IgniteVerb implements Verb {
     }
 
     @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         return check(c, VerbHelpers.resolve(c, c.inv.arg(0)));
     }
 
@@ -77,7 +71,7 @@ public final class IgniteVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static boolean hasFlame(VerbContext c) {
+    private static boolean hasFlame(ValidationContext c) {
         Item left = c.thrall.inventory().equipped(EquipmentSlot.HAND_LEFT);
         Item right = c.thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT);
         return (left != null && left.has(Tag.LIT))

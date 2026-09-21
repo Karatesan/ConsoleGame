@@ -2,21 +2,13 @@ package com.archon.verb;
 
 import com.archon.address.Address;
 import com.archon.address.Resolved;
-import com.archon.command.Ast;
 import com.archon.model.Item;
 import com.archon.model.Tag;
-import com.archon.model.Vec2;
 
 public final class PourVerb implements Verb {
-    @Override public String name() { return "pour"; }
-    @Override public String help() {
-        return "pour <liquid> <tile|entity> — 1 AP. Consumes liquid; keeps the container.";
-    }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
-    @Override public boolean acceptsMaterial() { return true; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         int required = c.acceptsPipedMaterial() ? 1 : 2;
         return c.inv.args().size() < required
                 ? Check.invalid("pour needs a liquid source and destination", null)

@@ -11,15 +11,12 @@ import com.archon.system.environment.SimulationSystem;
 import com.archon.system.spatial.SpatialService;
 
 import java.util.List;
-
-/** Common parsing, targeting, and environmental helper methods for Verbs. */
-import java.util.List;
 import java.util.Optional;
 
 public final class VerbHelpers {
     private VerbHelpers() {}
 
-    public static Resolved resolve(VerbContext c, String raw) {
+    public static Resolved resolve(ValidationContext c, String raw) {
         return Resolved.resolve(Address.parse(raw), c.world);
     }
 
@@ -41,19 +38,9 @@ public final class VerbHelpers {
         return Optional.of(resolved instanceof Resolved.OnBody body ? body.part() : BodyPart.TORSO);
     }
 
-    public static int powerAp(Ast.Invocation inv, int base) {
-        String power = inv.flag("power");
-        if (power == null) return base;
-        return switch (power.toLowerCase()) {
-            case "light" -> 1;
-            case "heavy" -> 3;
-            default -> base;
-        };
-    }
-
-    public static String soleAdjacentHostile(VerbContext c) {
+    public static String soleAdjacentHostile(ValidationContext c) {
         List<Entity> hostiles = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
-        return hostiles.size() == 1 ? hostiles.get(0).id() : null;
+        return hostiles.size() == 1 ? hostiles.getFirst().id() : null;
     }
 
     public static void spill(VerbContext c, Vec2 at, Tag substance) {

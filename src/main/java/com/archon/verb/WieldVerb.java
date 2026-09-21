@@ -1,20 +1,14 @@
 package com.archon.verb;
 
 import com.archon.address.Resolved;
-import com.archon.command.Ast;
 import com.archon.model.EquipmentSlot;
 import com.archon.model.Inventory;
-import com.archon.model.Item;
 import com.archon.model.ItemLocation;
 
 public final class WieldVerb implements Verb {
-    @Override public String name() { return "wield"; }
-    @Override public String help() { return "wield <item> — equip from pack to hand. 1 AP. Accepts material."; }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
-    @Override public boolean acceptsMaterial() { return true; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         return c.inv.arg(0) == null && !c.acceptsPipedMaterial()
                 ? Check.invalid("wield what?", null)
                 : Check.ok();

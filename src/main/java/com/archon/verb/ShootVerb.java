@@ -1,19 +1,15 @@
 package com.archon.verb;
 
 import com.archon.address.Resolved;
-import com.archon.command.Ast;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.system.combat.CombatEngine;
 import com.archon.system.spatial.SpatialService;
 
 public final class ShootVerb implements Verb {
-    @Override public String name() { return "shoot"; }
-    @Override public String help() { return "shoot <target> [-a part] — 2 AP. Requires nocked."; }
-    @Override public int apCost(Ast.Invocation inv) { return 2; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         if (c.inv.arg(0) == null) {
             return Check.invalid("shoot needs a target", "try: scan");
         }
@@ -24,11 +20,11 @@ public final class ShootVerb implements Verb {
     }
 
     @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         return check(c, VerbHelpers.resolve(c, c.inv.arg(0)));
     }
 
-    private Check check(VerbContext c, Resolved resolved) {
+    private Check check(ValidationContext c, Resolved resolved) {
         Check syntax = validateStructural(c);
         if (!syntax.valid()) return syntax;
 
@@ -38,7 +34,7 @@ public final class ShootVerb implements Verb {
             return Check.invalid("shoot needs an entity or body-part target", null);
         }
         if (!c.thrall.isNocked()) {
-            return Check.blocked("nothing nocked", "try: nock | shoot <target>");
+            return Check.blocked("nothing nocked", "try: nock ; shoot <target>");
         }
 
         Entity target = VerbHelpers.targetEntity(resolved).orElseThrow();
@@ -68,8 +64,7 @@ public final class ShootVerb implements Verb {
         c.say("Arrow strikes " + target.name() + "'s " + part.path + ". " + result.damage() + " dmg.");
         if (result.killed()) {
             c.say(target.name() + " falls.");
-            return ExitCode.SUCCESS;
         }
-        return ExitCode.PARTIAL;
+        return ExitCode.SUCCESS;
     }
 }

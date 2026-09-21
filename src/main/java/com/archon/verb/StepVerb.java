@@ -1,6 +1,5 @@
 package com.archon.verb;
 
-import com.archon.command.Ast;
 import com.archon.model.Vec2;
 import com.archon.system.spatial.SpatialService;
 
@@ -8,23 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class StepVerb implements Verb {
-    @Override
-    public String name() {
-        return "step";
-    }
 
     @Override
-    public String help() {
-        return "step <dir> [-c] — move 1 tile. 1 AP (2 with -c).";
-    }
-
-    @Override
-    public int apCost(Ast.Invocation inv) {
-        return inv.hasFlag("careful") ? 2 : 1;
-    }
-
-    @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         String direction = c.inv.arg(0);
         if (direction == null) {
             return Check.invalid("step needs a direction", "n s e w ne nw se sw");
@@ -36,7 +21,7 @@ public final class StepVerb implements Verb {
     }
 
     @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         Vec2 destination = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
         if (!SpatialService.passable(c.world, destination)) {
             return Check.blocked("wall or occupant at " + destination, "open: " + openDirs(c));
@@ -58,7 +43,7 @@ public final class StepVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private String openDirs(VerbContext c) {
+    private String openDirs(ValidationContext c) {
         List<String> open = new ArrayList<>();
         for (String direction : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw")) {
             Vec2 destination = c.thrall.pos().plus(Vec2.dir(direction));

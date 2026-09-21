@@ -1,6 +1,7 @@
 package com.archon.ui;
 
 import com.archon.event.GameEvent;
+import com.archon.exec.EconomyRules;
 import com.archon.exec.RoundState;
 import com.archon.model.Entity;
 import com.archon.model.EquipmentSlot;
@@ -30,6 +31,7 @@ public final class ConsoleView implements View {
 
     public ConsoleView() {
         this(false);
+
     }
 
     public ConsoleView(boolean fullscreen) {
@@ -186,7 +188,7 @@ public final class ConsoleView implements View {
         Thrall thrall = world.thrall();
         StringBuilder pips = new StringBuilder();
 
-        for (int i = 0; i < RoundState.BASE_AP; i++) {
+        for (int i = 0; i < round.rules().roundAp(); i++) {
             pips.append(i < round.ap() ? '*' : 'o').append(' ');
         }
 
@@ -199,9 +201,9 @@ public final class ConsoleView implements View {
                 thrall.maxHp(),
                 pips.toString().trim(),
                 round.ap(),
-                RoundState.BASE_AP,
+                round.ap(),
                 round.linesUsed(),
-                round.taxForNextLine(),
+                round.rules().taxForNextLine(round.linesUsed()),
                 name(thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
                 name(thrall.inventory().equipped(EquipmentSlot.HAND_LEFT)),
                 thrall.inventory().pack().size(),

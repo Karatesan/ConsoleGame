@@ -8,15 +8,9 @@ import com.archon.model.Tag;
 import com.archon.model.Vec2;
 
 public final class ThrowVerb implements Verb {
-    @Override public String name() { return "throw"; }
-    @Override public String help() {
-        return "throw <item> <target> — 2 AP. Accepts material from a pipe.";
-    }
-    @Override public int apCost(Ast.Invocation inv) { return 2; }
-    @Override public boolean acceptsMaterial() { return true; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         int required = c.acceptsPipedMaterial() ? 1 : 2;
         return c.inv.args().size() < required
                 ? Check.invalid("throw needs an item and a target", "take /pack/flask_oil | throw o1")

@@ -4,16 +4,7 @@ import com.archon.model.Actor;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 
-public final class ScanVerb extends FreeVerb {
-    @Override
-    public String name() {
-        return "scan";
-    }
-
-    @Override
-    public String help() {
-        return "scan — list perceived entities. 0 AP.";
-    }
+public final class ScanVerb implements Verb {
 
     @Override
     public ExitCode execute(VerbContext c) {

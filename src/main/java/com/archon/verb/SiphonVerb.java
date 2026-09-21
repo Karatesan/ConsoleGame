@@ -2,30 +2,22 @@ package com.archon.verb;
 
 import com.archon.address.Address;
 import com.archon.address.Resolved;
-import com.archon.command.Ast;
 import com.archon.model.Actor;
-import com.archon.model.Entity;
 import com.archon.model.GameMap;
 import com.archon.model.Item;
 import com.archon.model.Prop;
 import com.archon.model.Tag;
 
 public final class SiphonVerb implements Verb {
-    @Override public String name() { return "siphon"; }
-    @Override public String help() {
-        return "siphon <source> — extract one liquid portion. 1 AP. Produces material.";
-    }
-    @Override public int apCost(Ast.Invocation inv) { return 1; }
-    @Override public boolean producesMaterial() { return true; }
 
     @Override
-    public Check validateStructural(VerbContext c) {
+    public Check validateStructural(ValidationContext c) {
         return c.inv.arg(0) == null
                 ? Check.invalid("siphon from what?", null)
                 : Check.ok();
     }
 
-    private Check check(VerbContext c, Resolved resolved) {
+    private Check check(ValidationContext c, Resolved resolved) {
         Check resolution = VerbTargets.resolution(resolved);
         if (!resolution.valid()) return resolution;
         if (resolved instanceof Resolved.OnTile tile
@@ -41,7 +33,7 @@ public final class SiphonVerb implements Verb {
     }
 
     @Override
-    public Check validateState(VerbContext c) {
+    public Check validateState(ValidationContext c) {
         return check(c, VerbHelpers.resolve(c, c.inv.arg(0)));
     }
 
@@ -66,7 +58,7 @@ public final class SiphonVerb implements Verb {
         return ExitCode.SUCCESS;
     }
 
-    private static Tag sourceSubstance(VerbContext c, Resolved resolved) {
+    private static Tag sourceSubstance(ValidationContext c, Resolved resolved) {
         Item item = sourceItem(resolved);
         if (item != null) return item.substance();
 

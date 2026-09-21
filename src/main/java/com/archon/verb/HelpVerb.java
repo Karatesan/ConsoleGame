@@ -1,18 +1,15 @@
 package com.archon.verb;
 
-public final class HelpVerb extends FreeVerb {
-    @Override public String name() { return "help"; }
-    @Override public String help() { return "help [verb | topic] — command manual and reference guides. 0 AP."; }
+public final class HelpVerb implements Verb {
+    private final CommandManual manual;
+
+    public HelpVerb(CommandManual manual) {
+        this.manual = java.util.Objects.requireNonNull(manual, "manual");
+    }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        String v = c.inv.arg(0);
-        if (v == null) {
-            c.say(CommandManual.renderIndex());
-        } else {
-            String manual = CommandManual.lookup(v);
-            c.say(manual == null ? "no such verb: " + v : manual);
-        }
+        c.say(manual.render(c.inv.arg(0)));
         return ExitCode.SUCCESS;
     }
 }
