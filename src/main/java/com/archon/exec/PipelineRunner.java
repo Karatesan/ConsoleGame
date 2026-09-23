@@ -1,48 +1,35 @@
 package com.archon.exec;
 
 import com.archon.command.Ast;
-import com.archon.event.EventBus;
-import com.archon.model.World;
-import com.archon.verb.*;
+import com.archon.verb.ExitCode;
+import com.archon.verb.Material;
 
 import java.util.Objects;
 
 public final class PipelineRunner {
+    public record Result(ExitCode code, boolean paidExecuted, boolean terminalExecuted) {}
 
-    private final World world;
-    private final EventBus bus;
-    private final VerbCatalog catalog;
+    private final InvocationRunner invocations;
 
-    public PipelineRunner(World world, EventBus bus, VerbCatalog catalog) {
-        this.world = Objects.requireNonNull(world, "world");
-        this.bus = Objects.requireNonNull(bus, "bus");
-        this.catalog = Objects.requireNonNull(catalog, "catalog");
+    public PipelineRunner(InvocationRunner invocations) {
+        this.invocations = Objects.requireNonNull(invocations, "invocations");
     }
 
-    public ExitCode runStage(Ast.Stage stage, boolean firstStage) {
+    public Result runStage(Ast.Stage stage) {
         Material material = null;
-        ExitCode code = ExitCode.SUCCESS;
+        boolean paid = false;
+        boolean terminal = false;
 
-        for (Ast.Invocation inv : stage.pipeline()) {
-            if (code != ExitCode.SUCCESS) return ExitCode.BLOCKED;
-            VerbContext ctx = new VerbContext(world, inv, bus, material, firstStage);
-            try {
-                code = catalog.get(inv.verb()).action().execute(ctx);
-            } catch (RuntimeException ex) {
-                bus.narrate("the working falters: " + ex.getMessage());
-                return ExitCode.BLOCKED;
+        for (int i = 0; i < stage.pipeline().size(); i++) {
+            InvocationRunner.Result result = invocations.run(
+                    stage.pipeline().get(i), material, i > 0);
+            paid |= result.paid();
+            terminal |= result.terminal();
+            if (result.code() != ExitCode.SUCCESS) {
+                return new Result(result.code(), paid, terminal);
             }
-            material = ctx.materialOut;
+            material = result.output();
         }
-        return code;
-    }
-
-    public void runFreePipeline(Ast.Stage stage) {
-        for (Ast.Invocation inv : stage.pipeline()) {
-            VerbDefinition definition = catalog.get(inv.verb());
-            if (definition != null) {
-                definition.action().execute(new VerbContext(world, inv, bus, null, true));
-            }
-        }
+        return new Result(ExitCode.SUCCESS, paid, terminal);
     }
 }

@@ -11,23 +11,38 @@ public final class RoundState {
         ap = rules.roundAp();
     }
 
-    public EconomyRules rules() { return rules; }
-    public int ap() {return ap;}
-    public int linesUsed() {return linesUsed;}
-    public int roundNo() {return roundNo;}
+    public EconomyRules rules() {
+        return rules;
+    }
 
-    public void spend(int n)   { ap = Math.max(0, ap - n); }
-    public void countLine()    { linesUsed++; }
+    public int ap() {
+        return ap;
+    }
+
+    public int linesUsed() {
+        return linesUsed;
+    }
+
+    public int roundNo() {
+        return roundNo;
+    }
+
+    public void spend(int amount) {
+        if (amount < 0 || amount > ap) {
+            throw new IllegalArgumentException("spending must be between 0 and " + ap + ": " + amount);
+        }
+        ap -= amount;
+    }
+
+    public void countLine() {
+        linesUsed = Math.incrementExact(linesUsed);
+    }
 
     public int reset() {
+        roundNo = Math.incrementExact(roundNo);
         int wasted = ap;
         ap = rules.roundAp();
         linesUsed = 0;
-        roundNo++;
         return wasted;
     }
-
-    /** Test hooks. */
-    public void setAp(int v) { ap = v; }
-    public void setLinesUsed(int v) { linesUsed = v; }
 }

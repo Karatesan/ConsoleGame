@@ -8,20 +8,19 @@ import com.archon.exec.RoundState;
 import com.archon.model.Dice;
 import com.archon.model.World;
 import com.archon.ui.ConsoleView;
+import com.archon.ui.View;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Scanner;
 
 public final class Repl {
 
-    private final Map<String, String> aliases = new HashMap<>();
     private String lastLine = "";
+    private final AliasProcessor aliasProcessor = new AliasProcessor();
 
     public void run(long seed) {
         World world = Scenario.testRoom(new Dice.Seeded(seed));
         EventBus bus = new EventBus();
-        ConsoleView view = new ConsoleView();
+        View view = new ConsoleView();
         bus.subscribe(view::handle);
 
         RoundState round = new RoundState(EconomyRules.prototype());
@@ -32,8 +31,8 @@ public final class Repl {
         view.frame(world, round);
 
         Scanner in = new Scanner(System.in);
-        while (true) {
-            System.out.print("ARCHON> ");
+        while (world.thrall().alive()) {
+            view.prompt();
             if (!in.hasNextLine()) break;
             String raw = in.nextLine().trim();
 
@@ -42,65 +41,18 @@ public final class Repl {
             if (raw.isEmpty()) continue;
 
             if (raw.startsWith("alias ")) {
-                defineAlias(raw, bus);
+                aliasProcessor.defineAlias(raw, bus);
                 view.frame(world, round);
                 continue;
             }
-            raw = expandAliases(raw);
+            raw = aliasProcessor.expandAliases(raw);
             lastLine = raw;
 
-            Executor.Outcome o = exec.submit(raw);
-
-            if (!world.thrall().alive()) {
-                view.frame(world, round);
-                System.out.println("Run over.");
-                break;
-            }
-
-            if (o.roundOver()) {
+            Executor.Outcome outcome = exec.submit(raw);
+            if (world.thrall().alive() && outcome.roundOver()) {
                 exec.endRound();
             }
             view.frame(world, round);
         }
-    }
-
-    private void defineAlias(String raw, EventBus bus) {
-        String body = raw.substring(6).trim();
-        int eq = body.indexOf('=');
-        if (eq < 0) {
-            bus.narrate("usage: alias k=\"strike -p heavy\"");
-            return;
-        }
-        String name = body.substring(0, eq).trim();
-        String value = body.substring(eq + 1).trim().replaceAll("^\"|\"$", "");
-        aliases.put(name, value);
-        bus.narrate("alias " + name + " -> " + value);
-    }
-
-    /**
-     * Expansion happens before parsing, so verb count and allocation are computed post-expansion.
-     */
-    private String expandAliases(String raw) {
-        String out = raw;
-        for (int depth = 0; depth < 5; depth++) {
-            String[] parts = out.split("(?=\\s*(;|&&|\\|\\||\\|))");
-            StringBuilder sb = new StringBuilder();
-            boolean changed = false;
-            for (String part : parts) {
-                String trimmed = part.stripLeading();
-                String lead = part.substring(0, part.length() - trimmed.length());
-                String[] toks = trimmed.split("\\s+", 2);
-                String head = toks.length > 0 ? toks[0].replaceAll("^(;|&&|\\|\\||\\|)\\s*", "") : "";
-                String opPrefix = toks.length > 0 ? toks[0].substring(0, toks[0].length() - head.length()) : "";
-                if (aliases.containsKey(head)) {
-                    changed = true;
-                    sb.append(lead).append(opPrefix).append(aliases.get(head));
-                    if (toks.length > 1) sb.append(' ').append(toks[1]);
-                } else sb.append(part);
-            }
-            out = sb.toString();
-            if (!changed) break;
-        }
-        return out;
     }
 }

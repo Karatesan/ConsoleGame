@@ -1,33 +1,22 @@
 package com.archon.verb;
 
 import com.archon.address.Resolved;
-import com.archon.command.Ast;
 import com.archon.model.*;
 import com.archon.system.combat.CombatEngine;
-import com.archon.system.spatial.SpatialService;
 
-import java.util.List;
-
-import java.util.List;
-
-import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public final class StrikeVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        if (c.inv.arg(0) == null) {
-            List<Entity> adjacent = SpatialService.hostilesAdjacentTo(c.world, c.thrall.pos());
-            if (adjacent.isEmpty()) return Check.blocked("nothing adjacent to strike", null);
-            if (adjacent.size() > 1) {
-                return Check.invalid(
-                        "ambiguous target: " + adjacent.stream().map(Entity::id).toList(),
-                        "name one explicitly"
-                );
-            }
+        String power = c.inv.flag("power");
+        if (power != null && !Set.of("light", "normal", "heavy")
+                .contains(power.toLowerCase(Locale.ROOT))) {
+            return Check.invalid("unknown power \"" + power + "\"", "light, normal, heavy");
         }
-        Check check = targetCheck(c, resolveTarget(c));
-        return check.valid() ? check : Check.invalid(check.reason(), check.hint());
+        return VerbSyntax.aimedAddress(c, true);
     }
 
     private Resolved resolveTarget(ValidationContext c) {
@@ -48,34 +37,17 @@ public final class StrikeVerb implements Verb {
                 || equipment.slot() == EquipmentSlot.HAND_RIGHT);
     }
 
-    private Check targetCheck(ValidationContext c, Resolved resolved) {
+    private Check check(ValidationContext c, Resolved resolved) {
         Check resolution = VerbTargets.resolution(resolved);
         if (!resolution.valid()) return resolution;
-        if (VerbHelpers.aimPart(c.inv, resolved).isEmpty()) {
-            return Check.invalid(
-                    "unknown hit location",
-                    "valid: head, torso, arm.l, arm.r, legs"
-            );
+        if (!(resolved instanceof Resolved.OnEntity
+                || resolved instanceof Resolved.OnBody || isHandTarget(resolved))) {
+            return Check.blocked("strike needs an entity, body part, or hand slot", null);
         }
-        return resolved instanceof Resolved.OnEntity
-                || resolved instanceof Resolved.OnBody
-                || isHandTarget(resolved)
-                ? Check.ok()
-                : Check.invalid("strike needs an entity, body part, or hand slot", null);
-    }
-
-    private Check check(ValidationContext c, Resolved resolved) {
-        Check target = targetCheck(c, resolved);
-        if (!target.valid()) return target;
         if (isHandTarget(resolved) && resolved instanceof Resolved.OnLocation) {
             return Check.blocked("nothing in that hand to disarm", null);
         }
         return VerbTargets.reachable(c, (Resolved.Target) resolved);
-    }
-
-    @Override
-    public Check validateState(ValidationContext c) {
-        return check(c, resolveTarget(c));
     }
 
     @Override
@@ -100,7 +72,8 @@ public final class StrikeVerb implements Verb {
 
         Entity target = VerbHelpers.targetEntity(resolved).orElseThrow();
         BodyPart part = VerbHelpers.aimPart(c.inv, resolved).orElseThrow();
-        String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power");
+        String power = c.inv.flag("power") == null
+                ? "normal" : c.inv.flag("power").toLowerCase(Locale.ROOT);
         CombatEngine.MeleeHitResult result = CombatEngine.resolveMelee(
                 c.world.dice(), c.world, c.thrall, target, part, power, c.inv.hasFlag("force")
         );

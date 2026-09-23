@@ -4,7 +4,6 @@ import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.model.World;
 
-
 public final class VerbContext extends ValidationContext {
     public final EventBus bus;
     public Material materialOut;
@@ -13,10 +12,9 @@ public final class VerbContext extends ValidationContext {
             World world,
             Ast.Invocation inv,
             EventBus bus,
-            Material materialIn,
-            boolean firstStage
+            Material materialIn
     ) {
-        super(world, inv, materialIn, firstStage);
+        super(world, inv, materialIn != null, materialIn);
         this.bus = java.util.Objects.requireNonNull(bus, "bus");
     }
 

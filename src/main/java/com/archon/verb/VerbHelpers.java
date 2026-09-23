@@ -7,7 +7,6 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
-import com.archon.system.environment.SimulationSystem;
 import com.archon.system.spatial.SpatialService;
 
 import java.util.List;
@@ -43,8 +42,7 @@ public final class VerbHelpers {
         return hostiles.size() == 1 ? hostiles.getFirst().id() : null;
     }
 
-    public static void spill(VerbContext c, Vec2 at, Tag substance) {
-        SimulationSystem.spill(c.world, at, substance);
+    public static void describeSpill(VerbContext c, Vec2 at, Tag substance) {
         c.say(substance.name().toLowerCase() + " spreads across " + at + ".");
     }
 }

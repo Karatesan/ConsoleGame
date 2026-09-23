@@ -1,59 +1,42 @@
 package com.archon.verb;
 
-import com.archon.address.Address;
-import com.archon.address.Resolved;
-import com.archon.model.Item;
 import com.archon.model.Tag;
+import com.archon.model.Vec2;
+import com.archon.system.environment.Substances;
 
 public final class PourVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        int required = c.acceptsPipedMaterial() ? 1 : 2;
-        return c.inv.args().size() < required
-                ? Check.invalid("pour needs a liquid source and destination", null)
-                : Check.ok();
+        return VerbSyntax.delivery(c);
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Check syntax = validateStructural(c);
-        if (!syntax.valid()) return VerbTargets.reject(c, syntax);
-
-        String address = c.inv.arg(c.acceptsPipedMaterial() ? 0 : 1);
-        Resolved destination = VerbHelpers.resolve(c, address);
-        Check resolution = VerbTargets.resolution(destination);
-        if (!resolution.valid()) return VerbTargets.reject(c, resolution);
-        if (!(destination instanceof Resolved.OnEntity
-                || destination instanceof Resolved.OnTile tile
-                && tile.layer() != Address.Layer.CEILING)) {
-            return VerbTargets.reject(c, Check.invalid("pour needs an entity or floor tile", null));
+        DeliveryTarget destination = DeliveryTarget.select(c, DeliveryTarget.Mode.POUR);
+        if (destination instanceof DeliveryTarget.Rejected rejected) {
+            return VerbTargets.reject(c, rejected.check());
         }
+        Vec2 at = ((DeliveryTarget.Selected) destination).pos();
 
-        Resolved.Target target = (Resolved.Target) destination;
-        Check reach = VerbTargets.reachable(c, target);
-        if (!reach.valid()) return VerbTargets.reject(c, reach);
-
-        Item container = null;
         Tag substance;
         if (c.materialIn instanceof Material.OfSubstance material) {
             substance = material.substance();
+            if (substance != null) {
+                Substances.spill(c.world, at, substance);
+            }
         } else {
             ItemInput input = ItemInput.select(c, 0);
             if (input instanceof ItemInput.Rejected rejected) {
                 return VerbTargets.reject(c, rejected.check());
             }
-            container = ((ItemInput.Selected) input).target().item();
-            substance = container.substance();
+            substance = Substances.pour(c.world, at, ((ItemInput.Selected) input).target().item());
         }
 
         if (substance == null) {
             return VerbTargets.reject(c, Check.blocked("nothing pourable", null));
         }
-        if (container != null) {
-            substance = container.consumeSubstance();
-        }
-        VerbHelpers.spill(c, target.pos(), substance);
+        VerbHelpers.describeSpill(c, at, substance);
         return ExitCode.SUCCESS;
     }
 }

@@ -3,23 +3,14 @@ package com.archon.exec;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
-import com.archon.model.Actor;
+import com.archon.system.combat.Reaction;
 import com.archon.verb.ExitCode;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public final class StageRunner {
-
-    public record ExecutionTrace(
-            ExitCode lastCode,
-            int charged,
-            boolean broke,
-            int breakStage,
-            String breakReason,
-            String breakHint
-    ) {}
-
     private final EventBus bus;
     private final PipelineRunner pipelineRunner;
     private final ExecutionPolicy policy;
@@ -32,75 +23,60 @@ public final class StageRunner {
         this.interrupts = Objects.requireNonNull(interrupts, "interrupts");
     }
 
-    public void runFreeLine(Ast.Line line) {
-        for (Ast.Stage stage : line.stages()) {
-            pipelineRunner.runFreePipeline(stage);
-        }
-    }
-
     public ExecutionTrace execute(Ast.Line line, RoundState round) {
-        List<Ast.Stage> stages = line.stages();
+        List<ExecutionTrace.Stage> results = new ArrayList<>();
         ExitCode last = ExitCode.SUCCESS;
         int charged = 0;
-        int breakStage = -1;
-        boolean broke = false;
-        String breakReason = null;
-        String breakHint = null;
+        boolean paidExecuted = false;
+        boolean stopped = false;
 
-        for (int i = 0; i < stages.size(); i++) {
-            Ast.Stage stage = stages.get(i);
+        for (int i = 0; i < line.stages().size(); i++) {
+            Ast.Stage stage = line.stages().get(i);
             int cost = policy.stageCost(stage);
-
-            // Operator branching — never a break.
-            if (i > 0) {
-                boolean run = switch (stage.op()) {
-                    case AND -> last == ExitCode.SUCCESS;
-                    case OR -> last != ExitCode.SUCCESS;
-                    default -> true;
-                };
-                if (!run) {
-                    bus.post(new GameEvent.StageSkipped(
-                            i + 1,
-                            stage.render(),
-                            stage.op() == Ast.Op.AND ? "&& requires SUCCESS" : "|| requires failure"
-                    ));
-                    continue;
-                }
-
-                // Interrupt check at the stage boundary.
-                Actor source = interrupts.fire();
-                if (source != null) {
-                    charged += round.rules().interruptedCharge(cost);
-                    breakStage = i + 1;
-                    breakReason = source.name() + " (READIED) interrupted the sequence";
-                    breakHint = "it was flagged READIED in your last scan";
-                    broke = true;
-                    break;
-                }
+            if (stopped) {
+                results.add(
+                        new ExecutionTrace.Stage(i + 1, ExecutionTrace.State.NOT_REACHED, null, cost, 0, false, false,
+                                "line interrupted"));
+                continue;
             }
 
-            ExitCode code = pipelineRunner.runStage(stage, i == 0);
-            last = code;
-
-            if (code == ExitCode.BLOCKED || code == ExitCode.INVALID) {
-                breakStage = i + 1;
-                breakReason = "runtime BLOCKED at stage " + (i + 1) + ": " + stage.render();
-                breakHint = "use && to make this stage conditional on the previous one";
-                broke = true;
-                break;
-            }
-            if (code == ExitCode.INTERRUPT) {
-                charged += round.rules().interruptedCharge(cost);
-                breakStage = i + 1;
-                breakReason = "interrupted during stage " + (i + 1);
-                broke = true;
-                break;
+            boolean run = switch (stage.op()) {
+                case AND -> last == ExitCode.SUCCESS;
+                case OR -> last != ExitCode.SUCCESS;
+                default -> true;
+            };
+            if (!run) {
+                String reason = stage.op() == Ast.Op.AND ? "&& requires SUCCESS" : "|| requires ordinary failure";
+                results.add(new ExecutionTrace.Stage(i + 1, ExecutionTrace.State.SKIPPED, null, cost, 0, false, false,
+                        reason));
+                bus.post(new GameEvent.StageSkipped(i + 1, stage.render(), reason));
+                continue;
             }
 
-            charged += cost;
-            bus.post(new GameEvent.StageResult(i + 1, stages.size(), stage.render(), code, cost, round.ap() - charged));
+            Reaction reaction = paidExecuted && policy.paidStage(stage) ? interrupts.fire().orElse(null) : null;
+            if (reaction != null) {
+                results.add(new ExecutionTrace.Stage(i + 1, ExecutionTrace.State.INTERRUPTED_BEFORE, ExitCode.INTERRUPT,
+                        cost, round.rules().interruptedCharge(cost), false, false,
+                        reaction.sourceName() + " (READIED) interrupted the sequence"));
+                stopped = true;
+                continue;
+            }
+
+            PipelineRunner.Result result = pipelineRunner.runStage(stage);
+            last = result.code();
+            paidExecuted |= result.paidExecuted();
+            stopped = last == ExitCode.INTERRUPT;
+            int charge = stopped ? round.rules().interruptedCharge(cost) : cost;
+            charged += charge;
+            results.add(new ExecutionTrace.Stage(i + 1,
+                    stopped ? ExecutionTrace.State.INTERRUPTED_DURING : ExecutionTrace.State.EXECUTED, last, cost,
+                    charge, result.paidExecuted(), result.terminalExecuted(),
+                    stopped ? "interrupted during stage " + (i + 1) : null));
+            if (!stopped) {
+                bus.post(new GameEvent.StageResult(i + 1, line.stages().size(), stage.render(), last, charge,
+                        round.ap() - charged));
+            }
         }
-
-        return new ExecutionTrace(last, charged, broke, breakStage, breakReason, breakHint);
+        return new ExecutionTrace(results);
     }
 }

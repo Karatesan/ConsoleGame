@@ -3,9 +3,6 @@ package com.archon.verb;
 import com.archon.model.Vec2;
 import com.archon.system.spatial.SpatialService;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public final class StepVerb implements Verb {
 
     @Override
@@ -16,15 +13,6 @@ public final class StepVerb implements Verb {
         }
         if (Vec2.dir(direction) == null) {
             return Check.invalid("unknown direction \"" + direction + "\"", "n s e w ne nw se sw");
-        }
-        return Check.ok();
-    }
-
-    @Override
-    public Check validateState(ValidationContext c) {
-        Vec2 destination = c.thrall.pos().plus(Vec2.dir(c.inv.arg(0)));
-        if (!SpatialService.passable(c.world, destination)) {
-            return Check.blocked("wall or occupant at " + destination, "open: " + openDirs(c));
         }
         return Check.ok();
     }
@@ -41,16 +29,5 @@ public final class StepVerb implements Verb {
         c.world.markThrallMoved();
         c.say("Thrall advances to " + destination + ".");
         return ExitCode.SUCCESS;
-    }
-
-    private String openDirs(ValidationContext c) {
-        List<String> open = new ArrayList<>();
-        for (String direction : List.of("n", "s", "e", "w", "ne", "nw", "se", "sw")) {
-            Vec2 destination = c.thrall.pos().plus(Vec2.dir(direction));
-            if (SpatialService.passable(c.world, destination)) {
-                open.add(direction);
-            }
-        }
-        return String.join(", ", open);
     }
 }

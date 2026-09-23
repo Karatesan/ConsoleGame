@@ -5,7 +5,7 @@ import com.archon.model.Actor;
 import com.archon.model.ItemLocation;
 
 final class VerbTargets {
-    private VerbTargets() { }
+    private VerbTargets() {}
 
     static Check resolution(Resolved resolved) {
         if (!(resolved instanceof Resolved.Failure failure)) {
@@ -13,9 +13,9 @@ final class VerbTargets {
         }
 
         return switch (failure.problem()) {
-            case BAD_SYNTAX, INVALID_PATH, INVALID_TILE, OUT_OF_BOUNDS ->
+            case BAD_SYNTAX, INVALID_TILE ->
                     Check.invalid(failure.reason(), null);
-            case UNKNOWN_ENTITY, DEAD_ENTITY, ITEM_NOT_FOUND ->
+            case UNKNOWN_ENTITY, DEAD_ENTITY, ITEM_NOT_FOUND, UNSUPPORTED_PATH, OUT_OF_BOUNDS ->
                     Check.blocked(failure.reason(), null);
         };
     }

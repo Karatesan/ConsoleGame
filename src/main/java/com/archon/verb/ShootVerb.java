@@ -10,37 +10,22 @@ public final class ShootVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        if (c.inv.arg(0) == null) {
-            return Check.invalid("shoot needs a target", "try: scan");
-        }
-        String aim = c.inv.flag("aim");
-        return aim != null && BodyPart.parse(aim) == null
-                ? Check.invalid("unknown hit location \"" + aim + "\"", null)
-                : Check.ok();
-    }
-
-    @Override
-    public Check validateState(ValidationContext c) {
-        return check(c, VerbHelpers.resolve(c, c.inv.arg(0)));
+        return VerbSyntax.aimedAddress(c, false);
     }
 
     private Check check(ValidationContext c, Resolved resolved) {
-        Check syntax = validateStructural(c);
-        if (!syntax.valid()) return syntax;
-
         Check resolution = VerbTargets.resolution(resolved);
         if (!resolution.valid()) return resolution;
         if (!(resolved instanceof Resolved.OnEntity || resolved instanceof Resolved.OnBody)) {
-            return Check.invalid("shoot needs an entity or body-part target", null);
+            return Check.blocked("shoot needs an entity or body-part target", null);
         }
         if (!c.thrall.isNocked()) {
             return Check.blocked("nothing nocked", "try: nock ; shoot <target>");
         }
 
         Entity target = VerbHelpers.targetEntity(resolved).orElseThrow();
-        return SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos())
-                ? Check.ok()
-                : Check.blocked("no line of fire", null);
+        return SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos()) ? Check.ok() : Check.blocked(
+                "no line of fire", null);
     }
 
     @Override
@@ -53,9 +38,8 @@ public final class ShootVerb implements Verb {
         BodyPart part = VerbHelpers.aimPart(c.inv, resolved).orElseThrow();
         c.thrall.fireNocked();
 
-        CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(
-                c.world.dice(), c.world, c.thrall, target, part
-        );
+        CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(c.world.dice(), c.world, c.thrall, target,
+                part);
         if (!result.hit()) {
             c.say("Arrow flies wide of " + target.name() + ".");
             return ExitCode.MISS;

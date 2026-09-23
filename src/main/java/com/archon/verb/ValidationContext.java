@@ -6,7 +6,6 @@ import com.archon.model.World;
 
 import java.util.Objects;
 
-/** Shared command inputs available during validation and execution. */
 public class ValidationContext {
 
     public final World world;
@@ -14,23 +13,22 @@ public class ValidationContext {
     public final Ast.Invocation inv;
     public final Material materialIn;
 
-    /** True for invocations in the first stage of a line. */
-    public final boolean firstStage;
+    /** Input is supplied by a pipe, or expected from one during validation. */
+    public final boolean pipedInput;
 
     public ValidationContext(
             World world,
             Ast.Invocation inv,
-            Material materialIn,
-            boolean firstStage
+            boolean pipedInput,
+            Material materialIn
     ) {
         this.world = Objects.requireNonNull(world, "world");
         this.thrall = world.thrall();
         this.inv = Objects.requireNonNull(inv, "inv");
+        if (materialIn != null && !pipedInput) {
+            throw new IllegalArgumentException("material requires a piped input");
+        }
         this.materialIn = materialIn;
-        this.firstStage = firstStage;
-    }
-
-    public boolean acceptsPipedMaterial() {
-        return materialIn != null;
+        this.pipedInput = pipedInput;
     }
 }

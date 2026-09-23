@@ -1,17 +1,14 @@
 package com.archon.verb;
 
-import com.archon.address.Resolved;
 import com.archon.model.EquipmentSlot;
 import com.archon.model.Inventory;
-import com.archon.model.ItemLocation;
+import com.archon.system.item.ItemMoves;
 
 public final class WieldVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        return c.inv.arg(0) == null && !c.acceptsPipedMaterial()
-                ? Check.invalid("wield what?", null)
-                : Check.ok();
+        return VerbSyntax.item(c, 0);
     }
 
     @Override
@@ -21,20 +18,18 @@ public final class WieldVerb implements Verb {
             return VerbTargets.reject(c, rejected.check());
         }
 
-        Resolved.OnItem selected = ((ItemInput.Selected) input).target();
-        if (!(selected.location() instanceof ItemLocation.Pack)) {
-            return VerbTargets.reject(c, Check.blocked("item is already equipped", null));
-        }
-
+        var selected = ((ItemInput.Selected) input).target();
         Inventory inventory = c.thrall.inventory();
-        EquipmentSlot slot = inventory.equipped(EquipmentSlot.HAND_RIGHT) == null
-                ? EquipmentSlot.HAND_RIGHT
-                : EquipmentSlot.HAND_LEFT;
-        if (inventory.equipped(slot) != null) {
-            return VerbTargets.reject(c, Check.blocked("both hands full", null));
-        }
-        if (!inventory.equipFromPack(selected.item(), slot)) {
-            return VerbTargets.reject(c, Check.blocked("item is no longer in the pack", null));
+        EquipmentSlot slot = inventory.equipped(
+                EquipmentSlot.HAND_RIGHT) == null ? EquipmentSlot.HAND_RIGHT : EquipmentSlot.HAND_LEFT;
+        var result = ItemMoves.equip(selected.item(), selected.location(), slot);
+        if (result != ItemMoves.Result.SUCCESS) {
+            String reason = switch (result) {
+                case NOT_PACKED -> "item is already equipped";
+                case SLOT_OCCUPIED -> "both hands full";
+                default -> result.reason();
+            };
+            return VerbTargets.reject(c, Check.blocked(reason, null));
         }
 
         c.say("Thrall grips " + selected.item().name() + " (" + slot.path + ").");

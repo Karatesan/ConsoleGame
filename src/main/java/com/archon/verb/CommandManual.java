@@ -3,16 +3,9 @@ package com.archon.verb;
 import com.archon.command.FlagSpec;
 import com.archon.exec.EconomyRules;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
-/** Renders catalog metadata and authored cross-command reference topics. */
 public final class CommandManual {
 
     private static final List<String> TOPICS =
@@ -224,44 +217,42 @@ public final class CommandManual {
         return """
                 TOPIC: COMMAND OPERATORS
 
-                PAID OR MIXED LINES:
-                  ;    Execute the next stage unless execution has broken.
+                ALL LINES, INCLUDING FREE COMMANDS:
+                  ;    Continue after any ordinary outcome.
                        Example: step e ; strike o1
-
-                  &&   Execute the next stage when the preceding result is SUCCESS.
-                       Successful melee and ranged hits count as SUCCESS, not only kills.
-                       Example: strike o1 && step n
-
-                  ||   Execute the next stage when the preceding result is not SUCCESS.
+                  &&   Continue only after SUCCESS.
+                       Successful hits count as SUCCESS, not only kills.
+                  ||   Recover after MISS, PARTIAL, or gameplay BLOCKED.
                        Example: strike o1 || guard
-
-                  |    Pass item or substance output to the next command in one stage.
-                       The stage costs only its final invocation.
+                  |    Pass actual material output within one pipeline stage.
                        Example: siphon b1/contents | pour @o1/floor
 
+                BRANCHING:
+                  Evaluate stages left to right. Skips preserve the last executed outcome.
+                  In 'a && b || c', c runs if a fails or an executed b fails.
+                  Ordinary failure does not break a line. Interruption does, without recovery.
+                  Malformed commands are rejected before commitment, even in skipped branches.
+                  Missing, unsuitable, or currently unreachable targets are gameplay failures.
+
                 PIPELINES:
-                  Every non-final command must declare material output.
-                  Every receiving command must declare a material input slot.
-                  An unsuccessful upstream command stops the pipeline.
-                  Effects already performed upstream are not rolled back.
-                  Pour emits no material, and Ignite accepts none. Sequence them instead:
+                  Every non-final command must declare possible output.
+                  Its consumer must accept every declared possible output kind.
+                  Stop at the first non-success, preserving its outcome.
+                  Successful production of no material blocks the next consumer.
+                  There is no implicit forwarding of consumed input or fallback to operands.
+                  Materials do not cross ;, &&, or ||. Earlier effects are not rolled back.
+                  Pour emits nothing and Ignite accepts nothing. Sequence them instead:
                     siphon b1/contents | pour @o1/floor && ignite @o1/floor
 
-                CURRENT RECOVERY LIMITATIONS:
-                  BLOCKED and INVALID still break paid execution before a fallback can run.
-                  A blocked first stage may also be rejected during submission validation.
-                  Thus '||' currently handles outcomes such as MISS, but is not yet general
-                  recovery from a blocked action.
-                  An actual interruption breaks execution.
+                TERMINAL COMMANDS:
+                  Must be the final invocation, including on free-only lines.
+                  End the round only when actually executed successfully.
+                  A skipped terminal or failed upstream producer does not end the round.
 
-                FREE-ONLY LINES:
-                  Currently use a separate path: every stage executes without evaluating
-                  && or ||, and no material is forwarded between commands.
-
-                TERMINAL DETECTION:
-                  The final invocation in the submitted syntax determines terminal status.
-                  On a completed paid line, a terminal command can end the round even if
-                  its stage was skipped. Terminal validation is bypassed on free-only lines.
+                REACTIONS:
+                  Check between executed paid stages and after normally completed paid work.
+                  Free and skipped stages add no checkpoints. Pipelines add no internal checks.
+                  A post-completion reaction does damage but does not retroactively break a line.
                 """;
     }
 
@@ -301,8 +292,8 @@ public final class CommandManual {
 
                 EMPTY LOCATIONS:
                   An empty equipment slot, empty prop contents, or pack root is a location,
-                  not an item. Commands requiring an item may reject those targets.
-                  Address resolution does not imply that a command can reach or use a target.
+                  not an item. Commands requiring an item may be blocked by those targets.
+                  Resolution does not imply that a command can reach or use a target.
                 """;
     }
 
@@ -317,37 +308,38 @@ public final class CommandManual {
                 LINE TAX:
                   Untaxed paid lines per round: %d.
                   Tax on each subsequent paid line: %d AP.
-                  This is a fixed tax, not an escalating tax.
-                  Tax is charged at commitment and is not refunded.
-                  A chained line still pays tax if its submission is taxable.
+                  This is fixed, not escalating; commitment tax is never refunded.
+                  A submission containing paid work is paid even if that work is later skipped.
 
                 ALLOCATION:
-                  A pipeline allocates the cost of its final invocation.
-                  A line allocates the sum of its stage costs.
-                  Conditional stages contribute to affordability even if later skipped.
+                  A pipeline allocates its final invocation's price, not the sum inside it.
+                  A line allocates every stage, including conditional stages.
+                  Allocation plus tax must be affordable before commitment.
+                  Singles permit adaptation; complex lines commit more work in advance.
 
-                COMPLETION:
-                  Executed stages are charged their stage costs.
-                  Skipped stages are not charged.
-                  Rejected submissions do not spend AP or consume a paid line.
+                COMPLETION AND RECOVERY:
+                  Every attempted ordinary stage pays its normal stage price, including
+                  MISS, PARTIAL, BLOCKED, and pipelines whose producer fails.
+                  An executed fallback also pays its price. Skipped stages pay nothing.
+                  Ordinary failure without successful recovery still has no break penalty.
+                  Rejected submissions spend nothing and consume no paid line.
 
-                BREAKS:
-                  After commitment, a broken line forfeits its allocation plus %d AP.
-                  Forfeiture is capped by AP remaining after the submission tax.
-                  This replaces ordinary completed-line charging; it is not an additional
-                  charge on top of the trace's executed-stage total.
-                  Interrupt accounting records half the interrupted stage cost, rounded down,
-                  but broken-line settlement still uses allocation forfeiture.
+                INTERRUPTIONS:
+                  A broken line forfeits its allocation plus %d AP, capped by AP after tax.
+                  This replaces ordinary trace charging rather than adding to it.
+                  The trace records half the interrupted stage price, rounded down.
+                  This applies before a stage begins and during an interrupted pipeline.
 
                 FREE COMMANDS AND AUDITS:
-                  Entirely free lines bypass paid-line accounting.
-                  A free command inside a paid line does not make the whole line tax-free.
-                  Audit never spends AP. Its report is not yet identical to execution in
-                  every case, particularly free-only lines and the post-tax forfeiture cap.
+                  Free-only lines use the same language without AP, tax, paid-line counting,
+                  movement resets, or runner-managed reactions.
+                  Free commands inside paid lines do not remove the commitment tax.
+                  Audit shares submission validity, allocation, tax, affordability, and
+                  forfeiture calculations. It spends nothing and predicts no future outcomes.
 
                 PASS:
-                  A terminal ending requests the end of the round.
-                  Remaining AP is discarded when the application advances the round.
+                  A successfully executed terminal requests the end of the round.
+                  The application discards remaining AP when advancing the round.
                 """.formatted(
                 rules.roundAp(),
                 rules.untaxedLines(),

@@ -1,7 +1,6 @@
 package com.archon.ui;
 
 import com.archon.event.GameEvent;
-import com.archon.exec.EconomyRules;
 import com.archon.exec.RoundState;
 import com.archon.model.Entity;
 import com.archon.model.EquipmentSlot;
@@ -14,153 +13,117 @@ import com.archon.model.Vec2;
 import com.archon.model.World;
 import com.archon.system.spatial.SpatialService;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class ConsoleView implements View {
 
-    private static final int LOG_LINES = 14;
+    private boolean forceMap = true;
+    private String lastMap = "";
+    private String lastStatus = "";
 
-    /**
-     * STREAM: print as events arrive (safe everywhere, incl. IDE consoles).
-     * FULLSCREEN: buffer events, clear screen, redraw map+HUD+log as one frame.
-     */
-    private final boolean fullscreen;
-    private final Deque<String> log = new ArrayDeque<>();
-    private boolean dirty = true;
-
-    public ConsoleView() {
-        this(false);
-
-    }
-
-    public ConsoleView(boolean fullscreen) {
-        this.fullscreen = fullscreen;
-    }
-
-    private void emit(String text) {
-        for (String line : text.split("\n")) {
-            if (fullscreen) {
-                log.addLast(line);
-                while (log.size() > LOG_LINES) {
-                    log.removeFirst();
-                }
-            } else {
-                System.out.println("  " + line);
-            }
+    private void emit(String label, String text) {
+        for (String line : text.split("\\R")) {
+            System.out.printf("  %-6s %s%n", label, line);
+            label = "|";
         }
     }
 
     @Override
-    public void handle(GameEvent e) {
-        switch (e) {
-            case GameEvent.Narrative n -> emit(n.text());
-            case GameEvent.Audit a -> emit(a.text());
-            case GameEvent.Redraw r -> dirty = true;
+    public void handle(GameEvent event) {
+        switch (event) {
+            case GameEvent.Narrative narrative -> emit("|", narrative.text());
+            case GameEvent.Audit audit -> emit("AUDIT", audit.text());
+            case GameEvent.Redraw redraw -> forceMap = true;
 
-            case GameEvent.Rejected r -> {
-                emit("x " + r.code() + " — " + r.reason());
-                if (r.hint() != null) {
-                    emit("    " + r.hint());
+            case GameEvent.Rejected rejected -> {
+                emit("REJECT", rejected.code() + " — " + rejected.reason());
+                if (rejected.hint() != null) {
+                    emit("HINT", rejected.hint());
                 }
-                emit("    0 AP spent. Line not counted.");
+                emit("COST", "No AP spent; paid-line count unchanged.");
             }
-            case GameEvent.LineStart s ->
-                    emit("> " + s.raw() + "   [alloc " + s.allocation() + " AP, tax " + s.tax() + ", "
-                            + (s.chain() ? "CHAIN" : "SINGLE") + "]");
+            case GameEvent.LineStart start -> emit("RUN",
+                    start.raw() + " | Allocation " + start.allocation() + " AP | Tax " + start.tax() + " AP");
 
-            case GameEvent.StageResult s ->
-                    emit(String.format("  [%d/%d] %-36s %-12s (%d AP)  AP %d", s.index(), s.total(), s.render(),
-                            s.code(), s.charged(), Math.max(0, s.apLeft())));
+            case GameEvent.StageResult result -> emit("RESULT",
+                    result.total() == 1 ? result.code().name() : String.format("%d/%d %s | Trace charge %d AP | %s",
+                            result.index(), result.total(), result.code(), result.charged(), result.render()));
 
-            case GameEvent.StageSkipped s ->
-                    emit(String.format("  [%d]   %-36s SKIPPED      (%s)", s.index(), s.render(), s.why()));
+            case GameEvent.StageSkipped skipped ->
+                    emit("SKIP", skipped.index() + " " + skipped.render() + " | " + skipped.why());
 
-            case GameEvent.LineComplete c -> {
-                emit(String.format("  LINE COMPLETE — %d AP charged, %d tax, %d returned unused. AP %d.",
-                        c.charged(), c.tax(), c.returnedUnused(), c.apLeft()));
-                dirty = true;
-            }
-            case GameEvent.LineBroke b -> {
-                emit("x BREAK — " + b.reason());
-                emit(String.format("    Forfeited: %d AP allocation + %d AP penalty = %d AP.", b.allocation(),
-                        b.penalty(), b.forfeited()));
-                if (b.hint() != null) {
-                    emit("    Tip: " + b.hint());
+            case GameEvent.LineComplete complete -> emit("COST",
+                    String.format("%d AP charged | Tax %d AP | Remaining %d AP", complete.charged(), complete.tax(),
+                            complete.apLeft()));
+
+            case GameEvent.LineBroke broke -> {
+                emit("BREAK", broke.reason());
+                emit("COST", "Forfeited " + broke.forfeited() + " AP | Remaining " + broke.apLeft() + " AP");
+                emit("|",
+                        "Allocation " + broke.allocation() + " + penalty " + broke.penalty() + ", capped by AP after tax.");
+                emit("|", "Replaces stage charges; excludes commitment tax.");
+                if (broke.hint() != null) {
+                    emit("HINT", broke.hint());
                 }
-                dirty = true;
             }
-            case GameEvent.InterruptFired i ->
-                    emit("!! INTERRUPT — " + i.source() + " (" + i.description() + "). " + i.damage() + " dmg.");
+            case GameEvent.InterruptFired interrupt -> emit("REACT",
+                    interrupt.source() + " — " + interrupt.description() + " | " + interrupt.damage() + " dmg");
 
-            case GameEvent.RoundEnd r -> {
-                emit(r.wasted() > 0
-                        ? "-- round ends. " + r.wasted() + " AP destroyed unspent."
-                        : "-- round ends. All AP spent.");
-                r.worldLog().forEach(this::emit);
-                dirty = true;
+            case GameEvent.RoundEnd end -> {
+                emit("ROUND", "Ended | Unspent AP discarded: " + end.wasted());
+                end.worldLog().forEach(line -> emit("|", line));
             }
-            case GameEvent.RoundStart s -> {
-                emit("== ROUND " + s.round() + " — AP " + s.ap() + "/" + s.ap());
-                dirty = true;
-            }
-            case GameEvent.ThrallDied d -> {
-                emit("*** THE THRALL COLLAPSES. THE LINK GOES DARK. ***");
-                dirty = true;
+            case GameEvent.RoundStart start -> emit("ROUND", start.round() + " begins | AP " + start.ap());
+
+            case GameEvent.ThrallDied died -> {
+                emit("DEATH", "THE THRALL COLLAPSES. THE LINK GOES DARK.");
+                forceMap = true;
             }
         }
     }
 
     @Override
     public void frame(World world, RoundState round) {
-        if (fullscreen) {
-            System.out.print("\033[H\033[2J");
-            System.out.flush();
-            header();
-            System.out.print(grid(world));
-            System.out.print(hud(world, round));
-            separator();
-            log.forEach(line -> System.out.println("  " + line));
-            separator();
-            dirty = false;
+        String map = grid(world);
+        String status = hud(world, round);
+        if (!forceMap && map.equals(lastMap) && status.equals(lastStatus)) {
             return;
         }
 
-        // Streaming: only redraw the board when the world actually changed.
-        if (!dirty) {
-            return;
+        System.out.printf("%n--- %s ---%n", world.thrall().alive() ? "STATE" : "RUN ENDED");
+        System.out.print(status);
+        if (forceMap || !world.thrall().alive() || !map.equals(lastMap)) {
+            System.out.println();
+            System.out.print(map);
         }
+        System.out.println("----------------------------------------------------------------");
 
-        dirty = false;
-        header();
-        System.out.print(grid(world));
-        System.out.print(hud(world, round));
-        separator();
+        lastMap = map;
+        lastStatus = status;
+        forceMap = false;
     }
 
-    private void header() {
-        System.out.println();
-        System.out.println("===================== ARCHON — Action Economy Prototype =====================");
-    }
-
-    private void separator() {
-        System.out.println("-----------------------------------------------------------------------------");
+    @Override
+    public void prompt() {
+        System.out.print("\nARCHON> ");
+        System.out.flush();
     }
 
     private String grid(World world) {
-        StringBuilder sb = new StringBuilder("    ");
+        StringBuilder output = new StringBuilder("    ");
         for (int x = 0; x < world.width(); x++) {
-            sb.append(x % 10).append(' ');
+            output.append(x % 10).append(' ');
         }
-        sb.append('\n');
+        output.append('\n');
 
         for (int y = 0; y < world.height(); y++) {
-            sb.append(String.format("%3d ", y));
+            output.append(String.format("%3d ", y));
             for (int x = 0; x < world.width(); x++) {
                 Vec2 position = new Vec2(x, y);
                 GameMap.Tile tile = world.tile(position);
                 Entity entity = SpatialService.entityAt(world, position);
-                char glyph;
+                char glyph = '.';
 
                 if (tile.isWall()) {
                     glyph = '#';
@@ -172,42 +135,26 @@ public final class ConsoleView implements View {
                     glyph = '~';
                 } else if (!tile.ground().isEmpty()) {
                     glyph = '%';
-                } else {
-                    glyph = '.';
                 }
 
-                sb.append(glyph).append(' ');
+                output.append(glyph).append(' ');
             }
-            sb.append('\n');
+            output.append('\n');
         }
 
-        return sb.toString();
+        return output.toString();
     }
 
     private String hud(World world, RoundState round) {
         Thrall thrall = world.thrall();
-        StringBuilder pips = new StringBuilder();
+        String conditions = Stream.of(Tag.BURNING, Tag.WET, Tag.FROZEN, Tag.CORRODED, Tag.PRONE, Tag.STUNNED,
+                Tag.BLIND).filter(thrall::has).map(Tag::name).collect(Collectors.joining(", "));
+        String pips = "* ".repeat(round.ap()) + "o ".repeat(round.rules().roundAp() - round.ap());
 
-        for (int i = 0; i < round.rules().roundAp(); i++) {
-            pips.append(i < round.ap() ? '*' : 'o').append(' ');
-        }
-
-        return String.format("""
-                        ROUND %d   HP %d/%d   AP [%s] %d/%d   LINE %d (next tax: +%d AP)
-                        hand/right: %-18s hand/left: %-18s pack %d/%d
-                        """,
-                round.roundNo(),
-                thrall.hp(),
-                thrall.maxHp(),
-                pips.toString().trim(),
-                round.ap(),
-                round.ap(),
-                round.linesUsed(),
-                round.rules().taxForNextLine(round.linesUsed()),
-                name(thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
-                name(thrall.inventory().equipped(EquipmentSlot.HAND_LEFT)),
-                thrall.inventory().pack().size(),
-                Inventory.PACK_MAX);
+        return "Round " + round.roundNo() + "   HP " + thrall.hp() + "/" + thrall.maxHp() + "   AP [" + pips.stripTrailing() + "] " + round.ap() + "/" + round.rules().roundAp() + "\nRight: " + name(
+                thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)) + "   Left: " + name(thrall.inventory().equipped(
+                EquipmentSlot.HAND_LEFT)) + "   Pack: " + thrall.inventory().pack().size() + "/" + Inventory.PACK_MAX + "\nConditions: " + (conditions.isEmpty() ? "none" : conditions) + "   Guard: " + (thrall.isGuarded() ? "raised" : "down") + "   Arrow: " + (thrall.isNocked() ? "nocked" : "not nocked") + (thrall.alive() ? "\nPaid lines: " + round.linesUsed() + "   Next tax: " + round.rules().taxForNextLine(
+                round.linesUsed()) + " AP" : "") + "\n";
     }
 
     private String name(Item item) {

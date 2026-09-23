@@ -2,11 +2,9 @@ package com.archon.exec;
 
 import com.archon.command.Ast;
 import com.archon.verb.VerbCatalog;
-import com.archon.verb.VerbDefinition;
 
 import java.util.Objects;
 
-/** Shared pricing and line classification under the current economy rules. */
 public final class ExecutionPolicy {
 
     private final VerbCatalog catalog;
@@ -17,31 +15,17 @@ public final class ExecutionPolicy {
 
     /** A material pipeline costs only its final invocation. */
     public int stageCost(Ast.Stage stage) {
-        VerbDefinition definition = catalog.get(stage.last().verb());
-        return definition == null ? 0 : definition.price().cost(stage.last());
+        return Objects.requireNonNull(catalog.get(stage.last().verb()), "unknown verb").price().cost(stage.last());
     }
 
-    public int allocationOf(Ast.Line line) {
-        return line.stages().stream().mapToInt(this::stageCost).sum();
+    public boolean paidStage(Ast.Stage stage) {
+        return stage.pipeline().stream().anyMatch(
+                invocation -> !Objects.requireNonNull(catalog.get(invocation.verb()), "unknown verb").free());
     }
 
-    public boolean allFree(Ast.Line line) {
-        return line.stages().stream()
-                .flatMap(stage -> stage.pipeline().stream())
-                .allMatch(invocation -> {
-                    VerbDefinition definition = catalog.get(invocation.verb());
-                    return definition != null && definition.free();
-                });
-    }
-
-    /** Preserves syntax-based terminal detection, including skipped stages. */
-    public boolean endsWithTerminal(Ast.Line line) {
-        if (line.stages().isEmpty()) {
-            return false;
-        }
-
-        Ast.Stage last = line.stages().getLast();
-        VerbDefinition definition = catalog.get(last.last().verb());
-        return definition != null && definition.terminal();
+    public SubmissionQuote quote(Ast.Line line, RoundState round) {
+        boolean free = line.stages().stream().noneMatch(this::paidStage);
+        int allocation = line.stages().stream().mapToInt(this::stageCost).reduce(0, Math::addExact);
+        return new SubmissionQuote(free, allocation, round);
     }
 }

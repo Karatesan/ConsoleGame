@@ -1,6 +1,5 @@
 package com.archon.exec;
 
-/** Immutable numerical economy rules, selected when a game is assembled. */
 public record EconomyRules(
         int roundAp,
         int untaxedLines,
@@ -8,17 +7,9 @@ public record EconomyRules(
         int breakPenalty
 ) {
     public EconomyRules {
-        if (roundAp <= 0) {
-            throw new IllegalArgumentException("round AP must be positive");
-        }
-        if (untaxedLines < 0) {
-            throw new IllegalArgumentException("untaxed lines must not be negative");
-        }
-        if (lineTax < 0) {
-            throw new IllegalArgumentException("line tax must not be negative");
-        }
-        if (breakPenalty < 0) {
-            throw new IllegalArgumentException("break penalty must not be negative");
+        if (roundAp <= 0 || untaxedLines < 0 || lineTax < 0 || breakPenalty < 0) {
+            throw new IllegalArgumentException(
+                    "round AP must be positive; other economy values must not be negative");
         }
     }
 
@@ -27,14 +18,22 @@ public record EconomyRules(
     }
 
     public int taxForNextLine(int linesUsed) {
-        return linesUsed < untaxedLines ? 0 : lineTax;
+        return nonNegative(linesUsed, "lines used") < untaxedLines ? 0 : lineTax;
     }
 
     public int interruptedCharge(int stageCost) {
-        return stageCost / 2;
+        return nonNegative(stageCost, "stage cost") / 2;
     }
 
     public int breakCharge(int allocation, int availableAp) {
-        return (int) Math.min((long) allocation + breakPenalty, availableAp);
+        return (int) Math.min((long) nonNegative(allocation, "allocation") + breakPenalty,
+                nonNegative(availableAp, "available AP"));
+    }
+
+    private static int nonNegative(int value, String name) {
+        if (value < 0) {
+            throw new IllegalArgumentException(name + " must not be negative");
+        }
+        return value;
     }
 }

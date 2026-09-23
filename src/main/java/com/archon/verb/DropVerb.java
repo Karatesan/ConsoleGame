@@ -1,14 +1,12 @@
 package com.archon.verb;
 
-import com.archon.model.Item;
+import com.archon.system.item.ItemMoves;
 
 public final class DropVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        return c.inv.arg(0) == null && !c.acceptsPipedMaterial()
-                ? Check.invalid("drop what?", null)
-                : Check.ok();
+        return VerbSyntax.item(c, 0);
     }
 
     @Override
@@ -17,12 +15,12 @@ public final class DropVerb implements Verb {
         if (input instanceof ItemInput.Rejected rejected) {
             return VerbTargets.reject(c, rejected.check());
         }
-        Item item = ((ItemInput.Selected) input).target().item();
-        if (!c.thrall.inventory().remove(item)) {
-            return VerbTargets.reject(c, Check.blocked("not carrying that item", null));
+        var selected = ((ItemInput.Selected) input).target();
+        var result = ItemMoves.drop(c.world.map(), selected.item(), selected.location());
+        if (result != ItemMoves.Result.SUCCESS) {
+            return VerbTargets.reject(c, Check.blocked(result.reason(), null));
         }
-        c.world.map().placeGroundItem(c.thrall.pos(), item);
-        c.say("Thrall drops " + item.name() + ".");
+        c.say("Thrall drops " + selected.item().name() + ".");
         return ExitCode.SUCCESS;
     }
 }
