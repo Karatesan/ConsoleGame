@@ -8,5 +8,4 @@ import com.archon.model.World;
 public interface View {
     void handle(GameEvent event);
     void frame(World world, RoundState round);
-    default void prompt() {}
 }

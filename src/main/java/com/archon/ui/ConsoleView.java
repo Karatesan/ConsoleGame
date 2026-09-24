@@ -104,12 +104,6 @@ public final class ConsoleView implements View {
         forceMap = false;
     }
 
-    @Override
-    public void prompt() {
-        System.out.print("\nARCHON> ");
-        System.out.flush();
-    }
-
     private String grid(World world) {
         StringBuilder output = new StringBuilder("    ");
         for (int x = 0; x < world.width(); x++) {

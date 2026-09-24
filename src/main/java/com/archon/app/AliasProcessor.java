@@ -7,6 +7,9 @@ import java.util.Map;
 
 public class AliasProcessor {
 
+    public static String ALIAS_PREFIX = "alias";
+    private static final int MAX_ALIAS_EXPANSION_DEPTH = 5;
+
     private final Map<String, String> aliases = new HashMap<>();
 
     public void defineAlias(String raw, EventBus bus) {
@@ -27,7 +30,7 @@ public class AliasProcessor {
      */
     public String expandAliases(String raw) {
         String out = raw;
-        for (int depth = 0; depth < 5; depth++) {
+        for (int depth = 0; depth < MAX_ALIAS_EXPANSION_DEPTH; depth++) {
             String[] parts = out.split("(?=\\s*(;|&&|\\|\\||\\|))");
             StringBuilder sb = new StringBuilder();
             boolean changed = false;
