@@ -1,4 +1,3 @@
-// src/main/java/com/archon/verb/ShootVerb.java
 package com.archon.verb;
 
 import com.archon.address.Resolved;
@@ -14,29 +13,22 @@ public final class ShootVerb implements Verb {
         return c.checkAimedAddress(false);
     }
 
-    private Check check(ValidationContext c, Resolved resolved) {
-        Check resolution = resolved.toCheck();
-        if (!resolution.valid()) return resolution;
-        if (!(resolved instanceof Resolved.OnEntity || resolved instanceof Resolved.OnBody)) {
-            return Check.blocked("shoot needs an entity or body-part target", null);
-        }
-        if (!c.thrall.isNocked()) {
-            return Check.blocked("nothing nocked", "try: nock ; shoot <target>");
-        }
-
-        Entity target = resolved.targetEntity().orElseThrow();
-        return SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos())
-                ? Check.ok()
-                : Check.blocked("no line of fire", null);
-    }
-
     @Override
     public ExitCode execute(VerbContext c) {
-        Resolved resolved = c.resolve(c.inv.arg(0));
-        Check check = check(c, resolved);
-        if (!check.valid()) return c.reject(check);
+        Resolved.Target resolved = c.resolveTarget(c.inv.arg(0));
+        if (resolved == null) return ExitCode.BLOCKED;
 
-        Entity target = resolved.targetEntity().orElseThrow();
+        Entity target = resolved.targetEntity().orElse(null);
+        if (target == null) {
+            return c.rejectBlocked("shoot needs an entity or body-part target");
+        }
+        if (!c.thrall.isNocked()) {
+            return c.rejectBlocked("nothing nocked");
+        }
+        if (!SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos())) {
+            return c.rejectBlocked("no line of fire");
+        }
+
         BodyPart part = c.aimPart(resolved);
         c.thrall.fireNocked();
 

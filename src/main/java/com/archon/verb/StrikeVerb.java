@@ -1,4 +1,3 @@
-// src/main/java/com/archon/verb/StrikeVerb.java
 package com.archon.verb;
 
 import com.archon.address.Resolved;
@@ -19,38 +18,31 @@ public final class StrikeVerb implements Verb {
         return c.checkAimedAddress(true);
     }
 
-    private Resolved resolveTarget(ValidationContext c) {
-        String address = c.inv.arg(0) != null ? c.inv.arg(0) : c.soleAdjacentHostile();
-        return address == null
-                ? new Resolved.Failure(Resolved.Problem.UNKNOWN_ENTITY, "no single adjacent target; name one explicitly")
-                : c.resolve(address);
-    }
-
     private boolean isHandTarget(Resolved resolved) {
         return resolved instanceof Resolved.ItemTarget target
                 && target.location() instanceof ItemLocation.Equipment equipment
                 && (equipment.slot() == EquipmentSlot.HAND_LEFT || equipment.slot() == EquipmentSlot.HAND_RIGHT);
     }
 
-    private Check check(ValidationContext c, Resolved resolved) {
-        Check resolution = resolved.toCheck();
-        if (!resolution.valid()) return resolution;
-        if (!(resolved instanceof Resolved.OnEntity || resolved instanceof Resolved.OnBody || isHandTarget(resolved))) {
-            return Check.blocked("strike needs an entity, body part, or hand slot", null);
-        }
-        if (isHandTarget(resolved) && resolved instanceof Resolved.OnLocation) {
-            return Check.blocked("nothing in that hand to disarm", null);
-        }
-        return c.checkReachable((Resolved.Target) resolved);
-    }
-
     @Override
     public ExitCode execute(VerbContext c) {
-        Resolved resolved = resolveTarget(c);
-        Check check = check(c, resolved);
-        if (!check.valid()) return c.reject(check);
+        String address = c.inv.arg(0) != null ? c.inv.arg(0) : c.soleAdjacentHostile();
+        if (address == null) {
+            return c.rejectBlocked("no single adjacent target; name one explicitly");
+        }
 
-        if (resolved instanceof Resolved.OnItem item
+        Resolved.Target target = c.resolveTarget(address);
+        if (target == null) return ExitCode.BLOCKED;
+
+        if (!(target instanceof Resolved.OnEntity || target instanceof Resolved.OnBody || isHandTarget(target))) {
+            return c.rejectBlocked("strike needs an entity, body part, or hand slot");
+        }
+        if (isHandTarget(target) && target instanceof Resolved.OnLocation) {
+            return c.rejectBlocked("nothing in that hand to disarm");
+        }
+        if (!c.checkReachable(target)) return ExitCode.BLOCKED;
+
+        if (target instanceof Resolved.OnItem item
                 && item.location() instanceof ItemLocation.Equipment equipment) {
             Actor owner = equipment.owner();
             var result = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner, equipment.slot());
@@ -62,23 +54,23 @@ public final class StrikeVerb implements Verb {
             return ExitCode.MISS;
         }
 
-        Entity target = resolved.targetEntity().orElseThrow();
-        BodyPart part = c.aimPart(resolved);
+        Entity entity = target.targetEntity().orElseThrow();
+        BodyPart part = c.aimPart(target);
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power").toLowerCase(Locale.ROOT);
         var result = CombatEngine.resolveMelee(
-                c.world.dice(), c.world, c.thrall, target, part, power, c.inv.hasFlag("force")
+                c.world.dice(), c.world, c.thrall, entity, part, power, c.inv.hasFlag("force")
         );
         if (!result.hit()) {
-            c.say("Strike at " + target.name() + "'s " + part.path + " — MISS.");
+            c.say("Strike at " + entity.name() + "'s " + part.path + " — MISS.");
             return ExitCode.MISS;
         }
         c.say(String.format(
                 "%s strikes %s's %s. %d dmg.",
                 result.weapon() == null ? "Bare limb" : result.weapon().name(),
-                target.name(), part.path, result.damage()
+                entity.name(), part.path, result.damage()
         ));
         if (result.killed()) {
-            c.say(target.name() + " falls.");
+            c.say(entity.name() + " falls.");
         }
         return ExitCode.SUCCESS;
     }

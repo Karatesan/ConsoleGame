@@ -2,7 +2,6 @@ package com.archon.model;
 
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.Objects;
 import java.util.Set;
 
 public final class Item {
@@ -14,27 +13,9 @@ public final class Item {
     private final int damage;
 
     public Item(String id, String name, Set<Tag> tags, Tag substance, int durability, int damage) {
-        this.id = Objects.requireNonNull(id, "id cannot be null");
-        if (id.isBlank()) {
-            throw new IllegalArgumentException("id cannot be blank");
-        }
-
-        this.name = Objects.requireNonNull(name, "name cannot be null");
-        if (name.isBlank()) {
-            throw new IllegalArgumentException("name cannot be blank");
-        }
-
-        Objects.requireNonNull(tags, "tags cannot be null");
-        if (durability < 0) {
-            throw new IllegalArgumentException("durability cannot be negative");
-        }
-        if (damage < 0) {
-            throw new IllegalArgumentException("damage cannot be negative");
-        }
-
-        EnumSet<Tag> copiedTags = EnumSet.noneOf(Tag.class);
-        copiedTags.addAll(tags);
-        this.tags = copiedTags;
+        this.id = id;
+        this.name = name;
+        this.tags = tags.isEmpty() ? EnumSet.noneOf(Tag.class) : EnumSet.copyOf(tags);
         this.substance = substance;
         this.durability = durability;
         this.damage = damage;
@@ -52,29 +33,12 @@ public final class Item {
         return new Item(id, name, EnumSet.of(Tag.GLASS, Tag.BREAKABLE), substance, 1, 0);
     }
 
-    public String id() {
-        return id;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public Set<Tag> tags() {
-        return Collections.unmodifiableSet(tags);
-    }
-
-    public Tag substance() {
-        return substance;
-    }
-
-    public int durability() {
-        return durability;
-    }
-
-    public int damage() {
-        return damage;
-    }
+    public String id() { return id; }
+    public String name() { return name; }
+    public Set<Tag> tags() { return tags; }
+    public Tag substance() { return substance; }
+    public int durability() { return durability; }
+    public int damage() { return damage; }
 
     public boolean has(Tag tag) {
         return tags.contains(tag);
@@ -87,9 +51,6 @@ public final class Item {
     }
 
     public void wear(int amount) {
-        if (amount < 0) {
-            throw new IllegalArgumentException("wear cannot be negative");
-        }
         durability = Math.max(0, durability - amount);
     }
 

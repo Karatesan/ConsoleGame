@@ -4,12 +4,11 @@ import com.archon.command.Ast;
 import com.archon.command.CommandParser;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
-import com.archon.model.World;
 import com.archon.system.combat.Reaction;
+import com.archon.model.World;
 import com.archon.verb.*;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Supplier;
 
 public final class Executor {
@@ -52,10 +51,17 @@ public final class Executor {
 
         if (line.stages().isEmpty()) return;
 
-        Validator.Plan plan = validator.checkAndQuote(line, round);
-        if (!plan.check().valid()) {
-            Check c = plan.check();
-            bus.post(new GameEvent.Rejected(c.code(), c.reason(), c.hint()));
+        Check check = validator.validateStructure(line);
+        if (!check.valid()) {
+            bus.post(new GameEvent.Rejected(ExitCode.INVALID, check.reason(), check.hint()));
+            return;
+        }
+
+        Validator.Plan plan = validator.quote(line, round);
+        if (plan.requiredAp() > round.ap()) {
+            String reason = String.format("insufficient AP: %d AP tax + %d AP allocation = %d. Available: %d.",
+                    plan.tax(), plan.allocation(), plan.requiredAp(), round.ap());
+            bus.post(new GameEvent.Rejected(ExitCode.BLOCKED, reason, "reduce the submitted allocation"));
             return;
         }
 
@@ -157,31 +163,9 @@ public final class Executor {
     }
 
     private StepResult runInvocation(VerbDefinition def, Ast.Invocation inv, Material input) {
-        if (input != null && !def.input().contains(kind(input))) {
-            throw new IllegalStateException("unexpected input kind for " + inv.verb());
-        }
         VerbContext ctx = new VerbContext(world, inv, bus, input);
-        ExitCode code = Objects.requireNonNull(def.action().execute(ctx), "verb returned no outcome");
-        if (code == ExitCode.INVALID) {
-            throw new IllegalStateException(inv.verb() + " returned INVALID after submission validation");
-        }
-        if (ctx.materialOut != null && !def.output().contains(kind(ctx.materialOut))) {
-            throw new IllegalStateException("undeclared output kind from " + inv.verb());
-        }
+        ExitCode code = def.action().execute(ctx);
         return new StepResult(code, ctx.materialOut);
-    }
-
-    private static MaterialKind kind(Material material) {
-        return switch (material) {
-            case Material.OfItem item -> {
-                Objects.requireNonNull(item.item(), "material item");
-                yield MaterialKind.ITEM;
-            }
-            case Material.OfSubstance substance -> {
-                Objects.requireNonNull(substance.substance(), "material substance");
-                yield MaterialKind.SUBSTANCE;
-            }
-        };
     }
 
     public void endRound() {

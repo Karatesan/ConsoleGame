@@ -1,4 +1,3 @@
-// src/main/java/com/archon/verb/ValidationContext.java
 package com.archon.verb;
 
 import com.archon.address.Address;
@@ -26,7 +25,7 @@ public class ValidationContext {
     public Check checkAddress(int index) {
         String raw = inv.arg(index);
         if (raw == null) {
-            return Check.invalid(inv.verb() + " needs an address", null);
+            return Check.invalid(inv.verb() + " needs an address");
         }
         return checkRawAddress(raw);
     }
@@ -38,8 +37,7 @@ public class ValidationContext {
     public Check checkAimedAddress(boolean optional) {
         String aim = inv.flag("aim");
         if (aim != null && BodyPart.parse(aim) == null) {
-            return Check.invalid("unknown hit location \"" + aim + "\"",
-                    "valid: head, torso, arm.l, arm.r, legs");
+            return Check.invalid("unknown hit location \"" + aim + "\"", "valid: head, torso, arm.l, arm.r, legs");
         }
         return optional ? checkOptionalAddress(0) : checkAddress(0);
     }
@@ -47,9 +45,7 @@ public class ValidationContext {
     public Check checkItem(int index) {
         if (pipedInput) return Check.ok();
         String raw = inv.arg(index);
-        return raw == null || raw.isBlank()
-                ? Check.invalid("an item is required", null)
-                : checkRawAddress(itemAddress(raw));
+        return raw == null || raw.isBlank() ? Check.invalid("an item is required") : checkRawAddress(itemAddress(raw));
     }
 
     public Check checkDelivery() {
@@ -62,19 +58,11 @@ public class ValidationContext {
     }
 
     private static Check checkRawAddress(String raw) {
-        return Address.parse(raw) instanceof Address.Invalid(String reason)
-                ? Check.invalid(reason, null)
-                : Check.ok();
+        return Address.parse(raw) instanceof Address.Invalid(String reason) ? Check.invalid(reason) : Check.ok();
     }
 
     public Resolved resolve(String raw) {
         return Resolved.resolve(raw, world);
-    }
-
-    public Check checkReachable(Resolved.Target target) {
-        return target.pos().chebyshev(thrall.pos()) <= 1
-                ? Check.ok()
-                : Check.blocked("target at " + target.pos() + " out of reach", "step closer first");
     }
 
     public boolean isCarried(ItemLocation location) {

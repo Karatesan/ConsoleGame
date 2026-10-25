@@ -1,4 +1,3 @@
-// src/main/java/com/archon/verb/VerbContext.java
 package com.archon.verb;
 
 import com.archon.address.Resolved;
@@ -27,14 +26,17 @@ public final class VerbContext extends ValidationContext {
         bus.narrate(text);
     }
 
-    public ExitCode reject(Check check) {
-        say(check.reason());
-        return check.code();
-    }
-
     public ExitCode rejectBlocked(String reason) {
         say(reason);
         return ExitCode.BLOCKED;
+    }
+
+    public boolean checkReachable(Resolved.Target target) {
+        if (target.pos().chebyshev(thrall.pos()) <= 1) {
+            return true;
+        }
+        say("target at " + target.pos() + " out of reach");
+        return false;
     }
 
     public void describeSpill(Vec2 at, Tag substance) {
@@ -42,13 +44,11 @@ public final class VerbContext extends ValidationContext {
     }
 
     public Resolved.Target resolveTarget(String raw) {
-        Resolved resolved = resolve(raw);
-        Check check = resolved.toCheck();
-        if (!check.valid()) {
-            say(check.reason());
+        if ( resolve(raw) instanceof Resolved.Failure(String reason) ) {
+            say(reason);
             return null;
         }
-        return (Resolved.Target) resolved;
+        return (Resolved.Target) resolve(raw);
     }
 
     public Resolved.OnItem selectCarriedItem(int argIndex) {
@@ -62,9 +62,8 @@ public final class VerbContext extends ValidationContext {
         }
 
         Resolved resolved = resolve(itemAddress(inv.arg(argIndex)));
-        Check resolution = resolved.toCheck();
-        if (!resolution.valid()) {
-            say(resolution.reason());
+        if (resolved instanceof Resolved.Failure(String reason)) {
+            say(reason);
             return null;
         }
         if (resolved instanceof Resolved.OnLocation) {
@@ -98,12 +97,8 @@ public final class VerbContext extends ValidationContext {
             return null;
         }
 
-        if (!isThrow) {
-            Check reach = checkReachable(target);
-            if (!reach.valid()) {
-                say(reach.reason());
-                return null;
-            }
+        if (!isThrow && !checkReachable(target)) {
+            return null;
         }
 
         Substances.requireDestination(world, target.pos());
