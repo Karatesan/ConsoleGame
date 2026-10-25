@@ -1,3 +1,4 @@
+// src/main/java/com/archon/verb/ShootVerb.java
 package com.archon.verb;
 
 import com.archon.address.Resolved;
@@ -10,11 +11,11 @@ public final class ShootVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        return VerbSyntax.aimedAddress(c, false);
+        return c.checkAimedAddress(false);
     }
 
     private Check check(ValidationContext c, Resolved resolved) {
-        Check resolution = VerbTargets.resolution(resolved);
+        Check resolution = resolved.toCheck();
         if (!resolution.valid()) return resolution;
         if (!(resolved instanceof Resolved.OnEntity || resolved instanceof Resolved.OnBody)) {
             return Check.blocked("shoot needs an entity or body-part target", null);
@@ -23,23 +24,23 @@ public final class ShootVerb implements Verb {
             return Check.blocked("nothing nocked", "try: nock ; shoot <target>");
         }
 
-        Entity target = VerbHelpers.targetEntity(resolved).orElseThrow();
-        return SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos()) ? Check.ok() : Check.blocked(
-                "no line of fire", null);
+        Entity target = resolved.targetEntity().orElseThrow();
+        return SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos())
+                ? Check.ok()
+                : Check.blocked("no line of fire", null);
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
-        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
+        Resolved resolved = c.resolve(c.inv.arg(0));
         Check check = check(c, resolved);
-        if (!check.valid()) return VerbTargets.reject(c, check);
+        if (!check.valid()) return c.reject(check);
 
-        Entity target = VerbHelpers.targetEntity(resolved).orElseThrow();
-        BodyPart part = VerbHelpers.aimPart(c.inv, resolved).orElseThrow();
+        Entity target = resolved.targetEntity().orElseThrow();
+        BodyPart part = c.aimPart(resolved);
         c.thrall.fireNocked();
 
-        CombatEngine.RangedHitResult result = CombatEngine.resolveRanged(c.world.dice(), c.world, c.thrall, target,
-                part);
+        var result = CombatEngine.resolveRanged(c.world.dice(), c.world, c.thrall, target, part);
         if (!result.hit()) {
             c.say("Arrow flies wide of " + target.name() + ".");
             return ExitCode.MISS;

@@ -1,3 +1,4 @@
+// src/main/java/com/archon/verb/TakeVerb.java
 package com.archon.verb;
 
 import com.archon.address.Address;
@@ -10,12 +11,12 @@ public final class TakeVerb implements Verb {
 
     @Override
     public Check validateStructural(ValidationContext c) {
-        return VerbSyntax.address(c, 0);
+        return c.checkAddress(0);
     }
 
     private Resolved resolveItem(ValidationContext c) {
-        Resolved resolved = VerbHelpers.resolve(c, c.inv.arg(0));
-        if (resolved instanceof Resolved.OnTile tile && tile.layer() != Address.Layer.CEILING) {
+        Resolved resolved = c.resolve(c.inv.arg(0));
+        if (resolved.isFloorTile() && resolved instanceof Resolved.OnTile tile) {
             var ground = c.world.tile(tile.pos()).ground();
             if (!ground.isEmpty()) {
                 return new Resolved.OnItem(ground.getFirst(), new ItemLocation.Ground(tile.pos()));
@@ -25,48 +26,47 @@ public final class TakeVerb implements Verb {
     }
 
     private Check check(ValidationContext c, Resolved resolved) {
-        Check resolution = VerbTargets.resolution(resolved);
-        if (!resolution.valid()) {
-            return resolution;
-        }
+        Check resolution = resolved.toCheck();
+        if (!resolution.valid()) return resolution;
+
         if (resolved instanceof Resolved.OnTile tile) {
-            return tile.layer() == Address.Layer.CEILING ? Check.blocked("cannot take ground items from the ceiling",
-                    null) : Check.blocked("nothing on the ground there", null);
+            return tile.layer() == Address.Layer.CEILING
+                    ? Check.blocked("cannot take ground items from the ceiling", null)
+                    : Check.blocked("nothing on the ground there", null);
         }
         if (resolved instanceof Resolved.OnLocation location) {
-            return location.location() instanceof ItemLocation.Pack ? Check.blocked("select an item from the pack",
-                    "use /pack/<item>") : Check.blocked("nothing there to take", null);
+            return location.location() instanceof ItemLocation.Pack
+                    ? Check.blocked("select an item from the pack", "use /pack/<item>")
+                    : Check.blocked("nothing there to take", null);
         }
         if (!(resolved instanceof Resolved.OnItem item)) {
             return Check.blocked("take needs an item or ground tile", null);
         }
 
-        boolean carried = VerbTargets.ownedBy(item.location(), c.thrall);
+        boolean carried = c.isCarried(item.location());
         if (!carried) {
-            Check reach = VerbTargets.reachable(c, item);
-            if (!reach.valid()) {
-                return reach;
-            }
+            Check reach = c.checkReachable(item);
+            if (!reach.valid()) return reach;
         }
 
-        ItemMoves.Result result = carried ? ItemMoves.checkSource(c.world.map(), item.item(),
-                item.location()) : ItemMoves.checkToPack(c.world.map(), item.item(), item.location(), c.thrall);
-        return result == ItemMoves.Result.SUCCESS ? Check.ok() : Check.blocked(result.reason(),
-                result == ItemMoves.Result.PACK_FULL ? "drop something" : null);
+        ItemMoves.Result result = carried
+                ? ItemMoves.checkSource(c.world.map(), item.item(), item.location())
+                : ItemMoves.checkToPack(c.world.map(), item.item(), item.location(), c.thrall);
+        return result == ItemMoves.Result.SUCCESS
+                ? Check.ok()
+                : Check.blocked(result.reason(), result == ItemMoves.Result.PACK_FULL ? "drop something" : null);
     }
 
     @Override
     public ExitCode execute(VerbContext c) {
         Resolved resolved = resolveItem(c);
         Check check = check(c, resolved);
-        if (!check.valid()) {
-            return VerbTargets.reject(c, check);
-        }
+        if (!check.valid()) return c.reject(check);
 
         Resolved.OnItem selected = (Resolved.OnItem) resolved;
         Item item = selected.item();
         ItemLocation location = selected.location();
-        if (VerbTargets.ownedBy(location, c.thrall)) {
+        if (c.isCarried(location)) {
             c.materialOut = new Material.OfItem(item);
             c.say("Thrall draws " + item.name() + ".");
             return ExitCode.SUCCESS;
@@ -80,7 +80,7 @@ public final class TakeVerb implements Verb {
 
         ItemMoves.Result result = ItemMoves.toPack(c.world.map(), item, location, c.thrall);
         if (result != ItemMoves.Result.SUCCESS) {
-            return VerbTargets.reject(c, Check.blocked(result.reason(), null));
+            return c.rejectBlocked(result.reason());
         }
 
         c.materialOut = new Material.OfItem(item);
