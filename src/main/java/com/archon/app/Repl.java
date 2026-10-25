@@ -4,12 +4,16 @@ import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
 import com.archon.exec.EconomyRules;
 import com.archon.exec.Executor;
+import com.archon.exec.Interrupts;
 import com.archon.exec.RoundState;
 import com.archon.model.Dice;
 import com.archon.model.World;
+import com.archon.system.combat.ReactionSystem;
+import com.archon.system.environment.SimulationSystem;
 import com.archon.ui.ConsoleInput;
 import com.archon.ui.ConsoleView;
 import com.archon.ui.View;
+import com.archon.verb.VerbCatalog;
 
 import static com.archon.app.AliasProcessor.ALIAS_PREFIX;
 
@@ -25,7 +29,9 @@ public final class Repl {
             bus.subscribe(view::handle);
 
             RoundState round = new RoundState(EconomyRules.prototype());
-            Executor exec = ExecutionSetup.create(world, bus, round);
+            VerbCatalog catalog = DefaultVerbs.create(round.rules());
+            Interrupts interrupts = new Interrupts(() -> ReactionSystem.fire(world), bus);
+            Executor exec = new Executor(world, bus, round, catalog, interrupts, () -> SimulationSystem.tick(world));
 
             bus.post(new GameEvent.RoundStart(round.roundNo(), round.ap()));
             bus.narrate("Type 'help'. Use Up/Down for history. Free commands never cost AP or count as a line.");
@@ -45,10 +51,7 @@ public final class Repl {
                     continue;
                 }
 
-                Executor.Outcome outcome = exec.submit(aliasProcessor.expandAliases(raw));
-                if (world.thrall().alive() && outcome.roundOver()) {
-                    exec.endRound();
-                }
+                exec.submit(aliasProcessor.expandAliases(raw));
                 view.frame(world, round);
             }
         }

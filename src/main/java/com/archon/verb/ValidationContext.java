@@ -11,24 +11,14 @@ public class ValidationContext {
     public final World world;
     public final Thrall thrall;
     public final Ast.Invocation inv;
-    public final Material materialIn;
 
     /** Input is supplied by a pipe, or expected from one during validation. */
     public final boolean pipedInput;
 
-    public ValidationContext(
-            World world,
-            Ast.Invocation inv,
-            boolean pipedInput,
-            Material materialIn
-    ) {
+    public ValidationContext(World world, Ast.Invocation inv, boolean pipedInput) {
         this.world = Objects.requireNonNull(world, "world");
         this.thrall = world.thrall();
         this.inv = Objects.requireNonNull(inv, "inv");
-        if (materialIn != null && !pipedInput) {
-            throw new IllegalArgumentException("material requires a piped input");
-        }
-        this.materialIn = materialIn;
         this.pipedInput = pipedInput;
     }
 }

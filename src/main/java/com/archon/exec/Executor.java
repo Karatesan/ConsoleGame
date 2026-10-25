@@ -14,11 +14,6 @@ import java.util.function.Supplier;
 
 public final class Executor {
 
-    public enum Kind {NOOP, FREE, REJECTED, COMPLETE, BROKE}
-
-    public record Outcome(Kind kind, ExitCode lastCode, int tax, int allocation, int charged, int forfeited,
-                          int apAfter, int linesUsed, boolean roundOver) {}
-
     private record StepResult(ExitCode code, Material output) {}
 
     private final World world;
@@ -42,24 +37,26 @@ public final class Executor {
         this.tick = tick;
     }
 
-    public RoundState round() { return round; }
+    public RoundState round() {
+        return round;
+    }
 
-    public Outcome submit(String raw) {
+    public void submit(String raw) {
         Ast.Line line;
         try {
             line = parser.parse(raw);
         } catch (CommandParser.ParseError err) {
             bus.post(new GameEvent.Rejected(ExitCode.INVALID, err.getMessage(), err.hint));
-            return out(Kind.REJECTED, ExitCode.INVALID, 0, 0);
+            return;
         }
 
-        if (line.stages().isEmpty()) return out(Kind.NOOP, ExitCode.SUCCESS, 0, 0);
+        if (line.stages().isEmpty()) return;
 
         Validator.Plan plan = validator.checkAndQuote(line, round);
         if (!plan.check().valid()) {
             Check c = plan.check();
             bus.post(new GameEvent.Rejected(c.code(), c.reason(), c.hint()));
-            return out(Kind.REJECTED, c.code(), plan.tax(), plan.allocation());
+            return;
         }
 
         if (!plan.free()) {
@@ -69,10 +66,10 @@ public final class Executor {
             bus.post(new GameEvent.LineStart(line.raw(), round.linesUsed(), plan.allocation(), plan.tax(), line.isChain()));
         }
 
-        return executeAndSettle(line, plan);
+        executeAndSettle(line, plan);
     }
 
-    private Outcome executeAndSettle(Ast.Line line, Validator.Plan plan) {
+    private void executeAndSettle(Ast.Line line, Validator.Plan plan) {
         ExitCode lastCode = ExitCode.SUCCESS;
         int charged = 0;
         boolean paidExecuted = false;
@@ -139,10 +136,8 @@ public final class Executor {
         }
 
         boolean broke = brokeStage != -1;
-        int forfeited = 0;
-
         if (broke) {
-            forfeited = plan.free() ? 0 : round.rules().breakCharge(plan.allocation(), round.ap());
+            int forfeited = plan.free() ? 0 : round.rules().breakCharge(plan.allocation(), round.ap());
             round.spend(forfeited);
             bus.post(new GameEvent.LineBroke(brokeStage, brokeReason, plan.allocation(),
                     plan.free() ? 0 : round.rules().breakPenalty(), forfeited, round.ap(), null));
@@ -154,13 +149,11 @@ public final class Executor {
             bus.post(new GameEvent.LineComplete(charged, plan.tax(), plan.allocation() - charged, round.ap()));
         }
 
-        boolean alive = world.thrall().alive();
-        if (!alive) bus.post(new GameEvent.ThrallDied());
-
-        boolean roundOver = alive && ((!plan.free() && round.ap() == 0) || (!broke && terminalExecuted));
-        Kind kind = broke ? Kind.BROKE : plan.free() ? Kind.FREE : Kind.COMPLETE;
-
-        return new Outcome(kind, lastCode, plan.tax(), plan.allocation(), charged, forfeited, round.ap(), round.linesUsed(), roundOver);
+        if (!world.thrall().alive()) {
+            bus.post(new GameEvent.ThrallDied());
+        } else if ((!plan.free() && round.ap() == 0) || (!broke && terminalExecuted)) {
+            endRound();
+        }
     }
 
     private StepResult runInvocation(VerbDefinition def, Ast.Invocation inv, Material input) {
@@ -195,9 +188,5 @@ public final class Executor {
         List<String> worldLog = tick.get();
         bus.post(new GameEvent.RoundEnd(round.reset(), worldLog));
         bus.post(world.thrall().alive() ? new GameEvent.RoundStart(round.roundNo(), round.ap()) : new GameEvent.ThrallDied());
-    }
-
-    private Outcome out(Kind kind, ExitCode code, int tax, int allocation) {
-        return new Outcome(kind, code, tax, allocation, 0, 0, round.ap(), round.linesUsed(), false);
     }
 }

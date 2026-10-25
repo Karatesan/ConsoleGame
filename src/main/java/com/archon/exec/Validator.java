@@ -71,7 +71,7 @@ public final class Validator {
                     return Check.invalid("\"" + inv.verb() + "\" cannot receive all producer material kinds",
                             "producer: " + inputKinds + "; accepted: " + def.input());
 
-                Check check = def.action().validateStructural(new ValidationContext(world, inv, p > 0, null));
+                Check check = def.action().validateStructural(new ValidationContext(world, inv, p > 0));
                 if (!check.valid()) {
                     if (check.code() != ExitCode.INVALID) {
                         throw new IllegalStateException("submission validation returned a gameplay failure");
