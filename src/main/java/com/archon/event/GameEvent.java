@@ -16,7 +16,6 @@ public sealed interface GameEvent {
                      int forfeited, int apLeft, String hint)                          implements GameEvent {}
     record InterruptFired(String source, String description, int damage)               implements GameEvent {}
     record Narrative(String text)                                                     implements GameEvent {}
-    record Audit(String text)                                                         implements GameEvent {}
     record Redraw()                                                                   implements GameEvent {}
     record ThrallDied()                                                               implements GameEvent {}
 }

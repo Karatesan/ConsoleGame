@@ -8,8 +8,7 @@ import java.util.stream.Collectors;
 
 public final class CommandManual {
 
-    private static final List<String> TOPICS =
-            List.of("operators", "address", "economy", "flags");
+    private static final List<String> TOPICS = List.of("operators", "address", "economy", "flags");
 
     private final EconomyRules rules;
     private VerbCatalog catalog;
@@ -49,31 +48,27 @@ public final class CommandManual {
             case "flags" -> flags();
             default -> null;
         };
-        return topic == null
-                ? "no such command or topic: " + query
-                : topic.stripTrailing();
+        return topic == null ? "no such command or topic: " + query : topic.stripTrailing();
     }
 
     private String renderIndex() {
         StringBuilder out = new StringBuilder("""
                 ARCHON COMMAND MANUAL
                 Type 'help <verb>' for a command page, or 'help <topic>' for a reference guide.
-
+                
                 """);
 
         Map<String, List<VerbDefinition>> categories = new LinkedHashMap<>();
         for (VerbDefinition definition : catalog.all()) {
-            categories.computeIfAbsent(
-                    definition.documentation().category(),
-                    ignored -> new ArrayList<>()
-            ).add(definition);
+            categories.computeIfAbsent(definition.documentation().category(), ignored -> new ArrayList<>()).add(
+                    definition);
         }
 
         for (Map.Entry<String, List<VerbDefinition>> category : categories.entrySet()) {
             out.append(category.getKey()).append(":\n");
             for (VerbDefinition definition : category.getValue()) {
-                out.append("  ").append(synopsis(definition))
-                        .append(" — ").append(definition.documentation().summary()).append('\n');
+                out.append("  ").append(synopsis(definition)).append(" — ").append(
+                        definition.documentation().summary()).append('\n');
                 out.append("    ").append(definition.price().describe());
                 if (definition.free()) out.append("; free");
                 if (definition.terminal()) out.append("; terminal");
@@ -83,9 +78,7 @@ public final class CommandManual {
         }
 
         out.append("REFERENCE TOPICS:\n  ");
-        out.append(TOPICS.stream()
-                .map(topic -> "help " + topic)
-                .collect(Collectors.joining(" | ")));
+        out.append(TOPICS.stream().map(topic -> "help " + topic).collect(Collectors.joining(" | ")));
         return out.toString();
     }
 
@@ -93,14 +86,12 @@ public final class CommandManual {
         VerbDefinition.Documentation doc = definition.documentation();
         StringBuilder out = new StringBuilder();
 
-        out.append("NAME:\n  ").append(definition.name())
-                .append(" — ").append(doc.summary()).append("\n\n");
+        out.append("NAME:\n  ").append(definition.name()).append(" — ").append(doc.summary()).append("\n\n");
         out.append("SYNOPSIS:\n  ").append(synopsis(definition));
         for (FlagSpec option : definition.options()) {
             out.append(" [").append(optionSyntax(option)).append(']');
         }
-        out.append(" [").append(optionSyntax(FlagSpec.AUDIT)).append("]\n\n");
-
+        out.append("\n\n");
         out.append("AP COST:\n  ").append(definition.price().describe()).append('\n');
         out.append("  Free: ").append(definition.free() ? "yes" : "no").append('\n');
         out.append("  Terminal: ").append(definition.terminal() ? "yes" : "no").append("\n\n");
@@ -122,7 +113,6 @@ public final class CommandManual {
         for (FlagSpec option : definition.options()) {
             appendOption(out, option);
         }
-        appendOption(out, FlagSpec.AUDIT);
 
         if (!doc.examples().isEmpty()) {
             out.append("\nEXAMPLES:\n");
@@ -140,9 +130,7 @@ public final class CommandManual {
     }
 
     private static String optionSyntax(FlagSpec option) {
-        String name = option.shortName() == null
-                ? "--" + option.name()
-                : "-" + option.shortName();
+        String name = option.shortName() == null ? "--" + option.name() : "-" + option.shortName();
         if (!option.takesValue()) {
             return name;
         }
@@ -158,9 +146,8 @@ public final class CommandManual {
         }
         out.append("--").append(option.name());
         if (option.takesValue()) {
-            out.append(option.bareDefault() == null ? " <" : " [<")
-                    .append(option.valueName())
-                    .append(option.bareDefault() == null ? ">" : ">]");
+            out.append(option.bareDefault() == null ? " <" : " [<").append(option.valueName()).append(
+                    option.bareDefault() == null ? ">" : ">]");
         }
         out.append("\n    ").append(option.description());
         if (option.bareDefault() != null) {
@@ -170,12 +157,8 @@ public final class CommandManual {
     }
 
     private static String kinds(Set<MaterialKind> kinds) {
-        return kinds.isEmpty()
-                ? "none"
-                : kinds.stream()
-                .sorted()
-                .map(kind -> kind.name().toLowerCase(Locale.ROOT))
-                .collect(Collectors.joining(", "));
+        return kinds.isEmpty() ? "none" : kinds.stream().sorted().map(
+                kind -> kind.name().toLowerCase(Locale.ROOT)).collect(Collectors.joining(", "));
     }
 
     private String flags() {
@@ -183,10 +166,9 @@ public final class CommandManual {
                 TOPIC: COMMAND FLAGS
                 Options belong to individual commands. An option supported by one command
                 is not automatically accepted by another.
-
+                
                 GLOBAL LINE OPTION:
                 """);
-        appendOption(out, FlagSpec.AUDIT);
 
         for (VerbDefinition definition : catalog.all()) {
             if (definition.options().isEmpty()) continue;
@@ -204,7 +186,7 @@ public final class CommandManual {
                   An option taking a value must be last in a short-option group.
                   Repeated options use the final value.
                   --name=value supplies an inline value.
-
+                
                 CURRENT LIMITATIONS:
                   There is no end-of-options '--' marker.
                   A separated value beginning with '-' is not consumed as an option value.
@@ -216,7 +198,7 @@ public final class CommandManual {
     private static String operators() {
         return """
                 TOPIC: COMMAND OPERATORS
-
+                
                 ALL LINES, INCLUDING FREE COMMANDS:
                   ;    Continue after any ordinary outcome.
                        Example: step e ; strike o1
@@ -226,14 +208,14 @@ public final class CommandManual {
                        Example: strike o1 || guard
                   |    Pass actual material output within one pipeline stage.
                        Example: siphon b1/contents | pour @o1/floor
-
+                
                 BRANCHING:
                   Evaluate stages left to right. Skips preserve the last executed outcome.
                   In 'a && b || c', c runs if a fails or an executed b fails.
                   Ordinary failure does not break a line. Interruption does, without recovery.
                   Malformed commands are rejected before commitment, even in skipped branches.
                   Missing, unsuitable, or currently unreachable targets are gameplay failures.
-
+                
                 PIPELINES:
                   Every non-final command must declare possible output.
                   Its consumer must accept every declared possible output kind.
@@ -243,12 +225,12 @@ public final class CommandManual {
                   Materials do not cross ;, &&, or ||. Earlier effects are not rolled back.
                   Pour emits nothing and Ignite accepts nothing. Sequence them instead:
                     siphon b1/contents | pour @o1/floor && ignite @o1/floor
-
+                
                 TERMINAL COMMANDS:
                   Must be the final invocation, including on free-only lines.
                   End the round only when actually executed successfully.
                   A skipped terminal or failed upstream producer does not end the round.
-
+                
                 REACTIONS:
                   Check between executed paid stages and after normally completed paid work.
                   Free and skipped stages add no checkpoints. Pipelines add no internal checks.
@@ -259,7 +241,7 @@ public final class CommandManual {
     private static String addressing() {
         return """
                 TOPIC: ADDRESSING SYNTAX
-
+                
                 TILES:
                   @x,y                 Absolute tile, for example @3,4.
                   @self                The thrall's current tile.
@@ -267,11 +249,11 @@ public final class CommandManual {
                   @x,y/floor           Explicit floor layer.
                   @x,y/ceiling         Explicit ceiling layer.
                   @<dir><distance>     Relative tile, for example @e2 or @sw1.
-
+                
                 THRALL INVENTORY:
                   /pack                The pack location, not a selected item.
                   /pack/<item>         A selected packed item, for example /pack/torch.
-
+                
                 ENTITIES, BODY PARTS, AND EQUIPMENT:
                   <entityId>           The entity itself.
                   <entity>/body/head   An explicit body-part target.
@@ -279,17 +261,17 @@ public final class CommandManual {
                   <entity>/body/arm.l
                   <entity>/body/arm.r
                   <entity>/body/legs
-
+                
                   <entity>/head        Equipment location, not the head body part.
                   <entity>/hand/right  Right-hand equipment.
                   <entity>/hand/left   Left-hand equipment.
-
+                
                 EXAMPLES:
                   inspect o1/body/head
                   strike o1/body/head
                   strike o1/hand/right
                   take o1/hand/right
-
+                
                 EMPTY LOCATIONS:
                   An empty equipment slot, empty prop contents, or pack root is a location,
                   not an item. Commands requiring an item may be blocked by those targets.
@@ -300,51 +282,44 @@ public final class CommandManual {
     private String economy() {
         return """
                 TOPIC: ACTION ECONOMY
-
+                
                 ROUND BUDGET:
                   Each round begins with %d AP.
                   Unspent AP is discarded when the round ends.
-
+                
                 LINE TAX:
                   Untaxed paid lines per round: %d.
                   Tax on each subsequent paid line: %d AP.
                   This is fixed, not escalating; commitment tax is never refunded.
                   A submission containing paid work is paid even if that work is later skipped.
-
+                
                 ALLOCATION:
                   A pipeline allocates its final invocation's price, not the sum inside it.
                   A line allocates every stage, including conditional stages.
                   Allocation plus tax must be affordable before commitment.
                   Singles permit adaptation; complex lines commit more work in advance.
-
+                
                 COMPLETION AND RECOVERY:
                   Every attempted ordinary stage pays its normal stage price, including
                   MISS, PARTIAL, BLOCKED, and pipelines whose producer fails.
                   An executed fallback also pays its price. Skipped stages pay nothing.
                   Ordinary failure without successful recovery still has no break penalty.
                   Rejected submissions spend nothing and consume no paid line.
-
+                
                 INTERRUPTIONS:
                   A broken line forfeits its allocation plus %d AP, capped by AP after tax.
                   This replaces ordinary trace charging rather than adding to it.
                   The trace records half the interrupted stage price, rounded down.
                   This applies before a stage begins and during an interrupted pipeline.
-
-                FREE COMMANDS AND AUDITS:
+                
+                FREE COMMANDS:
                   Free-only lines use the same language without AP, tax, paid-line counting,
                   movement resets, or runner-managed reactions.
                   Free commands inside paid lines do not remove the commitment tax.
-                  Audit shares submission validity, allocation, tax, affordability, and
-                  forfeiture calculations. It spends nothing and predicts no future outcomes.
-
+                
                 PASS:
                   A successfully executed terminal requests the end of the round.
                   The application discards remaining AP when advancing the round.
-                """.formatted(
-                rules.roundAp(),
-                rules.untaxedLines(),
-                rules.lineTax(),
-                rules.breakPenalty()
-        );
+                """.formatted(rules.roundAp(), rules.untaxedLines(), rules.lineTax(), rules.breakPenalty());
     }
 }

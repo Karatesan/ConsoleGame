@@ -2,6 +2,7 @@ package com.archon.command;
 
 import java.util.List;
 import java.util.Map;
+
 public final class Ast {
     private Ast() {}
 
@@ -11,6 +12,7 @@ public final class Ast {
         public String flag(String name) { return flags.get(name); }
         public boolean hasFlag(String name) { return flags.containsKey(name); }
         public String arg(int i) { return i < args.size() ? args.get(i) : null; }
+
         public String render() {
             StringBuilder sb = new StringBuilder(verb);
             args.forEach(a -> sb.append(' ').append(a));
@@ -19,15 +21,14 @@ public final class Ast {
         }
     }
 
-    /** One unit between ;, && and ||. A pipeline of one or more invocations. */
     public record Stage(List<Invocation> pipeline, Op op) {
-        public Invocation last() { return pipeline.get(pipeline.size() - 1); }
+        public Invocation last() { return pipeline.getLast(); }
         public String render() {
             return String.join(" | ", pipeline.stream().map(Invocation::render).toList());
         }
     }
 
-    public record Line(List<Stage> stages, boolean dryRun, String raw) {
+    public record Line(List<Stage> stages, String raw) {
         public int verbCount() { return stages.stream().mapToInt(s -> s.pipeline().size()).sum(); }
         public boolean isChain() { return verbCount() >= 2; }
     }

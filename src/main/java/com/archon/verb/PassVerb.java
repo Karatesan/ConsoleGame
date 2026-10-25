@@ -1,7 +1,5 @@
 package com.archon.verb;
 
-import com.archon.command.Ast;
-
 public final class PassVerb implements Verb {
 
     @Override

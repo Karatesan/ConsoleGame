@@ -16,5 +16,4 @@ public final class EventBus {
 
     public void narrate(String text) { post(new GameEvent.Narrative(text)); }
     public void redraw()             { post(new GameEvent.Redraw()); }
-    public void audit(String text)   { post(new GameEvent.Audit(text)); }
 }

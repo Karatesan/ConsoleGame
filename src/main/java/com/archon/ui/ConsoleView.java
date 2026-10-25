@@ -33,7 +33,6 @@ public final class ConsoleView implements View {
     public void handle(GameEvent event) {
         switch (event) {
             case GameEvent.Narrative narrative -> emit("|", narrative.text());
-            case GameEvent.Audit audit -> emit("AUDIT", audit.text());
             case GameEvent.Redraw redraw -> forceMap = true;
 
             case GameEvent.Rejected rejected -> {
@@ -80,6 +79,7 @@ public final class ConsoleView implements View {
                 emit("DEATH", "THE THRALL COLLAPSES. THE LINK GOES DARK.");
                 forceMap = true;
             }
+            default -> throw new IllegalStateException("Unexpected value: " + event);
         }
     }
 

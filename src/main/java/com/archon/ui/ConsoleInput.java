@@ -20,7 +20,7 @@ public final class ConsoleInput implements AutoCloseable {
         try {
             terminal = TerminalBuilder.builder()
                     .system(true)
-                    .dumb(false)
+                    .dumb(true)
                     .build();
         } catch (IOException exception) {
             throw new UncheckedIOException(

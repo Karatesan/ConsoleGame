@@ -1,51 +1,47 @@
 package com.archon.command;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import com.archon.verb.VerbCatalog;
+import com.archon.verb.VerbDefinition;
+
+import java.util.*;
 
 public final class CommandParser {
 
-    private final InvocationParser invocations;
-
-    public CommandParser(InvocationParser invocations) {
-        this.invocations = Objects.requireNonNull(invocations, "invocations");
-    }
-
     public static final class ParseError extends RuntimeException {
         public final String hint;
-
         public ParseError(String msg, String hint) {
             super(msg);
             this.hint = hint;
         }
     }
 
+    private final VerbCatalog catalog;
+
+    public CommandParser(VerbCatalog catalog) {
+        this.catalog = catalog;
+    }
+
     public Ast.Line parse(String raw) {
-        List<String> tokens = lex(raw);
-        if (tokens.isEmpty()) return new Ast.Line(List.of(), false, raw);
+        List<String> tokens = splitToTokens(raw);
+        if (tokens.isEmpty()) return new Ast.Line(List.of(), raw);
 
         List<Ast.Stage> stages = new ArrayList<>();
         List<Ast.Invocation> pipeline = new ArrayList<>();
         List<String> current = new ArrayList<>();
         Ast.Op pendingOp = Ast.Op.NONE;
-        boolean dryRun = false;
 
         for (String token : tokens) {
             boolean pipe = "|".equals(token);
-            boolean separator = ";".equals(token) || "&&".equals(token) || "||".equals(token);
+            boolean sep = ";".equals(token) || "&&".equals(token) || "||".equals(token);
 
-            if (pipe || separator) {
+            if (pipe || sep) {
                 if (current.isEmpty()) {
-                    throw new ParseError("operator with no command",
-                            "every operator must sit between two commands");
+                    throw new ParseError("operator with no command", "every operator must sit between two commands");
                 }
-                Ast.Invocation invocation = invocations.parse(current);
-                if (invocation.hasFlag(FlagSpec.AUDIT.name())) dryRun = true;
-                pipeline.add(invocation);
+                pipeline.add(parseInvocation(current));
                 current.clear();
 
-                if (separator) {
+                if (sep) {
                     stages.add(new Ast.Stage(List.copyOf(pipeline), pendingOp));
                     pipeline.clear();
                     pendingOp = switch (token) {
@@ -59,62 +55,106 @@ public final class CommandParser {
             }
         }
 
-        if (!current.isEmpty()) {
-            Ast.Invocation invocation = invocations.parse(current);
-            if (invocation.hasFlag(FlagSpec.AUDIT.name())) dryRun = true;
-            pipeline.add(invocation);
-        } else if (!pipeline.isEmpty() || pendingOp != Ast.Op.NONE) {
-            throw new ParseError("operator with no command",
-                    "a command line cannot end with an operator or pipe");
+        if (current.isEmpty()) {
+            throw new ParseError("operator with no command", "a command line cannot end with an operator or pipe");
         }
+        pipeline.add(parseInvocation(current));
+        stages.add(new Ast.Stage(List.copyOf(pipeline), pendingOp));
 
-        if (!pipeline.isEmpty()) {
-            stages.add(new Ast.Stage(List.copyOf(pipeline), pendingOp));
-        }
-        return new Ast.Line(List.copyOf(stages), dryRun, raw);
+        return new Ast.Line(List.copyOf(stages), raw);
     }
 
-    private List<String> lex(String raw) {
-        List<String> out = new ArrayList<>();
-        StringBuilder sb = new StringBuilder();
+    private Ast.Invocation parseInvocation(List<String> tokens) {
+        String commandName = tokens.getFirst().toLowerCase(Locale.ROOT);
+        VerbDefinition def = catalog.get(commandName);
+        if (def == null) {
+            throw new ParseError("unknown verb \"" + commandName + "\"", "verbs: " + String.join(" ", catalog.names()));
+        }
+
+        List<String> args = new ArrayList<>();
+        Map<String, String> flags = new LinkedHashMap<>();
+
+        for (int i = 1; i < tokens.size(); i++) {
+            String t = tokens.get(i);
+            if (t.startsWith("--")) {
+                int eq = t.indexOf('=');
+                String flagName = eq < 0 ? t.substring(2) : t.substring(2, eq);
+                FlagSpec spec = findFlag(def, flagName, false);
+                if (eq >= 0) {
+                    flags.put(spec.name(), t.substring(eq + 1));
+                } else if (spec.takesValue()) {
+                    i = readValue(spec, "--" + flagName, tokens, i, flags);
+                } else {
+                    flags.put(spec.name(), "");
+                }
+            } else if (t.startsWith("-") && t.length() > 1 && !t.matches("-?\\d+")) {
+                String group = t.substring(1);
+                for (int c = 0; c < group.length(); c++) {
+                    String shortName = String.valueOf(group.charAt(c));
+                    FlagSpec spec = findFlag(def, shortName, true);
+                    if (spec.takesValue()) {
+                        if (c != group.length() - 1) {
+                            throw new ParseError("-" + shortName + " requires a value and must be at the end of the flag group", null);
+                        }
+                        i = readValue(spec, "-" + shortName, tokens, i, flags);
+                    } else {
+                        flags.put(spec.name(), "");
+                    }
+                }
+            } else {
+                args.add(t);
+            }
+        }
+        return new Ast.Invocation(commandName, List.copyOf(args), Collections.unmodifiableMap(flags));
+    }
+
+    private int readValue(FlagSpec spec, String spelling, List<String> tokens, int i, Map<String, String> flags) {
+        if (i + 1 < tokens.size() && !tokens.get(i + 1).startsWith("-")) {
+            flags.put(spec.name(), tokens.get(i + 1));
+            return i + 1;
+        }
+        if (spec.bareDefault() != null) {
+            flags.put(spec.name(), spec.bareDefault());
+            return i;
+        }
+        throw new ParseError(spelling + " requires a value", null);
+    }
+
+    private FlagSpec findFlag(VerbDefinition def, String name, boolean isShort) {
+        FlagSpec spec = def.findOption(name, isShort);
+        if (spec != null) return spec;
+        List<String> known = def.options().stream().map(s -> "--" + s.name()).toList();
+        throw new ParseError("unknown option " + (isShort ? "-" : "--") + name + " for " + def.name(),
+                "options: " + String.join(", ", known));
+    }
+
+    private List<String> splitToTokens(String raw) {
+        List<String> wordsList = new ArrayList<>();
+        StringBuilder currentWord = new StringBuilder();
         boolean quoted = false;
 
         for (int i = 0; i < raw.length(); i++) {
             char c = raw.charAt(i);
             if (c == '"') {
                 quoted = !quoted;
-                continue;
-            }
-            if (quoted) {
-                sb.append(c);
-                continue;
-            }
-            if (Character.isWhitespace(c)) {
-                flush(out, sb);
-                continue;
-            }
-            if (c == ';' || c == '|' || c == '&') {
-                flush(out, sb);
+            } else if (quoted) {
+                currentWord.append(c);
+            } else if (Character.isWhitespace(c)) {
+                if (!currentWord.isEmpty()) { wordsList.add(currentWord.toString()); currentWord.setLength(0); }
+            } else if (c == ';' || c == '|' || c == '&') {
+                if (!currentWord.isEmpty()) { wordsList.add(currentWord.toString()); currentWord.setLength(0); }
                 if ((c == '|' || c == '&') && i + 1 < raw.length() && raw.charAt(i + 1) == c) {
-                    out.add("" + c + c);
+                    wordsList.add("" + c + c);
                     i++;
                 } else {
-                    out.add(String.valueOf(c));
+                    wordsList.add(String.valueOf(c));
                 }
-                continue;
+            } else {
+                currentWord.append(c);
             }
-            sb.append(c);
         }
-
         if (quoted) throw new ParseError("unbalanced quote", null);
-        flush(out, sb);
-        return out;
-    }
-
-    private void flush(List<String> out, StringBuilder sb) {
-        if (!sb.isEmpty()) {
-            out.add(sb.toString());
-            sb.setLength(0);
-        }
+        if (!currentWord.isEmpty()) wordsList.add(currentWord.toString());
+        return wordsList;
     }
 }
