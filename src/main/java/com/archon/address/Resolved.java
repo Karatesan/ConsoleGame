@@ -2,17 +2,10 @@ package com.archon.address;
 
 import com.archon.model.*;
 
-import java.util.Optional;
-
 public sealed interface Resolved {
 
     sealed interface Target extends Resolved {
         Vec2 pos();
-    }
-
-    sealed interface ItemTarget extends Target {
-        ItemLocation location();
-        default Vec2 pos() { return location().pos(); }
     }
 
     record OnEntity(Entity entity) implements Target {
@@ -23,24 +16,32 @@ public sealed interface Resolved {
         public Vec2 pos() { return actor.pos(); }
     }
 
-    record OnItem(Item item, ItemLocation location) implements ItemTarget {}
+    record OnItem(Item item, ItemLocation location) implements Target {
+        public Vec2 pos() { return location.pos(); }
+    }
 
-    record OnLocation(ItemLocation location) implements ItemTarget {}
+    record OnLocation(ItemLocation location) implements Target {
+        public Vec2 pos() { return location.pos(); }
+    }
 
     record OnTile(Vec2 pos, Address.Layer layer) implements Target {}
 
     record Failure(String reason) implements Resolved {}
 
-    default Optional<Entity> targetEntity() {
+    default Entity targetEntity() {
         return switch (this) {
-            case OnEntity target -> Optional.of(target.entity());
-            case OnBody target -> Optional.of(target.actor());
-            default -> Optional.empty();
+            case OnEntity(Entity entity) -> entity;
+            case OnBody(Actor actor, var ignored) -> actor;
+            default -> null;
         };
     }
 
     default boolean isFloorTile() {
-        return this instanceof OnTile tile && tile.layer() != Address.Layer.CEILING;
+        return this instanceof OnTile(var ignored, var layer) && layer != Address.Layer.CEILING;
+    }
+
+    default boolean isCeilingTile() {
+        return this instanceof OnTile(var ignored, var layer) && layer == Address.Layer.CEILING;
     }
 
     static Resolved resolve(String raw, World world) {
@@ -50,6 +51,8 @@ public sealed interface Resolved {
     static Resolved resolve(Address address, World world) {
         return switch (address) {
             case Address.Invalid(String reason) -> new Failure(reason);
+
+
             case Address.EntityAddr entity -> resolveEntity(entity, world);
             case Address.InventoryAddr inventory -> resolveInventory(world.thrall(), inventory.path());
             case Address.TileAddr tile -> resolveTile(tile, world);

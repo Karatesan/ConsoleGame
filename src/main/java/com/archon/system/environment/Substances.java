@@ -1,6 +1,5 @@
 package com.archon.system.environment;
 
-import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.model.Actor;
 import com.archon.model.Entity;
@@ -10,7 +9,6 @@ import com.archon.model.Prop;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
-import com.archon.system.item.ItemMoves;
 import com.archon.system.spatial.SpatialService;
 
 import java.util.Objects;
@@ -18,52 +16,31 @@ import java.util.Objects;
 /** Immediate finite extraction, container consumption, and substance application. */
 public final class Substances {
 
-    public sealed interface Extraction permits Portion, Unavailable {}
-
-    public record Portion(Tag substance) implements Extraction {
-        public Portion {
-            Objects.requireNonNull(substance, "substance");
-        }
-    }
-
-    public enum Unavailable implements Extraction {
-        EMPTY, STALE_SOURCE
-    }
-
     private Substances() {}
 
     /**
-     * Extracts the existing portion from an authoritative target.
+     * Extracts the existing portion from an authoritative target, or returns null when empty.
      * Entity sources use an actor's main hand or a prop's contents.
      */
-    public static Extraction extract(World world, Resolved.Target source) {
+    public static Tag extract(World world, Resolved.Target source) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(source, "source");
 
-        if (source instanceof Resolved.OnItem selected && ItemMoves.checkSource(world.map(), selected.item(),
-                selected.location()) != ItemMoves.Result.SUCCESS) {
-            return Unavailable.STALE_SOURCE;
-        }
-
         Item item = sourceItem(source);
         if (item != null) {
-            Tag substance = item.consumeSubstance();
-            return substance == null ? Unavailable.EMPTY : new Portion(substance);
+            return item.consumeSubstance();
         }
 
-        if (source instanceof Resolved.OnTile target && target.layer() != Address.Layer.CEILING) {
-            GameMap.Tile tile = requireDestination(world, target.pos());
+        if (source.isFloorTile()) {
+            GameMap.Tile tile = requireDestination(world, source.pos());
             Tag substance = tile.has(Tag.OIL) ? Tag.OIL : tile.has(Tag.WATER) ? Tag.WATER : null;
-            if (substance == null) {
-                return Unavailable.EMPTY;
-            }
-            if (!world.map().removeTag(target.pos(), substance)) {
+            if (substance != null && !world.map().removeTag(source.pos(), substance)) {
                 throw new IllegalStateException("selected substance disappeared during extraction");
             }
-            return new Portion(substance);
+            return substance;
         }
 
-        return Unavailable.EMPTY;
+        return null;
     }
 
     /** Keeps the container and returns the consumed substance, or null when empty. */
@@ -97,18 +74,12 @@ public final class Substances {
     }
 
     private static Item sourceItem(Resolved.Target source) {
-        if (source instanceof Resolved.OnItem target) {
-            return target.item();
-        }
-        if (source instanceof Resolved.OnEntity target) {
-            if (target.entity() instanceof Actor actor) {
-                return actor.mainHand();
-            }
-            if (target.entity() instanceof Prop prop) {
-                return prop.contents();
-            }
-        }
-        return null;
+        return switch (source) {
+            case Resolved.OnItem(Item item, var ignored) -> item;
+            case Resolved.OnEntity(Actor actor) -> actor.mainHand();
+            case Resolved.OnEntity(Prop prop) -> prop.contents();
+            default -> null;
+        };
     }
 
     private static void apply(World world, Vec2 at, Tag substance) {

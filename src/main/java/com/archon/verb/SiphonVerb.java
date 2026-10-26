@@ -2,6 +2,7 @@ package com.archon.verb;
 
 import com.archon.address.Address;
 import com.archon.address.Resolved;
+import com.archon.model.Tag;
 import com.archon.system.environment.Substances;
 
 public final class SiphonVerb implements Verb {
@@ -16,16 +17,14 @@ public final class SiphonVerb implements Verb {
         Resolved.Target target = c.resolveTarget(c.inv.arg(0));
         if (target == null) return ExitCode.BLOCKED;
 
-        if (target instanceof Resolved.OnTile tile && tile.layer() == Address.Layer.CEILING) {
+        if (target.isCeilingTile()) {
             return c.rejectBlocked("cannot siphon from the ceiling");
         }
         if (!c.checkReachable(target)) return ExitCode.BLOCKED;
 
-        Substances.Extraction extraction = Substances.extract(c.world, target);
-        if (!(extraction instanceof Substances.Portion(var substance))) {
-            return c.rejectBlocked(extraction == Substances.Unavailable.STALE_SOURCE
-                    ? "item no longer at its source"
-                    : "nothing to siphon");
+        Tag substance = Substances.extract(c.world, target);
+        if (substance == null) {
+            return c.rejectBlocked("nothing to siphon");
         }
 
         c.materialOut = new Material.OfSubstance(substance);

@@ -18,10 +18,15 @@ public final class StrikeVerb implements Verb {
         return c.checkAimedAddress(true);
     }
 
-    private boolean isHandTarget(Resolved resolved) {
-        return resolved instanceof Resolved.ItemTarget target
-                && target.location() instanceof ItemLocation.Equipment equipment
-                && (equipment.slot() == EquipmentSlot.HAND_LEFT || equipment.slot() == EquipmentSlot.HAND_RIGHT);
+    private static ItemLocation.Equipment handSlot(Resolved.Target target) {
+        ItemLocation loc = switch (target) {
+            case Resolved.OnItem(var ignored, var l) -> l;
+            case Resolved.OnLocation(var l) -> l;
+            default -> null;
+        };
+        return loc instanceof ItemLocation.Equipment eq
+                && (eq.slot() == EquipmentSlot.HAND_LEFT || eq.slot() == EquipmentSlot.HAND_RIGHT)
+                ? eq : null;
     }
 
     @Override
@@ -34,18 +39,19 @@ public final class StrikeVerb implements Verb {
         Resolved.Target target = c.resolveTarget(address);
         if (target == null) return ExitCode.BLOCKED;
 
-        if (!(target instanceof Resolved.OnEntity || target instanceof Resolved.OnBody || isHandTarget(target))) {
+        ItemLocation.Equipment hand = handSlot(target);
+        Entity entity = target.targetEntity();
+        if (entity == null && hand == null) {
             return c.rejectBlocked("strike needs an entity, body part, or hand slot");
         }
-        if (isHandTarget(target) && target instanceof Resolved.OnLocation) {
+        if (hand != null && target instanceof Resolved.OnLocation) {
             return c.rejectBlocked("nothing in that hand to disarm");
         }
         if (!c.checkReachable(target)) return ExitCode.BLOCKED;
 
-        if (target instanceof Resolved.OnItem item
-                && item.location() instanceof ItemLocation.Equipment equipment) {
-            Actor owner = equipment.owner();
-            var result = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner, equipment.slot());
+        if (hand != null) {
+            Actor owner = hand.owner();
+            var result = CombatEngine.attemptDisarm(c.world.dice(), c.world, owner, hand.slot());
             if (result.success()) {
                 c.say("The " + result.weapon().name() + " is knocked from " + owner.name() + "'s grip.");
                 return ExitCode.SUCCESS;
@@ -54,7 +60,6 @@ public final class StrikeVerb implements Verb {
             return ExitCode.MISS;
         }
 
-        Entity entity = target.targetEntity().orElseThrow();
         BodyPart part = c.aimPart(target);
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power").toLowerCase(Locale.ROOT);
         var result = CombatEngine.resolveMelee(

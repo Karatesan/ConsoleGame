@@ -14,7 +14,7 @@ public record EconomyRules(
     }
 
     public static EconomyRules prototype() {
-        return new EconomyRules(5, 1, 1, 1);
+        return new EconomyRules(6, 1, 1, 1);
     }
 
     public int taxForNextLine(int linesUsed) {

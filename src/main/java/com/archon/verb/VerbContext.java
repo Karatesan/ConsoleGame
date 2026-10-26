@@ -44,11 +44,12 @@ public final class VerbContext extends ValidationContext {
     }
 
     public Resolved.Target resolveTarget(String raw) {
-        if ( resolve(raw) instanceof Resolved.Failure(String reason) ) {
+        Resolved resolved = resolve(raw);
+        if (resolved instanceof Resolved.Failure(String reason)) {
             say(reason);
             return null;
         }
-        return (Resolved.Target) resolve(raw);
+        return (Resolved.Target) resolved;
     }
 
     public Resolved.OnItem selectCarriedItem(int argIndex) {

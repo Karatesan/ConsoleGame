@@ -4,16 +4,14 @@ import com.archon.command.Ast;
 import com.archon.command.CommandParser;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
-import com.archon.system.combat.Reaction;
 import com.archon.model.World;
+import com.archon.system.combat.Reaction;
 import com.archon.verb.*;
 
 import java.util.List;
 import java.util.function.Supplier;
 
 public final class Executor {
-
-    private record StepResult(ExitCode code, Material output) {}
 
     private final World world;
     private final EventBus bus;
@@ -72,28 +70,20 @@ public final class Executor {
             bus.post(new GameEvent.LineStart(line.raw(), round.linesUsed(), plan.allocation(), plan.tax(), line.isChain()));
         }
 
-        executeAndSettle(line, plan);
+        executeLine(line, plan);
     }
 
-    private void executeAndSettle(Ast.Line line, Validator.Plan plan) {
+    private void executeLine(Ast.Line line, Validator.Plan plan) {
         ExitCode lastCode = ExitCode.SUCCESS;
         int charged = 0;
         boolean paidExecuted = false;
         boolean terminalExecuted = false;
-        int brokeStage = -1;
-        String brokeReason = null;
 
         for (int i = 0; i < line.stages().size(); i++) {
             Ast.Stage stage = line.stages().get(i);
             int stageNum = i + 1;
-            int cost = validator.stageCost(stage);
 
-            boolean shouldRun = switch (stage.op()) {
-                case AND -> lastCode == ExitCode.SUCCESS;
-                case OR -> lastCode != ExitCode.SUCCESS;
-                default -> true;
-            };
-            if (!shouldRun) {
+            if (!shouldRun(stage.op(), lastCode)) {
                 String reason = stage.op() == Ast.Op.AND ? "&& requires SUCCESS" : "|| requires ordinary failure";
                 bus.post(new GameEvent.StageSkipped(stageNum, stage.render(), reason));
                 continue;
@@ -102,70 +92,76 @@ public final class Executor {
             if (paidExecuted && validator.paidStage(stage)) {
                 Reaction reaction = interrupts.fire().orElse(null);
                 if (reaction != null) {
-                    lastCode = ExitCode.INTERRUPT;
-                    charged += round.rules().interruptedCharge(cost);
-                    brokeStage = stageNum;
-                    brokeReason = reaction.sourceName() + " (READIED) interrupted the sequence";
-                    break;
+                    breakLine(stageNum, reaction.sourceName() + " (READIED) interrupted the sequence", plan);
+                    return;
                 }
             }
 
             Material material = null;
             for (int p = 0; p < stage.pipeline().size(); p++) {
                 Ast.Invocation inv = stage.pipeline().get(p);
-                VerbDefinition def = catalog.get(inv.verb());
-
                 if (p > 0 && material == null) {
                     bus.narrate("no material was produced for " + inv.verb());
                     lastCode = ExitCode.BLOCKED;
                     break;
                 }
 
-                StepResult res = runInvocation(def, inv, material);
-                lastCode = res.code();
+                VerbDefinition def = catalog.get(inv.verb());
+                VerbContext ctx = new VerbContext(world, inv, bus, material);
+                lastCode = def.action().execute(ctx);
                 paidExecuted |= !def.free();
-                terminalExecuted |= (def.terminal() && lastCode == ExitCode.SUCCESS);
 
                 if (lastCode != ExitCode.SUCCESS) break;
-                material = res.output();
+                material = ctx.materialOut;
             }
 
             if (lastCode == ExitCode.INTERRUPT) {
-                charged += round.rules().interruptedCharge(cost);
-                brokeStage = stageNum;
-                brokeReason = "interrupted during stage " + stageNum;
-                break;
+                breakLine(stageNum, "interrupted during stage " + stageNum, plan);
+                return;
             }
 
+            int cost = validator.stageCost(stage);
             charged += cost;
+            terminalExecuted |= (lastCode == ExitCode.SUCCESS && catalog.get(stage.last().verb()).terminal());
             bus.post(new GameEvent.StageResult(stageNum, line.stages().size(), stage.render(), lastCode, cost, round.ap() - charged));
         }
 
-        boolean broke = brokeStage != -1;
-        if (broke) {
-            int forfeited = plan.free() ? 0 : round.rules().breakCharge(plan.allocation(), round.ap());
-            round.spend(forfeited);
-            bus.post(new GameEvent.LineBroke(brokeStage, brokeReason, plan.allocation(),
-                    plan.free() ? 0 : round.rules().breakPenalty(), forfeited, round.ap(), null));
-        } else if (!plan.free()) {
+        completeLine(plan, charged, paidExecuted, terminalExecuted);
+    }
+
+    private static boolean shouldRun(Ast.Op op, ExitCode lastCode) {
+        return switch (op) {
+            case AND -> lastCode == ExitCode.SUCCESS;
+            case OR -> lastCode != ExitCode.SUCCESS;
+            case NONE, SEQ -> true;
+        };
+    }
+
+    private void breakLine(int stageNum, String reason, Validator.Plan plan) {
+        int forfeited = round.rules().breakCharge(plan.allocation(), round.ap());
+        round.spend(forfeited);
+        bus.post(new GameEvent.LineBroke(stageNum, reason, plan.allocation(),
+                round.rules().breakPenalty(), forfeited, round.ap(), null));
+        finishTurn(false);
+    }
+
+    private void completeLine(Validator.Plan plan, int charged, boolean paidExecuted, boolean terminalExecuted) {
+        if (!plan.free()) {
             round.spend(charged);
             if (paidExecuted && world.thrall().alive()) {
                 interrupts.fire();
             }
             bus.post(new GameEvent.LineComplete(charged, plan.tax(), plan.allocation() - charged, round.ap()));
         }
-
-        if (!world.thrall().alive()) {
-            bus.post(new GameEvent.ThrallDied());
-        } else if ((!plan.free() && round.ap() == 0) || (!broke && terminalExecuted)) {
-            endRound();
-        }
+        finishTurn(terminalExecuted);
     }
 
-    private StepResult runInvocation(VerbDefinition def, Ast.Invocation inv, Material input) {
-        VerbContext ctx = new VerbContext(world, inv, bus, input);
-        ExitCode code = def.action().execute(ctx);
-        return new StepResult(code, ctx.materialOut);
+    private void finishTurn(boolean terminalExecuted) {
+        if (!world.thrall().alive()) {
+            bus.post(new GameEvent.ThrallDied());
+        } else if (round.ap() == 0 || terminalExecuted) {
+            endRound();
+        }
     }
 
     public void endRound() {

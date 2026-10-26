@@ -18,7 +18,7 @@ public final class ShootVerb implements Verb {
         Resolved.Target resolved = c.resolveTarget(c.inv.arg(0));
         if (resolved == null) return ExitCode.BLOCKED;
 
-        Entity target = resolved.targetEntity().orElse(null);
+        Entity target = resolved.targetEntity();
         if (target == null) {
             return c.rejectBlocked("shoot needs an entity or body-part target");
         }
