@@ -207,7 +207,7 @@ public final class CommandManual {
                   ||   Recover after MISS, PARTIAL, or gameplay BLOCKED.
                        Example: strike o1 || guard
                   |    Pass actual material output within one pipeline stage.
-                       Example: siphon b1/contents | pour @o1/floor
+                       Example: siphon b1/contents | pour @o1
                 
                 BRANCHING:
                   Evaluate stages left to right. Skips preserve the last executed outcome.
@@ -224,7 +224,7 @@ public final class CommandManual {
                   There is no implicit forwarding of consumed input or fallback to operands.
                   Materials do not cross ;, &&, or ||. Earlier effects are not rolled back.
                   Pour emits nothing and Ignite accepts nothing. Sequence them instead:
-                    siphon b1/contents | pour @o1/floor && ignite @o1/floor
+                    siphon b1/contents | pour @o1 && ignite @o1
                 
                 TERMINAL COMMANDS:
                   Must be the final invocation, including on free-only lines.
@@ -246,8 +246,6 @@ public final class CommandManual {
                   @x,y                 Absolute tile, for example @3,4.
                   @self                The thrall's current tile.
                   @<entityId>          The tile occupied by an entity, for example @o1.
-                  @x,y/floor           Explicit floor layer.
-                  @x,y/ceiling         Explicit ceiling layer.
                   @<dir><distance>     Relative tile, for example @e2 or @sw1.
                 
                 THRALL INVENTORY:

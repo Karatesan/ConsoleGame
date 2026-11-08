@@ -63,14 +63,6 @@ public final class GameMap {
         return requireTile(position).tags.remove(Objects.requireNonNull(tag, "tag"));
     }
 
-    public void addCeilingTag(Vec2 position, Tag tag) {
-        requireTile(position).ceiling.add(Objects.requireNonNull(tag, "tag"));
-    }
-
-    public boolean removeCeilingTag(Vec2 position, Tag tag) {
-        return requireTile(position).ceiling.remove(Objects.requireNonNull(tag, "tag"));
-    }
-
     public void placeGroundItem(Vec2 position, Item item) {
         requireTile(position).ground.add(Objects.requireNonNull(item, "item"));
     }
@@ -95,18 +87,14 @@ public final class GameMap {
     public static final class Tile {
         private boolean wall;
         private final EnumSet<Tag> tags;
-        private final EnumSet<Tag> ceiling;
         private final ArrayList<Item> ground;
         private final Set<Tag> tagsView;
-        private final Set<Tag> ceilingView;
         private final List<Item> groundView;
 
         private Tile() {
             tags = EnumSet.noneOf(Tag.class);
-            ceiling = EnumSet.noneOf(Tag.class);
             ground = new ArrayList<>();
             tagsView = Collections.unmodifiableSet(tags);
-            ceilingView = Collections.unmodifiableSet(ceiling);
             groundView = Collections.unmodifiableList(ground);
         }
 
@@ -120,10 +108,6 @@ public final class GameMap {
 
         public Set<Tag> tags() {
             return tagsView;
-        }
-
-        public Set<Tag> ceiling() {
-            return ceilingView;
         }
 
         public List<Item> ground() {

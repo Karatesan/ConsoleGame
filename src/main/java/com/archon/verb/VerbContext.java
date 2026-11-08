@@ -45,8 +45,8 @@ public final class VerbContext extends ValidationContext {
 
     public Resolved.Target resolveTarget(String raw) {
         Resolved resolved = resolve(raw);
-        if (resolved instanceof Resolved.Failure(String reason)) {
-            say(reason);
+        if (resolved instanceof Resolved.Failure f) {
+            say(f.reason());
             return null;
         }
         return (Resolved.Target) resolved;
@@ -63,8 +63,8 @@ public final class VerbContext extends ValidationContext {
         }
 
         Resolved resolved = resolve(itemAddress(inv.arg(argIndex)));
-        if (resolved instanceof Resolved.Failure(String reason)) {
-            say(reason);
+        if (resolved instanceof Resolved.Failure f) {
+            say(f.reason());
             return null;
         }
         if (resolved instanceof Resolved.OnLocation) {
@@ -91,7 +91,7 @@ public final class VerbContext extends ValidationContext {
         if (target == null) return null;
 
         boolean accepted = target instanceof Resolved.OnEntity
-                || target.isFloorTile()
+                || target instanceof Resolved.OnTile
                 || (isThrow && target instanceof Resolved.OnBody);
         if (!accepted) {
             say(isThrow ? "throw needs an entity or floor target" : "pour needs an entity or floor tile");

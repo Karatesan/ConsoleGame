@@ -8,9 +8,10 @@ public sealed interface GameEvent {
     record RoundEnd(int wasted, List<String> worldLog)                                implements GameEvent {}
     record Rejected(ExitCode code, String reason, String hint)                        implements GameEvent {}
     record LineStart(String raw, int lineNo, int allocation, int tax, boolean chain)   implements GameEvent {}
+    record StageStart(int index, int total, String render)                             implements GameEvent {}
     record StageResult(int index, int total, String render, ExitCode code,
                        int charged, int apLeft)                                       implements GameEvent {}
-    record StageSkipped(int index, String render, String why)                          implements GameEvent {}
+    record StageSkipped(int index, int total, String render, String why)               implements GameEvent {}
     record LineComplete(int charged, int tax, int returnedUnused, int apLeft)          implements GameEvent {}
     record LineBroke(int stageIndex, String reason, int allocation, int penalty,
                      int forfeited, int apLeft, String hint)                          implements GameEvent {}

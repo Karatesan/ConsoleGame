@@ -1,6 +1,5 @@
 package com.archon.verb;
 
-import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.model.Item;
 import com.archon.model.ItemLocation;
@@ -18,16 +17,13 @@ public final class TakeVerb implements Verb {
         Resolved.Target target = c.resolveTarget(c.inv.arg(0));
         if (target == null) return ExitCode.BLOCKED;
 
-        if (target.isFloorTile()) {
+        if (target instanceof Resolved.OnTile) {
             var ground = c.world.tile(target.pos()).ground();
             if (!ground.isEmpty()) {
                 target = new Resolved.OnItem(ground.getFirst(), new ItemLocation.Ground(target.pos()));
             } else {
                 return c.rejectBlocked("nothing on the ground there");
             }
-        }
-        if (target.isCeilingTile()) {
-            return c.rejectBlocked("cannot take ground items from the ceiling");
         }
         if (target instanceof Resolved.OnLocation(var loc)) {
             return c.rejectBlocked(loc instanceof ItemLocation.Pack

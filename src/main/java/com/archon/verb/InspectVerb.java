@@ -1,7 +1,6 @@
 // src/main/java/com/archon/verb/InspectVerb.java
 package com.archon.verb;
 
-import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.model.*;
 
@@ -60,9 +59,6 @@ public final class InspectVerb implements Verb {
 
     private static String formatTile(World world, Resolved.OnTile target) {
         GameMap.Tile tile = world.tile(target.pos());
-        if (target.layer() == Address.Layer.CEILING) {
-            return target.pos() + " ceiling — tags " + tile.ceiling();
-        }
         return target.pos() + " " + (tile.isWall() ? "WALL" : "floor")
                 + " — tags " + tile.tags()
                 + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground());

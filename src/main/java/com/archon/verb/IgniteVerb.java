@@ -17,7 +17,7 @@ public final class IgniteVerb implements Verb {
         Resolved.Target target = c.resolveTarget(c.inv.arg(0));
         if (target == null) return ExitCode.BLOCKED;
 
-        if (!(target instanceof Resolved.OnEntity || target.isFloorTile())) {
+        if (!(target instanceof Resolved.OnEntity || target instanceof Resolved.OnTile)) {
             return c.rejectBlocked("ignite needs a whole entity or floor tile");
         }
         if (!c.checkReachable(target)) return ExitCode.BLOCKED;

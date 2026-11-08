@@ -1,0 +1,46 @@
+# --- Katalogi kompilacji i artefakty ---
+target/
+build/
+out/
+bin/
+*.class
+*.jar
+*.war
+*.ear
+
+# --- Wygenerowany kod (OpenAPI, MapStruct, gRPC, QueryDSL) ---
+# Agent powinien pracować na definicjach/interfejsach, a nie tysiącach linii wygenerowanego kodu
+**/generated/
+**/generated-sources/
+**/generated-test-sources/
+
+# --- Gradle & Maven cache/wrappers ---
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+.m2/
+
+# --- Konfiguracje IDE ---
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.factorypath
+
+# --- Zrzuty pamięci, logi i bazy testowe ---
+*.log
+*.hprof
+hs_err_pid*
+*.replay
+h2/
+h2.db
+
+# --- Pliki z sekretami ---
+**/secrets/
+*application-local.properties
+*application-local.yml
+*application-secret.*
+*.jks
+*.p12
+*.key
+.env*

@@ -85,7 +85,7 @@ public final class Executor {
 
             if (!shouldRun(stage.op(), lastCode)) {
                 String reason = stage.op() == Ast.Op.AND ? "&& requires SUCCESS" : "|| requires ordinary failure";
-                bus.post(new GameEvent.StageSkipped(stageNum, stage.render(), reason));
+                bus.post(new GameEvent.StageSkipped(stageNum, line.stages().size(), stage.render(), reason));
                 continue;
             }
 
@@ -97,6 +97,7 @@ public final class Executor {
                 }
             }
 
+            bus.post(new GameEvent.StageStart(stageNum, line.stages().size(), stage.render()));
             Material material = null;
             for (int p = 0; p < stage.pipeline().size(); p++) {
                 Ast.Invocation inv = stage.pipeline().get(p);

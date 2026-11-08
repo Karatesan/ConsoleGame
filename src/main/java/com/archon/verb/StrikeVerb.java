@@ -19,12 +19,7 @@ public final class StrikeVerb implements Verb {
     }
 
     private static ItemLocation.Equipment handSlot(Resolved.Target target) {
-        ItemLocation loc = switch (target) {
-            case Resolved.OnItem(var ignored, var l) -> l;
-            case Resolved.OnLocation(var l) -> l;
-            default -> null;
-        };
-        return loc instanceof ItemLocation.Equipment eq
+        return target.location() instanceof ItemLocation.Equipment eq
                 && (eq.slot() == EquipmentSlot.HAND_LEFT || eq.slot() == EquipmentSlot.HAND_RIGHT)
                 ? eq : null;
     }

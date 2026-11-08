@@ -1,6 +1,5 @@
 package com.archon.verb;
 
-import com.archon.address.Address;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.model.*;
@@ -57,8 +56,10 @@ public class ValidationContext {
         return raw.startsWith("@") || raw.contains("/") ? raw : "/pack/" + raw;
     }
 
-    private static Check checkRawAddress(String raw) {
-        return Address.parse(raw) instanceof Address.Invalid(String reason) ? Check.invalid(reason) : Check.ok();
+    private Check checkRawAddress(String raw) {
+        return resolve(raw) instanceof Resolved.Failure(String reason, boolean syntax) && syntax
+                ? Check.invalid(reason)
+                : Check.ok();
     }
 
     public Resolved resolve(String raw) {

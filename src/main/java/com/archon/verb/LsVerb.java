@@ -1,7 +1,6 @@
     // src/main/java/com/archon/verb/LsVerb.java
     package com.archon.verb;
 
-    import com.archon.address.Address;
     import com.archon.address.Resolved;
     import com.archon.model.ItemLocation;
     import com.archon.model.World;
@@ -37,10 +36,7 @@
                                 .toList());
                 case Resolved.OnLocation ignored -> "(empty)";
                 case Resolved.OnItem(var item, var ignored) -> "  " + item.id() + "  " + item.tags();
-                case Resolved.OnTile(var pos, var layer) ->
-                        layer == Address.Layer.CEILING
-                                ? "ceiling — tags " + world.tile(pos).ceiling()
-                                : world.tile(pos).ground().toString();
+                case Resolved.OnTile(var pos) -> world.tile(pos).ground().toString();
                 default -> null;
             };
         }

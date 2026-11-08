@@ -158,7 +158,7 @@ public final class DefaultVerbs {
                                 "ENVIRONMENT & ELEMENTAL", "[liquid] <tile|entity>", "Pour liquid",
                                 "Pours from a carried container or piped substance onto an adjacent "
                                         + "entity or floor tile. Keeps emptied containers and emits no material.",
-                                List.of("pour flask_oil @self", "siphon b1/contents | pour @o1/floor"))),
+                                List.of("pour flask_oil @self", "siphon b1/contents | pour @o1"))),
                 new VerbDefinition(
                         "siphon", new SiphonVerb(), List.of(), one, false, none, substances,
                         new Documentation(
@@ -166,15 +166,15 @@ public final class DefaultVerbs {
                                 "Consumes substance from a selected container or one liquid tag from a "
                                         + "reachable floor tile. Emits the extracted substance.",
                                 List.of("siphon b1/contents", "siphon @self",
-                                        "siphon b1/contents | pour @o1/floor"))),
+                                        "siphon b1/contents | pour @o1"))),
                 new VerbDefinition(
                         "ignite", new IgniteVerb(), List.of(), one, false, none, none,
                         new Documentation(
                                 "ENVIRONMENT & ELEMENTAL", "<entity|tile>", "Ignite a target",
                                 "Requires a lit item in hand and a reachable whole entity or floor tile. "
                                         + "Does not consume piped material; sequence it after pouring.",
-                                List.of("ignite o1", "ignite @o1/floor",
-                                        "siphon b1/contents | pour @o1/floor && ignite @o1/floor")))
+                                List.of("ignite o1", "ignite @o1",
+                                        "siphon b1/contents | pour @o1 && ignite @o1")))
         ));
         manual.bind(catalog);
         return catalog;

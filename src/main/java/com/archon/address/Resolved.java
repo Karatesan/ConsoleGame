@@ -2,6 +2,9 @@ package com.archon.address;
 
 import com.archon.model.*;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public sealed interface Resolved {
 
     sealed interface Target extends Resolved {
@@ -24,9 +27,15 @@ public sealed interface Resolved {
         public Vec2 pos() { return location.pos(); }
     }
 
-    record OnTile(Vec2 pos, Address.Layer layer) implements Target {}
+    record OnTile(Vec2 pos) implements Target {}
 
-    record Failure(String reason) implements Resolved {}
+    record Failure(String reason, boolean syntax) implements Resolved {
+        static Failure syntax(String reason) { return new Failure(reason, true); }
+        static Failure world(String reason) { return new Failure(reason, false); }
+    }
+
+    Pattern COORDINATES = Pattern.compile("([+-]?\\d+)\\s*,\\s*([+-]?\\d+)");
+    Pattern RELATIVE = Pattern.compile("(ne|nw|se|sw|n|s|e|w)(\\d+)?", Pattern.CASE_INSENSITIVE);
 
     default Entity targetEntity() {
         return switch (this) {
@@ -36,88 +45,122 @@ public sealed interface Resolved {
         };
     }
 
-    default boolean isFloorTile() {
-        return this instanceof OnTile(var ignored, var layer) && layer != Address.Layer.CEILING;
-    }
-
-    default boolean isCeilingTile() {
-        return this instanceof OnTile(var ignored, var layer) && layer == Address.Layer.CEILING;
-    }
-
-    static Resolved resolve(String raw, World world) {
-        return resolve(Address.parse(raw), world);
-    }
-
-    static Resolved resolve(Address address, World world) {
-        return switch (address) {
-            case Address.Invalid(String reason) -> new Failure(reason);
-
-
-            case Address.EntityAddr entity -> resolveEntity(entity, world);
-            case Address.InventoryAddr inventory -> resolveInventory(world.thrall(), inventory.path());
-            case Address.TileAddr tile -> resolveTile(tile, world);
+    default ItemLocation location() {
+        return switch (this) {
+            case OnItem(var ignored, var loc) -> loc;
+            case OnLocation(var loc) -> loc;
+            default -> null;
         };
     }
 
-    private static Resolved resolveEntity(Address.EntityAddr address, World world) {
-        Entity entity = world.get(address.id());
-        if (entity == null) {
-            return new Failure("unknown entity \"" + address.id() + "\"");
+    static Resolved resolve(String source, World world) {
+        if (source == null || source.isBlank()) {
+            return Failure.syntax("empty address");
         }
-        if (!entity.alive()) {
-            return new Failure(entity.id() + " is no longer alive");
+        if (source.endsWith("/") || source.contains("//")) {
+            return Failure.syntax("address contains an empty path segment");
+        }
+        if (source.startsWith("@")) {
+            return resolveTile(source.substring(1), world);
+        }
+        if (source.startsWith("/")) {
+            return resolvePath(source.substring(1), false, null, world);
         }
 
-        return switch (address.path()) {
-            case Address.RootPath ignored -> new OnEntity(entity);
-            case Address.ContentsPath ignored when entity instanceof Prop prop ->
-                    selection(prop.contents(), new ItemLocation.Contents(prop));
-            case Address.BodyPath(BodyPart part) when entity instanceof Actor actor ->
-                    new OnBody(actor, part);
-            case Address.Path path when entity instanceof Actor actor ->
-                    resolveInventory(actor, path);
-            default -> new Failure("target does not support that path");
-        };
+        int slash = source.indexOf('/');
+        String id = slash < 0 ? source : source.substring(0, slash);
+        if (id.isBlank()) {
+            return Failure.syntax("empty entity ID");
+        }
+        return resolvePath(slash < 0 ? "" : source.substring(slash + 1), true, id, world);
     }
 
-    private static Resolved resolveInventory(Actor actor, Address.Path path) {
-        return switch (path) {
-            case Address.PackPath(String query) -> query == null
-                    ? new OnLocation(new ItemLocation.Pack(actor))
-                    : actor.inventory().find(query)
-                    .<Resolved>map(item -> new OnItem(item, new ItemLocation.Pack(actor)))
-                    .orElseGet(() -> new Failure("no packed item \"" + query + "\" on " + actor.id()));
-            case Address.SlotPath(EquipmentSlot slot) ->
-                    selection(actor.inventory().equipped(slot), new ItemLocation.Equipment(actor, slot));
-            default -> new Failure("target does not support that path");
-        };
+    private static Resolved resolvePath(String text, boolean isEntity, String id, World world) {
+        BodyPart part = null;
+        String query = null;
+        EquipmentSlot slot = null;
+
+        if (isEntity && (text.isEmpty() || text.equals("contents"))) {
+            // valid entity-level path
+        } else if (isEntity && text.startsWith("body/")) {
+            part = BodyPart.parse(text.substring("body/".length()));
+            if (part == null) return Failure.syntax("unknown target path \"" + text + "\"");
+        } else if (text.equals("pack")) {
+            // valid pack root
+        } else if (text.startsWith("pack/")) {
+            query = text.substring("pack/".length());
+            if (query.isBlank()) return Failure.syntax("unknown target path \"" + text + "\"");
+        } else {
+            slot = EquipmentSlot.parse(text).orElse(null);
+            if (slot == null) return Failure.syntax("unknown target path \"" + text + "\"");
+        }
+
+        Entity entity = isEntity ? world.get(id) : world.thrall();
+        if (entity == null) return Failure.world("unknown entity \"" + id + "\"");
+        if (!entity.alive()) return Failure.world(entity.id() + " is no longer alive");
+
+        if (text.isEmpty()) return new OnEntity(entity);
+        if (text.equals("contents")) {
+            return entity instanceof Prop prop
+                    ? selection(prop.contents(), new ItemLocation.Contents(prop))
+                    : Failure.world("target does not support that path");
+        }
+        if (!(entity instanceof Actor actor)) {
+            return Failure.world("target does not support that path");
+        }
+        if (part != null) return new OnBody(actor, part);
+        if (slot != null) return selection(actor.inventory().equipped(slot), new ItemLocation.Equipment(actor, slot));
+        if (query == null) return new OnLocation(new ItemLocation.Pack(actor));
+        Item item = actor.inventory().find(query).orElse(null);
+        return item != null
+                ? new OnItem(item, new ItemLocation.Pack(actor))
+                : Failure.world("no packed item \"" + query + "\" on " + actor.id());
     }
 
-    private static Resolved resolveTile(Address.TileAddr address, World world) {
-        return switch (address.spec()) {
-            case Address.AbsoluteTile(int x, int y) -> bounded(x, y, address.layer(), world);
-            case Address.RelativeTile(Vec2 dir, int dist) -> bounded(
-                    world.thrall().pos().x() + (long) dir.x() * dist,
-                    world.thrall().pos().y() + (long) dir.y() * dist,
-                    address.layer(), world);
-            case Address.AnchorTile(String id) -> {
-                Entity anchor = id.equalsIgnoreCase("self") ? world.thrall() : world.get(id);
-                if (anchor == null) {
-                    yield new Failure("unknown tile reference \"" + id + "\"; use @x,y, @self, @e2, or @entityId");
+    private static Resolved resolveTile(String spec, World world) {
+        if (spec.isBlank()) {
+            return Failure.syntax("empty tile specification");
+        }
+        if (spec.contains("/")) {
+            return Failure.syntax("tile address does not take a path");
+        }
+
+        try {
+            if (spec.contains(",")) {
+                Matcher coords = COORDINATES.matcher(spec.trim());
+                if (!coords.matches()) {
+                    return Failure.syntax("invalid coordinates \"" + spec + "\"; use @x,y");
                 }
-                if (!anchor.alive()) {
-                    yield new Failure(anchor.id() + " is no longer alive");
-                }
-                yield bounded(anchor.pos().x(), anchor.pos().y(), address.layer(), world);
+                return bounded(Integer.parseInt(coords.group(1)), Integer.parseInt(coords.group(2)), world);
             }
-        };
+            Matcher rel = RELATIVE.matcher(spec);
+            if (rel.matches()) {
+                Vec2 dir = Vec2.dir(rel.group(1));
+                int dist = rel.group(2) == null ? 1 : Integer.parseInt(rel.group(2));
+                return bounded(
+                        world.thrall().pos().x() + (long) dir.x() * dist,
+                        world.thrall().pos().y() + (long) dir.y() * dist,
+                        world);
+            }
+        } catch (NumberFormatException exception) {
+            return Failure.syntax("tile coordinate or distance is too large in \"" + spec + "\"");
+        }
+
+        Entity anchor = spec.equalsIgnoreCase("self") ? world.thrall() : world.get(spec);
+        if (anchor == null) {
+            return Failure.world("unknown tile reference \"" + spec + "\"; use @x,y, @self, @e2, or @entityId");
+        }
+        if (!anchor.alive()) {
+            return Failure.world(anchor.id() + " is no longer alive");
+        }
+        return bounded(anchor.pos().x(), anchor.pos().y(), world);
     }
 
-    private static Resolved bounded(long x, long y, Address.Layer layer, World world) {
+    private static Resolved bounded(long x, long y, World world) {
         if (x < 0 || y < 0 || x >= world.width() || y >= world.height()) {
-            return new Failure("tile (" + x + "," + y + ") is outside the map");
+            return Failure.world("tile (" + x + "," + y + ") is outside the map");
         }
-        return new OnTile(new Vec2((int) x, (int) y), layer);
+        return new OnTile(new Vec2((int) x, (int) y));
     }
 
     private static Resolved selection(Item item, ItemLocation location) {

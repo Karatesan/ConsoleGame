@@ -29,57 +29,72 @@ public final class ConsoleView implements View {
         }
     }
 
+    private void indent(String text) {
+        for (String line : text.split("\\R")) {
+            System.out.printf("           %s%n", line);
+        }
+    }
+
     @Override
     public void handle(GameEvent event) {
         switch (event) {
-            case GameEvent.Narrative narrative -> emit("|", narrative.text());
+            case GameEvent.Narrative narrative -> indent(narrative.text());
             case GameEvent.Redraw redraw -> forceMap = true;
 
             case GameEvent.Rejected rejected -> {
-                emit("REJECT", rejected.code() + " — " + rejected.reason());
+                emit("REJECT", rejected.code().name() + " — " + rejected.reason());
                 if (rejected.hint() != null) {
                     emit("HINT", rejected.hint());
                 }
                 emit("COST", "No AP spent; paid-line count unchanged.");
             }
             case GameEvent.LineStart start -> emit("RUN",
-                    start.raw() + " | Allocation " + start.allocation() + " AP | Tax " + start.tax() + " AP");
+                    String.format("%s  (alloc %d AP, tax %d AP)", start.raw(), start.allocation(), start.tax()));
 
-            case GameEvent.StageResult result -> emit("RESULT",
-                    result.total() == 1 ? result.code().name() : String.format("%d/%d %s | Trace charge %d AP | %s",
-                            result.index(), result.total(), result.code(), result.charged(), result.render()));
+            case GameEvent.StageStart start -> {
+                if (start.total() > 1) {
+                    emit("[" + start.index() + "/" + start.total() + "]", start.render());
+                }
+            }
 
-            case GameEvent.StageSkipped skipped ->
-                    emit("SKIP", skipped.index() + " " + skipped.render() + " | " + skipped.why());
+            case GameEvent.StageResult result -> {
+                String charge = result.charged() > 0 ? " (" + result.charged() + " AP)" : "";
+                System.out.printf("         -> %s%s%n", result.code().name(), charge);
+            }
 
-            case GameEvent.LineComplete complete -> emit("COST",
-                    String.format("%d AP charged | Tax %d AP | Remaining %d AP", complete.charged(), complete.tax(),
-                            complete.apLeft()));
+            case GameEvent.StageSkipped skipped -> {
+                emit("[" + skipped.index() + "/" + skipped.total() + "]", skipped.render());
+                System.out.printf("         -> SKIPPED (%s)%n", skipped.why());
+            }
+
+            case GameEvent.LineComplete complete -> {
+                int total = complete.charged() + complete.tax();
+                emit("COST", String.format("%d AP spent (%d AP stages + %d AP tax) -> %d AP left",
+                        total, complete.charged(), complete.tax(), complete.apLeft()));
+            }
 
             case GameEvent.LineBroke broke -> {
                 emit("BREAK", broke.reason());
-                emit("COST", "Forfeited " + broke.forfeited() + " AP | Remaining " + broke.apLeft() + " AP");
-                emit("|",
-                        "Allocation " + broke.allocation() + " + penalty " + broke.penalty() + ", capped by AP after tax.");
-                emit("|", "Replaces stage charges; excludes commitment tax.");
+                emit("COST", "Forfeited " + broke.forfeited() + " AP -> " + broke.apLeft() + " AP left");
+                indent("Allocation " + broke.allocation() + " + penalty " + broke.penalty() + ", capped by AP after tax.");
+                indent("Replaces stage charges; excludes commitment tax.");
                 if (broke.hint() != null) {
                     emit("HINT", broke.hint());
                 }
             }
             case GameEvent.InterruptFired interrupt -> emit("REACT",
-                    interrupt.source() + " — " + interrupt.description() + " | " + interrupt.damage() + " dmg");
+                    interrupt.source() + " — " + interrupt.description() + " (" + interrupt.damage() + " dmg)");
 
             case GameEvent.RoundEnd end -> {
-                emit("ROUND", "Ended | Unspent AP discarded: " + end.wasted());
-                end.worldLog().forEach(line -> emit("|", line));
+                emit("ROUND", "Ended (unspent AP discarded: " + end.wasted() + ")");
+                end.worldLog().forEach(this::indent);
             }
-            case GameEvent.RoundStart start -> emit("ROUND", start.round() + " begins | AP " + start.ap());
+            case GameEvent.RoundStart start -> emit("ROUND", start.round() + " begins (AP " + start.ap() + ")");
 
             case GameEvent.ThrallDied died -> {
                 emit("DEATH", "THE THRALL COLLAPSES. THE LINK GOES DARK.");
                 forceMap = true;
             }
-            default -> throw new IllegalStateException("Unexpected value: " + event);
         }
     }
 
@@ -91,7 +106,8 @@ public final class ConsoleView implements View {
             return;
         }
 
-        System.out.printf("%n--- %s ---%n", world.thrall().alive() ? "STATE" : "RUN ENDED");
+        System.out.printf("%n--- %s ---%n",
+                world.thrall().alive() ? "STATE (Round " + round.roundNo() + ")" : "RUN ENDED");
         System.out.print(status);
         if (forceMap || !world.thrall().alive() || !map.equals(lastMap)) {
             System.out.println();
@@ -143,12 +159,23 @@ public final class ConsoleView implements View {
         Thrall thrall = world.thrall();
         String conditions = Stream.of(Tag.BURNING, Tag.WET, Tag.FROZEN, Tag.CORRODED, Tag.PRONE, Tag.STUNNED,
                 Tag.BLIND).filter(thrall::has).map(Tag::name).collect(Collectors.joining(", "));
-        String pips = "* ".repeat(round.ap()) + "o ".repeat(round.rules().roundAp() - round.ap());
+        String pips = ("* ".repeat(round.ap()) + "o ".repeat(round.rules().roundAp() - round.ap())).stripTrailing();
+        String taxInfo = thrall.alive()
+                ? String.format("   (Paid lines: %d | Next tax: %d AP)",
+                        round.linesUsed(), round.rules().taxForNextLine(round.linesUsed()))
+                : "";
 
-        return "Round " + round.roundNo() + "   HP " + thrall.hp() + "/" + thrall.maxHp() + "   AP [" + pips.stripTrailing() + "] " + round.ap() + "/" + round.rules().roundAp() + "\nRight: " + name(
-                thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)) + "   Left: " + name(thrall.inventory().equipped(
-                EquipmentSlot.HAND_LEFT)) + "   Pack: " + thrall.inventory().pack().size() + "/" + Inventory.PACK_MAX + "\nConditions: " + (conditions.isEmpty() ? "none" : conditions) + "   Guard: " + (thrall.isGuarded() ? "raised" : "down") + "   Arrow: " + (thrall.isNocked() ? "nocked" : "not nocked") + (thrall.alive() ? "\nPaid lines: " + round.linesUsed() + "   Next tax: " + round.rules().taxForNextLine(
-                round.linesUsed()) + " AP" : "") + "\n";
+        return String.format(
+                "HP %d/%d   AP [%s] %d/%d%s%n"
+                        + "Hands: [R] %s   [L] %s   Pack: %d/%d%n"
+                        + "Status: Guard %s | Arrow %s | Conditions: %s%n",
+                thrall.hp(), thrall.maxHp(), pips, round.ap(), round.rules().roundAp(), taxInfo,
+                name(thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
+                name(thrall.inventory().equipped(EquipmentSlot.HAND_LEFT)),
+                thrall.inventory().pack().size(), Inventory.PACK_MAX,
+                thrall.isGuarded() ? "raised" : "down",
+                thrall.isNocked() ? "nocked" : "not nocked",
+                conditions.isEmpty() ? "none" : conditions);
     }
 
     private String name(Item item) {

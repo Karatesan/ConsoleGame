@@ -31,7 +31,7 @@ public final class Substances {
             return item.consumeSubstance();
         }
 
-        if (source.isFloorTile()) {
+        if (source instanceof Resolved.OnTile) {
             GameMap.Tile tile = requireDestination(world, source.pos());
             Tag substance = tile.has(Tag.OIL) ? Tag.OIL : tile.has(Tag.WATER) ? Tag.WATER : null;
             if (substance != null && !world.map().removeTag(source.pos(), substance)) {
