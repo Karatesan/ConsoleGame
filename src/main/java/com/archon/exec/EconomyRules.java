@@ -14,7 +14,11 @@ public record EconomyRules(
     }
 
     public static EconomyRules prototype() {
-        return new EconomyRules(6, 1, 1, 1);
+        return new EconomyRules(
+                com.archon.model.Balance.DEFAULT_ROUND_AP,
+                com.archon.model.Balance.DEFAULT_UNTAXED_LINES,
+                com.archon.model.Balance.DEFAULT_LINE_TAX,
+                com.archon.model.Balance.DEFAULT_BREAK_PENALTY);
     }
 
     public int taxForNextLine(int linesUsed) {

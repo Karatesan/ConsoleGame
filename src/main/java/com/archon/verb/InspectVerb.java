@@ -26,6 +26,7 @@ public final class InspectVerb implements Verb {
             case Resolved.OnBody(Actor actor, BodyPart part) -> formatEntity(actor, part);
             case Resolved.OnItem(Item item, var ignored) ->
                     item.name() + " — tags " + item.tags()
+                            + (item.maxDamage() > 0 ? ", dmg " + item.minDamage() + "-" + item.maxDamage() : "")
                             + (item.substance() == null ? "" : ", contains " + item.substance());
             case Resolved.OnLocation(ItemLocation.Pack(var owner)) ->
                     owner.id() + "/pack — " + owner.inventory().pack();
@@ -43,6 +44,10 @@ public final class InspectVerb implements Verb {
             if (actor.mainHand() != null) {
                 out.append("\n  Holding: ").append(actor.mainHand().name());
             }
+            if (actor.isGuarded()) {
+                out.append(String.format("\n  GUARDED: +%d%% armor, -%d%% melee hit chance (bypass with -f)",
+                        Balance.GUARD_ARMOR_BONUS_PCT, Balance.GUARD_MELEE_HIT_PENALTY));
+            }
             if (actor.readied() != null && !actor.isReadiedSpent()) {
                 out.append("\n  READIED: ").append(actor.readied().description())
                         .append(" (").append(actor.readied().damage()).append(" dmg)");
@@ -51,7 +56,7 @@ public final class InspectVerb implements Verb {
                 if (focus != null && focus != part) continue;
                 out.append(String.format("%n  %-6s aim %+d  melee x%.1f%s",
                         part.path, part.hitMod, part.damageMult,
-                        Boolean.TRUE.equals(actor.crippled().get(part)) ? " CRIPPLED" : ""));
+                        actor.isCrippled(part) ? " CRIPPLED" : ""));
             }
         }
         return out.toString();

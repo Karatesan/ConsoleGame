@@ -1,11 +1,13 @@
 package com.archon.model;
 
+import static com.archon.model.Balance.*;
+
 public enum BodyPart {
-    HEAD ("head",  "h",  -30, 2.5),
-    TORSO("torso", "t",  +10, 1.0),
-    ARM_L("arm.l", "la", -10, 1.0),
-    ARM_R("arm.r", "ra", -10, 1.0),
-    LEGS ("legs",  "l",   -5, 0.8);
+    HEAD ("head",  "h",  HEAD_HIT_MOD,  HEAD_DMG_MULT),
+    TORSO("torso", "t",  TORSO_HIT_MOD, TORSO_DMG_MULT),
+    ARM_L("arm.l", "la", ARM_L_HIT_MOD, ARM_L_DMG_MULT),
+    ARM_R("arm.r", "ra", ARM_R_HIT_MOD, ARM_R_DMG_MULT),
+    LEGS ("legs",  "l",  LEGS_HIT_MOD,  LEGS_DMG_MULT);
 
     public final String path, shortName;
     public final int hitMod;

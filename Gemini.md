@@ -20,3 +20,5 @@ We are building a game with a C++ / data-oriented mindset, NOT enterprise softwa
 ### 4. Game Loop Performance (Update / Tick)
 - Avoid heap allocations (`new Object()`) inside frame/tick routines (`update`, `render`).
 - Prefer simple arrays, flat contiguous collections, and classic index-based loops (`for (int i = 0; ...)`) over heavy Java Streams (`Stream.map().filter()`) to prevent Garbage Collection pressure.
+
+For gaining info about dependencies use rg ... commandline tool 

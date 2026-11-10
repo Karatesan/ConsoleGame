@@ -10,7 +10,7 @@ import java.util.Optional;
 
 /** Equipment and carried items. Every item instance occupies at most one location. */
 public final class Inventory {
-    public static final int PACK_MAX = 8;
+    public static final int PACK_MAX = Balance.PACK_MAX;
 
     private final EnumMap<EquipmentSlot, Item> equipment = new EnumMap<>(EquipmentSlot.class);
     private final ArrayList<Item> pack = new ArrayList<>();

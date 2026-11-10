@@ -14,6 +14,6 @@ public record CreatureStats(int maxHp, int armor, int evasion, int strength) {
      * @param evasion initial evasion value
      */
     public CreatureStats(int maxHp, int armor, int evasion) {
-        this(maxHp, armor, evasion, 3);
+        this(maxHp, armor, evasion, Balance.DEFAULT_STRENGTH);
     }
 }

@@ -1,8 +1,6 @@
 package com.archon.model;
 
-import java.util.Collections;
 import java.util.EnumMap;
-import java.util.Map;
 import java.util.Objects;
 
 /** A creature with strength, equipment, carried items, and ranged-weapon state. */
@@ -61,8 +59,19 @@ public class Actor extends Entity {
         return inventory;
     }
 
-    public Map<BodyPart, Boolean> crippled() {
-        return Collections.unmodifiableMap(crippled);
+    public boolean isCrippled(BodyPart part) {
+        return Boolean.TRUE.equals(crippled.get(part));
+    }
+
+    public boolean cripple(BodyPart part) {
+        if (crippled.put(part, true)) {
+            return false;
+        }
+        if (part == BodyPart.HEAD) {
+            guarded = false;
+            clearReadied();
+        }
+        return true;
     }
 
     public int strength() {
@@ -93,6 +102,11 @@ public class Actor extends Entity {
 
     public void spendReadied() {
         readiedSpent = true;
+    }
+
+    public void clearReadied() {
+        readied = null;
+        readiedSpent = false;
     }
 
     public void resetRoundState() {

@@ -8,4 +8,6 @@ import com.archon.model.World;
 public interface View {
     void handle(GameEvent event);
     void frame(World world, RoundState round);
+    /** Draws an intermediate state during enemy-phase playback; prev is the previously shown scene. */
+    void scene(Scene scene, Scene prev);
 }

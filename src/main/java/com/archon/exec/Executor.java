@@ -8,7 +8,6 @@ import com.archon.model.World;
 import com.archon.system.combat.Reaction;
 import com.archon.verb.*;
 
-import java.util.List;
 import java.util.function.Supplier;
 
 public final class Executor {
@@ -20,10 +19,10 @@ public final class Executor {
     private final CommandParser parser;
     private final Validator validator;
     private final Interrupts interrupts;
-    private final Supplier<List<String>> tick;
+    private final Runnable tick;
 
     public Executor(World world, EventBus bus, RoundState round, VerbCatalog catalog,
-                    Interrupts interrupts, Supplier<List<String>> tick) {
+                    Interrupts interrupts, Runnable tick) {
         this.world = world;
         this.bus = bus;
         this.round = round;
@@ -166,8 +165,9 @@ public final class Executor {
     }
 
     public void endRound() {
-        List<String> worldLog = tick.get();
-        bus.post(new GameEvent.RoundEnd(round.reset(), worldLog));
+        bus.post(new GameEvent.EnemyPhaseStart());
+        tick.run();
+        bus.post(new GameEvent.RoundEnd(round.reset()));
         bus.post(world.thrall().alive() ? new GameEvent.RoundStart(round.roundNo(), round.ap()) : new GameEvent.ThrallDied());
     }
 }

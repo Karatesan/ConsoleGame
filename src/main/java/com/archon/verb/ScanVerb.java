@@ -23,8 +23,11 @@ public final class ScanVerb implements Verb {
                     e.hp(),
                     e.maxHp(),
                     e.tags().contains(Tag.BURNING) ? "[BURNING] " : "",
-                    e instanceof Actor actor && actor.readied() != null
-                            ? "[READIED: " + actor.readied().description() + "] "
+                    e instanceof Actor actor
+                            ? (actor.isGuarded() ? "[GUARDED] " : "")
+                              + (actor.readied() != null && !actor.isReadiedSpent()
+                                      ? "[READIED: " + actor.readied().description() + "] "
+                                      : "")
                             : "",
                     e.pos().chebyshev(c.thrall.pos()) <= 1
                             ? "adjacent"

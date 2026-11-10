@@ -2,6 +2,7 @@ package com.archon.app;
 
 import com.archon.command.FlagSpec;
 import com.archon.exec.EconomyRules;
+import com.archon.model.Balance;
 import com.archon.verb.*;
 import com.archon.verb.VerbDefinition.Documentation;
 import java.util.List;
@@ -95,7 +96,10 @@ public final class DefaultVerbs {
                                 List.of("step e", "step nw -c", "step w ; strike o1"))),
                 new VerbDefinition(
                         "strike", new StrikeVerb(), List.of(aim, power, force),
-                        new ApCost.ByValue("power", 2, Map.of("light", 1, "normal", 2, "heavy", 3)),
+                        new ApCost.ByValue("power", Balance.NORMAL_AP_COST, Map.of(
+                                "light", Balance.LIGHT_AP_COST,
+                                "normal", Balance.NORMAL_AP_COST,
+                                "heavy", Balance.HEAVY_AP_COST)),
                         false, none, none,
                         new Documentation(
                                 "COMBAT", "[target]", "Melee attack or disarm attempt",
@@ -107,7 +111,9 @@ public final class DefaultVerbs {
                         "guard", new GuardVerb(), List.of(), one, false, none, none,
                         new Documentation(
                                 "COMBAT", "", "Raise defense",
-                                "Raises guard, increasing armor by 30% until the next round.",
+                                "Raises guard, increasing armor by " + Balance.GUARD_ARMOR_BONUS_PCT
+                                        + "% and reducing enemy melee hit chance by " + Balance.GUARD_MELEE_HIT_PENALTY
+                                        + "% until the next round.",
                                 List.of("guard", "strike o1 || guard"))),
                 new VerbDefinition(
                         "nock", new NockVerb(), List.of(), one, false, none, none,

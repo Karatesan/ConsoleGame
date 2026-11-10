@@ -2,16 +2,12 @@ package com.archon.ui;
 
 import com.archon.event.GameEvent;
 import com.archon.exec.RoundState;
-import com.archon.model.Entity;
 import com.archon.model.EquipmentSlot;
-import com.archon.model.GameMap;
 import com.archon.model.Inventory;
 import com.archon.model.Item;
 import com.archon.model.Tag;
 import com.archon.model.Thrall;
-import com.archon.model.Vec2;
 import com.archon.model.World;
-import com.archon.system.spatial.SpatialService;
 
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -85,10 +81,18 @@ public final class ConsoleView implements View {
             case GameEvent.InterruptFired interrupt -> emit("REACT",
                     interrupt.source() + " — " + interrupt.description() + " (" + interrupt.damage() + " dmg)");
 
-            case GameEvent.RoundEnd end -> {
-                emit("ROUND", "Ended (unspent AP discarded: " + end.wasted() + ")");
-                end.worldLog().forEach(this::indent);
+            case GameEvent.RoundEnd end -> emit("ROUND", "Ended (unspent AP discarded: " + end.wasted() + ")");
+            case GameEvent.EnemyPhaseStart start -> { }
+            case GameEvent.Thinking thinking -> {
+                System.out.print("\r  ENEMY  " + ".".repeat(thinking.dots()));
+                if (thinking.dots() == 3) System.out.println();
+                System.out.flush();
             }
+            case GameEvent.ActorBeat beat -> {
+                emit(beat.id(), beat.name() + (beat.from().equals(beat.to()) ? "" : " " + beat.from() + " -> " + beat.to()));
+                beat.lines().forEach(this::indent);
+            }
+            case GameEvent.EnvBeat beat -> beat.lines().forEach(this::indent);
             case GameEvent.RoundStart start -> emit("ROUND", start.round() + " begins (AP " + start.ap() + ")");
 
             case GameEvent.ThrallDied died -> {
@@ -100,7 +104,7 @@ public final class ConsoleView implements View {
 
     @Override
     public void frame(World world, RoundState round) {
-        String map = grid(world);
+        String map = grid(new Scene(world), null);
         String status = hud(world, round);
         if (!forceMap && map.equals(lastMap) && status.equals(lastStatus)) {
             return;
@@ -120,39 +124,37 @@ public final class ConsoleView implements View {
         forceMap = false;
     }
 
-    private String grid(World world) {
-        StringBuilder output = new StringBuilder("    ");
-        for (int x = 0; x < world.width(); x++) {
-            output.append(x % 10).append(' ');
+    @Override
+    public void scene(Scene scene, Scene prev) {
+        System.out.print(grid(scene, prev));
+        lastMap = grid(scene, null);
+    }
+
+    /** Ids on the map; "id*" = moved this beat, "(id)" = where it came from. */
+    private String grid(Scene s, Scene prev) {
+        StringBuilder out = new StringBuilder("     ");
+        for (int x = 0; x < s.w; x++) out.append(String.format("%-5d", x));
+        out.append('\n');
+        for (int y = 0; y < s.h; y++) {
+            out.append(String.format("%3d  ", y));
+            for (int x = 0; x < s.w; x++) out.append(String.format("%-5s", cell(s, prev, x, y)));
+            out.append('\n');
         }
-        output.append('\n');
+        return out.toString();
+    }
 
-        for (int y = 0; y < world.height(); y++) {
-            output.append(String.format("%3d ", y));
-            for (int x = 0; x < world.width(); x++) {
-                Vec2 position = new Vec2(x, y);
-                GameMap.Tile tile = world.tile(position);
-                Entity entity = SpatialService.entityAt(world, position);
-                char glyph = '.';
-
-                if (tile.isWall()) {
-                    glyph = '#';
-                } else if (entity != null) {
-                    glyph = entity.glyph();
-                } else if (tile.has(Tag.BURNING)) {
-                    glyph = '*';
-                } else if (tile.has(Tag.OIL)) {
-                    glyph = '~';
-                } else if (!tile.ground().isEmpty()) {
-                    glyph = '%';
-                }
-
-                output.append(glyph).append(' ');
+    private String cell(Scene s, Scene prev, int x, int y) {
+        for (int i = 0; i < s.n; i++) {
+            if (s.hp[i] <= 0) continue;
+            String label = i == 0 ? "@" : s.id[i];
+            if (s.x[i] == x && s.y[i] == y) return prev != null && s.moved(i, prev) ? label + "*" : label;
+            if (prev != null && s.moved(i, prev)) {
+                int p = prev.indexOf(s.id[i]);
+                if (prev.x[p] == x && prev.y[p] == y) return "(" + label + ")";
             }
-            output.append('\n');
         }
-
-        return output.toString();
+        int t = y * s.w + x;
+        return s.wall[t] ? "####" : s.burning[t] ? "*" : s.oil[t] ? "~" : s.loot[t] ? "%" : ".";
     }
 
     private String hud(World world, RoundState round) {

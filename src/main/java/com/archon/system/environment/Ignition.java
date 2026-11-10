@@ -26,6 +26,10 @@ public final class Ignition {
 
     public static boolean entity(Entity entity) {
         Objects.requireNonNull(entity, "entity");
+        if (entity.has(Tag.WET)) {
+            entity.removeTag(Tag.WET);
+            return false;
+        }
         if (!entity.has(Tag.FLAMMABLE)) {
             return false;
         }
@@ -40,6 +44,10 @@ public final class Ignition {
         GameMap.Tile tile = world.map().tile(at);
         if (tile == null) {
             throw new IllegalArgumentException("Position is outside the map: " + at);
+        }
+        if (tile.has(Tag.WATER)) {
+            world.map().removeTag(at, Tag.WATER);
+            return false;
         }
         if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
             return false;

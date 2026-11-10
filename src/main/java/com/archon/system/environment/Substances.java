@@ -87,16 +87,21 @@ public final class Substances {
         map.addTag(at, Tag.LIQUID);
         map.addTag(at, substance);
 
+        Entity occupant = SpatialService.entityAt(world, at);
         if (substance == Tag.OIL) {
             map.addTag(at, Tag.FLAMMABLE);
+            if (occupant != null) {
+                occupant.applyTag(Tag.FLAMMABLE);
+                occupant.removeTag(Tag.WET);
+            }
         }
         if (substance == Tag.WATER) {
             map.addTag(at, Tag.CONDUCTIVE);
-        }
-
-        Entity occupant = SpatialService.entityAt(world, at);
-        if (occupant != null && substance == Tag.OIL) {
-            occupant.applyTag(Tag.FLAMMABLE);
+            map.removeTag(at, Tag.BURNING);
+            if (occupant != null) {
+                occupant.extinguish();
+                occupant.applyTag(Tag.WET);
+            }
         }
     }
 }

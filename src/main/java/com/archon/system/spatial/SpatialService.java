@@ -66,4 +66,26 @@ public final class SpatialService {
     public static boolean lineOfSight(World world, Vec2 a, Vec2 b) {
         return lineOfSight(world.map(), a, b);
     }
+
+    /** Strictly 4-way cardinal line of fire; blocked by walls and any intervening entity. */
+    public static boolean lineOfFire(World world, Vec2 a, Vec2 b) {
+        if (a.equals(b) || (a.x() != b.x() && a.y() != b.y())) {
+            return false;
+        }
+        int sx = Integer.compare(b.x(), a.x());
+        int sy = Integer.compare(b.y(), a.y());
+        int x = a.x() + sx;
+        int y = a.y() + sy;
+
+        while (x != b.x() || y != b.y()) {
+            Vec2 p = new Vec2(x, y);
+            GameMap.Tile tile = world.tile(p);
+            if (tile == null || tile.isWall() || entityAt(world, p) != null) {
+                return false;
+            }
+            x += sx;
+            y += sy;
+        }
+        return true;
+    }
 }

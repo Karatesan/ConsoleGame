@@ -3,6 +3,7 @@ package com.archon.verb;
 import com.archon.address.Resolved;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
 import com.archon.system.spatial.SpatialService;
 
@@ -25,8 +26,11 @@ public final class ShootVerb implements Verb {
         if (!c.thrall.isNocked()) {
             return c.rejectBlocked("nothing nocked");
         }
-        if (!SpatialService.lineOfSight(c.world, c.thrall.pos(), target.pos())) {
-            return c.rejectBlocked("no line of fire");
+        if (c.thrall.has(Tag.BLIND)) {
+            return c.rejectBlocked("blinded — cannot aim ranged weapon");
+        }
+        if (!SpatialService.lineOfFire(c.world, c.thrall.pos(), target.pos())) {
+            return c.rejectBlocked("no straight line of fire");
         }
 
         BodyPart part = c.aimPart(resolved);
@@ -38,7 +42,14 @@ public final class ShootVerb implements Verb {
             return ExitCode.MISS;
         }
 
-        c.say("Arrow strikes " + target.name() + "'s " + part.path + ". " + result.damage() + " dmg.");
+        String crit = result.crit() ? "CRITICAL! " : "";
+        c.say(crit + "Arrow strikes " + target.name() + "'s " + part.path + ". " + result.damage() + " dmg.");
+        if (result.crippledPart()) {
+            c.say(target.name() + "'s " + part.path + " is crippled!");
+        }
+        if (result.blindedTarget()) {
+            c.say(target.name() + " is blinded!");
+        }
         if (result.killed()) {
             c.say(target.name() + " falls.");
         }

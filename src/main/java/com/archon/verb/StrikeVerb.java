@@ -64,11 +64,19 @@ public final class StrikeVerb implements Verb {
             c.say("Strike at " + entity.name() + "'s " + part.path + " — MISS.");
             return ExitCode.MISS;
         }
+        String crit = result.crit() ? "CRITICAL! " : "";
         c.say(String.format(
-                "%s strikes %s's %s. %d dmg.",
+                "%s%s strikes %s's %s. %d dmg.",
+                crit,
                 result.weapon() == null ? "Bare limb" : result.weapon().name(),
                 entity.name(), part.path, result.damage()
         ));
+        if (result.crippledPart()) {
+            c.say(entity.name() + "'s " + part.path + " is crippled!");
+        }
+        if (result.blindedTarget()) {
+            c.say(entity.name() + " is blinded!");
+        }
         if (result.killed()) {
             c.say(entity.name() + " falls.");
         }

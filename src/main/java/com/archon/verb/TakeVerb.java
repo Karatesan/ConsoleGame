@@ -49,7 +49,7 @@ public final class TakeVerb implements Verb {
         if (check != ItemMoves.Result.SUCCESS) return c.rejectBlocked(check.reason());
 
         boolean stealing = location instanceof ItemLocation.Pack || location instanceof ItemLocation.Equipment;
-        if (stealing && !c.world.dice().chance(35)) {
+        if (stealing && !c.world.dice().chance(com.archon.model.Balance.SNATCH_BASE_CHANCE)) {
             c.say("Snatch fails.");
             return ExitCode.MISS;
         }

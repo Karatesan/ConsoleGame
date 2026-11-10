@@ -33,10 +33,10 @@ public final class Scenario {
         Thrall t = new Thrall(new Vec2(3, 4), 40);
         t.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_RIGHT,
-                Item.weapon("rusted_cleaver", "rusted cleaver", 6, 10, Tag.METAL));
+                Item.weapon("rusted_cleaver", "rusted cleaver", 4, 8, 10, Tag.METAL));
         t.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_LEFT,
-                new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1));
+                new Item("torch", "torch", Set.of(Tag.WOOD, Tag.LIT), null, 20, 1, 2));
         t.inventory().addToPack(Item.flask("flask_oil", "oil flask", Tag.OIL));
         t.inventory().addToPack(Item.flask("flask_water", "water flask", Tag.WATER));
         world.installThrall(t);
@@ -44,13 +44,17 @@ public final class Scenario {
         Actor orc = new Actor("o1", "Orc Guard", 'O', new Vec2(3, 5), new CreatureStats(24, 3, 5));
         orc.inventory().placeInSlotForSetup(
                 EquipmentSlot.HAND_RIGHT,
-                Item.weapon("iron_sword", "iron sword", 7, 12, Tag.METAL));
+                Item.weapon("iron_sword", "iron sword", 5, 9, 12, Tag.METAL));
         orc.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
         world.add(orc);
 
         Actor archer =
                 new Actor("g1", "Goblin Archer", 'G', new Vec2(8, 4), new CreatureStats(12, 0, 10));
+        archer.inventory().placeInSlotForSetup(
+                EquipmentSlot.HAND_RIGHT,
+                Item.weapon("shortbow", "shortbow", 5, 8, 12, Tag.WOOD, Tag.RANGED, Tag.FLAMMABLE));
         archer.with(Tag.ORGANIC, Tag.FLESH, Tag.FLAMMABLE);
+        archer.nock();
         archer.ready(Actor.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement in line of sight", 6);
         world.add(archer);
 

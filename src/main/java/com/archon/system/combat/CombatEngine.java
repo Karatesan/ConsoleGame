@@ -1,17 +1,18 @@
 package com.archon.system.combat;
 
 import com.archon.model.Actor;
+import com.archon.model.Balance;
 import com.archon.model.BodyPart;
 import com.archon.model.Dice;
 import com.archon.model.EquipmentSlot;
 import com.archon.model.Entity;
 import com.archon.model.Item;
 import com.archon.model.ItemLocation;
-import com.archon.model.Thrall;
+import com.archon.model.Tag;
 import com.archon.model.World;
 import com.archon.system.item.ItemMoves;
 
-import java.util.Objects;
+import static com.archon.model.Balance.*;
 
 /**
  * Domain service encapsulating combat calculations and state mutations
@@ -21,47 +22,77 @@ public final class CombatEngine {
     private CombatEngine() {}
 
     public record MeleeHitResult(boolean hit, int hitChance, int damage, BodyPart part, Item weapon, boolean killed,
-                                 boolean weaponDegraded) {}
+                                 boolean weaponDegraded, boolean crippledPart, boolean crit, boolean blindedTarget) {}
 
     public record DisarmResult(boolean success, Item weapon) {}
 
-    public record RangedHitResult(boolean hit, int hitChance, int damage, BodyPart part, boolean killed) {}
+    public record RangedHitResult(boolean hit, int hitChance, int damage, BodyPart part, boolean killed,
+                                  boolean crippledPart, boolean crit, boolean blindedTarget) {}
 
-    public static MeleeHitResult resolveMelee(Dice dice, World world, Thrall attacker, Entity target, BodyPart part,
+    public static MeleeHitResult resolveMelee(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
                                               String power, boolean force) {
-        Objects.requireNonNull(world, "world");
-        int hitChance = 70 + part.hitMod - target.evasion() + ("light".equals(power) ? 20 : "heavy".equals(
-                power) ? -20 : 0);
+        int powerHitMod = "light".equals(power) ? LIGHT_HIT_MOD : "heavy".equals(power) ? HEAVY_HIT_MOD : NORMAL_HIT_MOD;
+        int hitChance = BASE_HIT_CHANCE + part.hitMod + powerHitMod - effectiveEvasion(target);
+        if (attacker.isCrippled(BodyPart.ARM_R)) {
+            hitChance -= CRIPPLED_ARM_HIT_PENALTY;
+        }
+        if (attacker.has(Tag.BLIND)) {
+            hitChance -= BLIND_HIT_PENALTY;
+        }
         if (target instanceof Actor actor && actor.isGuarded() && !force) {
-            hitChance -= 25;
+            hitChance -= GUARD_MELEE_HIT_PENALTY;
         }
 
-        hitChance = clampHitChance(hitChance);
+        hitChance = Balance.clampChance(hitChance);
         Item weapon = attacker.mainHand();
         if (!dice.chance(hitChance)) {
-            return new MeleeHitResult(false, hitChance, 0, part, weapon, false, false);
+            return new MeleeHitResult(false, hitChance, 0, part, weapon, false, false, false, false, false);
         }
 
-        int baseDamage = (weapon == null ? 3 : weapon.damage()) + attacker.strength();
-        double multiplier = part.damageMult * ("light".equals(power) ? 0.6 : "heavy".equals(power) ? 1.6 : 1.0);
-        int damage = Math.max(1, (int) Math.round(baseDamage * multiplier) - target.armor());
+        int baseDamage = rollMeleeDamage(dice, attacker);
+        double powerDmgMult = "light".equals(power) ? LIGHT_DMG_MULT : "heavy".equals(power) ? HEAVY_DMG_MULT : NORMAL_DMG_MULT;
+        double multiplier = part.damageMult * powerDmgMult;
+        if (attacker.isCrippled(BodyPart.ARM_R)) {
+            multiplier *= CRIPPLED_ARM_DMG_MULT;
+        }
+        boolean crit = dice.chance(BASE_CRIT_CHANCE);
+        if (crit) {
+            multiplier *= CRIT_DMG_MULT;
+        }
+        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - effectiveArmor(target));
         target.takeDamage(damage);
 
         boolean weaponDegraded = force && weapon != null;
         if (weaponDegraded) {
-            weapon.wear(1);
+            weapon.wear(FORCE_WEAPON_WEAR);
         }
 
         boolean killed = !target.alive();
+        boolean crippledPart = !killed && rollCripple(dice, target, part, power);
+        boolean blindedTarget = !killed && rollBlind(dice, target, part);
         if (killed) {
             dropMainHand(world, target);
         }
-        return new MeleeHitResult(true, hitChance, damage, part, weapon, killed, weaponDegraded);
+        return new MeleeHitResult(true, hitChance, damage, part, weapon, killed, weaponDegraded, crippledPart, crit, blindedTarget);
+    }
+
+    public static int rollMeleeDamage(Dice dice, Actor attacker) {
+        Item weapon = attacker.mainHand();
+        int roll = weapon == null
+                ? dice.between(UNARMED_DMG_MIN, UNARMED_DMG_MAX)
+                : dice.between(weapon.minDamage(), weapon.maxDamage());
+        return roll + attacker.strength();
+    }
+
+    public static int baseMeleeDamage(Actor attacker) {
+        Item weapon = attacker.mainHand();
+        int avg = weapon == null
+                ? (UNARMED_DMG_MIN + UNARMED_DMG_MAX) / 2
+                : (weapon.minDamage() + weapon.maxDamage()) / 2;
+        return avg + attacker.strength();
     }
 
     public static DisarmResult attemptDisarm(Dice dice, World world, Actor owner, EquipmentSlot slot) {
-        Objects.requireNonNull(world, "world");
-        Objects.requireNonNull(owner, "owner");
         if (slot != EquipmentSlot.HAND_LEFT && slot != EquipmentSlot.HAND_RIGHT) {
             throw new IllegalArgumentException("disarm requires a hand slot");
         }
@@ -70,7 +101,9 @@ public final class CombatEngine {
         if (weapon == null) {
             return new DisarmResult(false, null);
         }
-        if (!dice.chance(45)) {
+        int disarmChance = owner.isCrippled(slot == EquipmentSlot.HAND_RIGHT ? BodyPart.ARM_R : BodyPart.ARM_L)
+                ? DISARM_CHANCE_CRIPPLED : DISARM_CHANCE_BASE;
+        if (!dice.chance(disarmChance)) {
             return new DisarmResult(false, weapon);
         }
 
@@ -78,28 +111,80 @@ public final class CombatEngine {
         return new DisarmResult(true, weapon);
     }
 
-    public static RangedHitResult resolveRanged(Dice dice, World world, Thrall attacker, Entity target, BodyPart part) {
-        Objects.requireNonNull(world, "world");
+    public static RangedHitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part) {
         int distance = target.pos().chebyshev(attacker.pos());
-        int rangeModifier = distance <= 1 ? -20 : distance <= 4 ? 0 : distance <= 8 ? -10 : -25;
-        int hitChance = clampHitChance(70 + part.hitMod + rangeModifier - target.evasion());
+        int rangeModifier = distance <= RANGED_POINT_BLANK_DIST ? RANGED_POINT_BLANK_MOD
+                : distance <= RANGED_OPTIMAL_DIST ? RANGED_OPTIMAL_MOD
+                : distance <= RANGED_MEDIUM_DIST ? RANGED_MEDIUM_MOD : RANGED_LONG_MOD;
+        int armPenalty = (attacker.isCrippled(BodyPart.ARM_L) || attacker.isCrippled(BodyPart.ARM_R))
+                ? -CRIPPLED_ARM_HIT_PENALTY : 0;
+        int blindPenalty = attacker.has(Tag.BLIND) ? -BLIND_HIT_PENALTY : 0;
+        int hitChance = Balance.clampChance(BASE_HIT_CHANCE + part.hitMod + rangeModifier + armPenalty + blindPenalty - effectiveEvasion(target));
 
         if (!dice.chance(hitChance)) {
-            return new RangedHitResult(false, hitChance, 0, part, false);
+            return new RangedHitResult(false, hitChance, 0, part, false, false, false, false);
         }
 
-        int damage = Math.max(1, dice.between(5, 10) - target.armor());
+        Item weapon = attacker.mainHand();
+        int baseDamage = (weapon != null && weapon.maxDamage() > 0)
+                ? dice.between(weapon.minDamage(), weapon.maxDamage())
+                : dice.between(RANGED_DMG_MIN, RANGED_DMG_MAX);
+        double multiplier = part.damageMult;
+        boolean crit = dice.chance(BASE_CRIT_CHANCE);
+        if (crit) {
+            multiplier *= CRIT_DMG_MULT;
+        }
+        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - effectiveArmor(target));
         target.takeDamage(damage);
 
         boolean killed = !target.alive();
+        boolean crippledPart = !killed && rollCripple(dice, target, part, "normal");
+        boolean blindedTarget = !killed && rollBlind(dice, target, part);
         if (killed) {
             dropMainHand(world, target);
         }
-        return new RangedHitResult(true, hitChance, damage, part, killed);
+        return new RangedHitResult(true, hitChance, damage, part, killed, crippledPart, crit, blindedTarget);
     }
 
-    private static int clampHitChance(int hitChance) {
-        return Math.max(5, Math.min(95, hitChance));
+    private static int effectiveArmor(Entity target) {
+        int base = target.armor();
+        return (target instanceof Actor a && a.isGuarded())
+                ? Math.max(base + 1, (int) Math.round(base * (1.0 + GUARD_ARMOR_BONUS_PCT / 100.0)))
+                : base;
+    }
+
+    private static int effectiveEvasion(Entity target) {
+        int eva = target.evasion();
+        if (target instanceof Actor a && a.isCrippled(BodyPart.HEAD)) {
+            eva -= CRIPPLED_HEAD_EVA_PENALTY;
+        }
+        if (target.has(Tag.BLIND)) {
+            eva -= BLIND_EVA_PENALTY;
+        }
+        if (target.has(Tag.PRONE)) {
+            eva -= PRONE_EVA_PENALTY;
+        }
+        return eva;
+    }
+
+    private static boolean rollCripple(Dice dice, Entity target, BodyPart part, String power) {
+        if (!(target instanceof Actor actor) || part == BodyPart.TORSO || actor.isCrippled(part)) {
+            return false;
+        }
+        int chance = "heavy".equals(power) ? HEAVY_CRIPPLE_CHANCE
+                : "light".equals(power) ? LIGHT_CRIPPLE_CHANCE : NORMAL_CRIPPLE_CHANCE;
+        return dice.chance(chance) && actor.cripple(part);
+    }
+
+    private static boolean rollBlind(Dice dice, Entity target, BodyPart part) {
+        if (part != BodyPart.HEAD || target.has(Tag.BLIND) || !dice.chance(HEAD_BLIND_CHANCE)) {
+            return false;
+        }
+        target.applyTag(Tag.BLIND);
+        if (target instanceof Actor actor) {
+            actor.clearReadied();
+        }
+        return true;
     }
 
     private static void dropMainHand(World world, Entity target) {
