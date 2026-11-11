@@ -43,6 +43,8 @@ public final class SimulationSystem {
 
                 if (!entity.alive()) {
                     log.add(entity.name() + " is consumed.");
+                    Destruction.Result destruction = Destruction.onKilled(world, entity);
+                    log.addAll(destruction.messages());
                 }
             }
             if (entity.alive() && entity.has(Tag.BLIND) && world.dice().chance(BLIND_RECOVER_CHANCE)) {

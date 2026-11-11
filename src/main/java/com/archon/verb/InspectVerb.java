@@ -54,8 +54,8 @@ public final class InspectVerb implements Verb {
             }
             for (BodyPart part : BodyPart.values()) {
                 if (focus != null && focus != part) continue;
-                out.append(String.format("%n  %-6s aim %+d  melee x%.1f%s",
-                        part.path, part.hitMod, part.damageMult,
+                out.append(String.format("%n  %-6s aim %+d  melee x%.1f  crit %+d%%%s",
+                        part.path, part.hitMod, part.damageMult, part.critBonus,
                         actor.isCrippled(part) ? " CRIPPLED" : ""));
             }
         }

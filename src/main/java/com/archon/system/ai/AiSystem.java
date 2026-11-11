@@ -148,7 +148,7 @@ public final class AiSystem {
             }
             if (actions > 0 && actor.isNocked()) {
                 actor.fireNocked();
-                var shot = CombatEngine.resolveRanged(world.dice(), world, actor, thrall, BodyPart.TORSO);
+                var shot = CombatEngine.resolveRanged(world.dice(), world, actor, thrall, BodyPart.TORSO, false);
                 actions--;
                 if (shot.hit()) {
                     String crit = shot.crit() ? "CRITICAL! " : "";
@@ -205,7 +205,7 @@ public final class AiSystem {
         if (dist <= 1) {
             BodyPart targetPart = (!thrall.isCrippled(BodyPart.LEGS) && world.dice().chance(AI_AIM_LEGS_CHANCE))
                     ? BodyPart.LEGS : BodyPart.TORSO;
-            var strike = CombatEngine.resolveMelee(world.dice(), world, actor, thrall, targetPart, "normal", false);
+            var strike = CombatEngine.resolveMelee(world.dice(), world, actor, thrall, targetPart, true, "normal", false);
             actions--;
             String weaponName = strike.weapon() == null ? "fists" : strike.weapon().name();
             if (strike.hit()) {

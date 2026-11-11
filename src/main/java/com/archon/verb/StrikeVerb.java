@@ -55,30 +55,44 @@ public final class StrikeVerb implements Verb {
             return ExitCode.MISS;
         }
 
-        BodyPart part = c.aimPart(target);
+        boolean isCreature = entity.kind() == Entity.Kind.CREATURE;
+        boolean aimed = isCreature && (c.inv.flag("aim") != null || target instanceof Resolved.OnBody);
+        BodyPart part = null;
+        if (isCreature) {
+            part = aimed ? c.aimPart(target) : BodyPart.rollLocation(c.world.dice());
+        }
+
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power").toLowerCase(Locale.ROOT);
         var result = CombatEngine.resolveMelee(
-                c.world.dice(), c.world, c.thrall, entity, part, power, c.inv.hasFlag("force")
+                c.world.dice(), c.world, c.thrall, entity, part, aimed, power, c.inv.hasFlag("force")
         );
+        String targetDesc = entity.name() + (part == null ? "" : "'s " + part.path);
         if (!result.hit()) {
-            c.say("Strike at " + entity.name() + "'s " + part.path + " — MISS.");
+            c.say("Strike at " + targetDesc + " — MISS.");
             return ExitCode.MISS;
         }
         String crit = result.crit() ? "CRITICAL! " : "";
         c.say(String.format(
-                "%s%s strikes %s's %s. %d dmg.",
+                "%s%s strikes %s. %d dmg.",
                 crit,
                 result.weapon() == null ? "Bare limb" : result.weapon().name(),
-                entity.name(), part.path, result.damage()
+                targetDesc, result.damage()
         ));
-        if (result.crippledPart()) {
+        if (result.crippledPart() && part != null) {
             c.say(entity.name() + "'s " + part.path + " is crippled!");
         }
         if (result.blindedTarget()) {
             c.say(entity.name() + " is blinded!");
         }
         if (result.killed()) {
-            c.say(entity.name() + " falls.");
+            if (entity.kind() == Entity.Kind.CREATURE) {
+                c.say(entity.name() + " falls.");
+            } else {
+                c.say(entity.name() + " is destroyed.");
+            }
+            for (String note : result.destruction().messages()) {
+                c.say(note);
+            }
         }
         return ExitCode.SUCCESS;
     }

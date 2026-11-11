@@ -1,4 +1,4 @@
-package com.archon.system.combat;
+    package com.archon.system.combat;
 
 import com.archon.model.Actor;
 import com.archon.model.Balance;
@@ -10,6 +10,7 @@ import com.archon.model.Item;
 import com.archon.model.ItemLocation;
 import com.archon.model.Tag;
 import com.archon.model.World;
+import com.archon.system.environment.Destruction;
 import com.archon.system.item.ItemMoves;
 
 import static com.archon.model.Balance.*;
@@ -22,17 +23,20 @@ public final class CombatEngine {
     private CombatEngine() {}
 
     public record MeleeHitResult(boolean hit, int hitChance, int damage, BodyPart part, Item weapon, boolean killed,
-                                 boolean weaponDegraded, boolean crippledPart, boolean crit, boolean blindedTarget) {}
+                                 boolean weaponDegraded, boolean crippledPart, boolean crit, boolean blindedTarget,
+                                 Destruction.Result destruction) {}
 
     public record DisarmResult(boolean success, Item weapon) {}
 
     public record RangedHitResult(boolean hit, int hitChance, int damage, BodyPart part, boolean killed,
-                                  boolean crippledPart, boolean crit, boolean blindedTarget) {}
+                                  boolean crippledPart, boolean crit, boolean blindedTarget,
+                                  Destruction.Result destruction) {}
 
     public static MeleeHitResult resolveMelee(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
-                                              String power, boolean force) {
+                                              boolean aimed, String power, boolean force) {
         int powerHitMod = "light".equals(power) ? LIGHT_HIT_MOD : "heavy".equals(power) ? HEAVY_HIT_MOD : NORMAL_HIT_MOD;
-        int hitChance = BASE_HIT_CHANCE + part.hitMod + powerHitMod - effectiveEvasion(target);
+        int aimMod = (aimed && part != null) ? part.hitMod : 0;
+        int hitChance = BASE_HIT_CHANCE + aimMod + powerHitMod - effectiveEvasion(target);
         if (attacker.isCrippled(BodyPart.ARM_R)) {
             hitChance -= CRIPPLED_ARM_HIT_PENALTY;
         }
@@ -46,20 +50,28 @@ public final class CombatEngine {
         hitChance = Balance.clampChance(hitChance);
         Item weapon = attacker.mainHand();
         if (!dice.chance(hitChance)) {
-            return new MeleeHitResult(false, hitChance, 0, part, weapon, false, false, false, false, false);
+            return new MeleeHitResult(false, hitChance, 0, part, weapon, false, false, false, false, false, Destruction.Result.EMPTY);
         }
 
         int baseDamage = rollMeleeDamage(dice, attacker);
         double powerDmgMult = "light".equals(power) ? LIGHT_DMG_MULT : "heavy".equals(power) ? HEAVY_DMG_MULT : NORMAL_DMG_MULT;
-        double multiplier = part.damageMult * powerDmgMult;
+        double partDmgMult = part != null ? part.damageMult : 1.0;
+        double multiplier = partDmgMult * powerDmgMult;
         if (attacker.isCrippled(BodyPart.ARM_R)) {
             multiplier *= CRIPPLED_ARM_DMG_MULT;
         }
-        boolean crit = dice.chance(BASE_CRIT_CHANCE);
+
+        // Fallout 2 Critical Hit Math: Base + Targeted Shot Crit Bonus
+        int critBonus = (aimed && part != null) ? part.critBonus : 0;
+        int critChance = Balance.clampChance(BASE_CRIT_CHANCE + critBonus);
+        boolean crit = dice.chance(critChance);
         if (crit) {
             multiplier *= CRIT_DMG_MULT;
         }
-        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - effectiveArmor(target));
+
+        // Critical hits bypass armor (Fallout 2 "Ignores Armor" rule)
+        int armor = crit ? 0 : effectiveArmor(target);
+        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armor);
         target.takeDamage(damage);
 
         boolean weaponDegraded = force && weapon != null;
@@ -68,12 +80,13 @@ public final class CombatEngine {
         }
 
         boolean killed = !target.alive();
-        boolean crippledPart = !killed && rollCripple(dice, target, part, power);
-        boolean blindedTarget = !killed && rollBlind(dice, target, part);
+        boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, power);
+        boolean blindedTarget = !killed && part != null && rollBlind(dice, target, part);
+        Destruction.Result destruction = Destruction.Result.EMPTY;
         if (killed) {
-            dropMainHand(world, target);
+            destruction = Destruction.onKilled(world, target);
         }
-        return new MeleeHitResult(true, hitChance, damage, part, weapon, killed, weaponDegraded, crippledPart, crit, blindedTarget);
+        return new MeleeHitResult(true, hitChance, damage, part, weapon, killed, weaponDegraded, crippledPart, crit, blindedTarget, destruction);
     }
 
     public static int rollMeleeDamage(Dice dice, Actor attacker) {
@@ -111,7 +124,7 @@ public final class CombatEngine {
         return new DisarmResult(true, weapon);
     }
 
-    public static RangedHitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part) {
+    public static RangedHitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part, boolean aimed) {
         int distance = target.pos().chebyshev(attacker.pos());
         int rangeModifier = distance <= RANGED_POINT_BLANK_DIST ? RANGED_POINT_BLANK_MOD
                 : distance <= RANGED_OPTIMAL_DIST ? RANGED_OPTIMAL_MOD
@@ -119,31 +132,40 @@ public final class CombatEngine {
         int armPenalty = (attacker.isCrippled(BodyPart.ARM_L) || attacker.isCrippled(BodyPart.ARM_R))
                 ? -CRIPPLED_ARM_HIT_PENALTY : 0;
         int blindPenalty = attacker.has(Tag.BLIND) ? -BLIND_HIT_PENALTY : 0;
-        int hitChance = Balance.clampChance(BASE_HIT_CHANCE + part.hitMod + rangeModifier + armPenalty + blindPenalty - effectiveEvasion(target));
+        int aimMod = (aimed && part != null) ? part.hitMod : 0;
+        int hitChance = Balance.clampChance(BASE_HIT_CHANCE + aimMod + rangeModifier + armPenalty + blindPenalty - effectiveEvasion(target));
 
         if (!dice.chance(hitChance)) {
-            return new RangedHitResult(false, hitChance, 0, part, false, false, false, false);
+            return new RangedHitResult(false, hitChance, 0, part, false, false, false, false, Destruction.Result.EMPTY);
         }
 
         Item weapon = attacker.mainHand();
         int baseDamage = (weapon != null && weapon.maxDamage() > 0)
                 ? dice.between(weapon.minDamage(), weapon.maxDamage())
                 : dice.between(RANGED_DMG_MIN, RANGED_DMG_MAX);
-        double multiplier = part.damageMult;
-        boolean crit = dice.chance(BASE_CRIT_CHANCE);
+        double multiplier = part != null ? part.damageMult : 1.0;
+
+        // Fallout 2 Critical Hit Math: Base + Targeted Shot Crit Bonus
+        int critBonus = (aimed && part != null) ? part.critBonus : 0;
+        int critChance = Balance.clampChance(BASE_CRIT_CHANCE + critBonus);
+        boolean crit = dice.chance(critChance);
         if (crit) {
             multiplier *= CRIT_DMG_MULT;
         }
-        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - effectiveArmor(target));
+
+        // Critical hits bypass armor (Fallout 2 "Ignores Armor" rule)
+        int armor = crit ? 0 : effectiveArmor(target);
+        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armor);
         target.takeDamage(damage);
 
         boolean killed = !target.alive();
-        boolean crippledPart = !killed && rollCripple(dice, target, part, "normal");
-        boolean blindedTarget = !killed && rollBlind(dice, target, part);
+        boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, "normal");
+        boolean blindedTarget = !killed && part != null && rollBlind(dice, target, part);
+        Destruction.Result destruction = Destruction.Result.EMPTY;
         if (killed) {
-            dropMainHand(world, target);
+            destruction = Destruction.onKilled(world, target);
         }
-        return new RangedHitResult(true, hitChance, damage, part, killed, crippledPart, crit, blindedTarget);
+        return new RangedHitResult(true, hitChance, damage, part, killed, crippledPart, crit, blindedTarget, destruction);
     }
 
     private static int effectiveArmor(Entity target) {
@@ -187,11 +209,7 @@ public final class CombatEngine {
         return true;
     }
 
-    private static void dropMainHand(World world, Entity target) {
-        if (!(target instanceof Actor actor)) {
-            return;
-        }
-
+    public static void dropMainHand(World world, Actor actor) {
         Item item = actor.mainHand();
         if (item != null) {
             EquipmentSlot slot = actor.inventory().equipped(

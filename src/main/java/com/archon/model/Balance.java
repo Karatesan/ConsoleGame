@@ -15,17 +15,22 @@ public final class Balance {
         return Math.clamp(chance, MIN_CHANCE, MAX_CHANCE);
     }
 
-    // --- Body Part Aiming Modifiers (hitChance %, melee damageMult) ---
-    public static final int HEAD_HIT_MOD         = -30;
+    // --- Body Part Aiming Modifiers (hitChance %, melee damageMult, critChanceBonus %) ---
+    public static final int HEAD_HIT_MOD         = -40;
     public static final double HEAD_DMG_MULT     = 2.5;
-    public static final int TORSO_HIT_MOD        = +10;
+    public static final int HEAD_CRIT_BONUS      = 35;
+    public static final int TORSO_HIT_MOD        = 0;
     public static final double TORSO_DMG_MULT    = 1.0;
-    public static final int ARM_L_HIT_MOD        = -10;
+    public static final int TORSO_CRIT_BONUS     = 0;
+    public static final int ARM_L_HIT_MOD        = -20;
     public static final double ARM_L_DMG_MULT    = 1.0;
-    public static final int ARM_R_HIT_MOD        = -10;
+    public static final int ARM_L_CRIT_BONUS     = 15;
+    public static final int ARM_R_HIT_MOD        = -20;
     public static final double ARM_R_DMG_MULT    = 1.0;
-    public static final int LEGS_HIT_MOD         = -5;
+    public static final int ARM_R_CRIT_BONUS     = 15;
+    public static final int LEGS_HIT_MOD         = -15;
     public static final double LEGS_DMG_MULT     = 0.8;
+    public static final int LEGS_CRIT_BONUS      = 10;
 
     // --- Melee Power Levels (AP cost, hitChance %, damageMult, crippleChance %) ---
     public static final int LIGHT_AP_COST        = 1;

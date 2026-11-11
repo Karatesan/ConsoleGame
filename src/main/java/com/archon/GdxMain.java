@@ -18,7 +18,7 @@ public final class GdxMain {
         config.setWindowedMode(GdxView.WIN_W, GdxView.WIN_H);
         config.useVsync(true);
         config.setForegroundFPS(60);
-        new Lwjgl3Application(new GdxView(args.length > 0 ? Long.parseLong(args[0]) : 1234L), config);
+        new Lwjgl3Application(new GdxView(args.length > 0 ? Long.parseLong(args[0]) : System.currentTimeMillis()), config);
     }
 
     /** macOS only lets GLFW run on the first thread, which needs a JVM flag; respawn with it once. */

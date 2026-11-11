@@ -152,11 +152,11 @@ class AiSystemTest {
         World world = Scenario.testRoom(alwaysMaxCrit);
         Actor orc = world.actor("o1");
 
-        // Cleaver max 8 + str 3 = 11; head 2.5x = 27.5; crit 2x = 55; minus orc armor 3 = 52 dmg
-        var res = CombatEngine.resolveMelee(alwaysMaxCrit, world, world.thrall(), orc, BodyPart.HEAD, "normal", false);
+        // Cleaver max 8 + str 3 = 11; head 2.5x = 27.5; crit 2x = 55; critical hit ignores armor = 55 dmg
+        var res = CombatEngine.resolveMelee(alwaysMaxCrit, world, world.thrall(), orc, BodyPart.HEAD, true, "normal", false);
         assertTrue(res.hit());
         assertTrue(res.crit(), "Should trigger critical hit");
-        assertEquals(52, res.damage(), "Crit multiplier (2x) should apply after head multiplier (2.5x)");
+        assertEquals(55, res.damage(), "Critical hits bypass armor and apply multipliers");
     }
 
     @Test
