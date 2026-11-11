@@ -39,4 +39,21 @@ public sealed interface ApCost {
             return fallback + " AP by default; --" + flag + " {" + choices + "}";
         }
     }
+
+    record Aimed(ApCost base, int extraAp) implements ApCost {
+        @Override
+        public int cost(Ast.Invocation invocation) {
+            int extra = isAimed(invocation) ? extraAp : 0;
+            return base.cost(invocation) + extra;
+        }
+
+        @Override
+        public String describe() {
+            return base.describe() + " (+" + extraAp + " AP when aimed)";
+        }
+
+        private static boolean isAimed(Ast.Invocation invocation) {
+            return invocation.hasFlag("aim") || (invocation.arg(0) != null && invocation.arg(0).contains("/body/"));
+        }
+    }
 }

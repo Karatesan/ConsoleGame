@@ -79,4 +79,55 @@ class CombatEngineTest {
             assertNotNull(part);
         }
     }
+
+    @Test
+    void hitResultCarriesTelemetryAndArmorBypass() {
+        Dice always = new Dice.Always(true);
+        var res = CombatEngine.resolveMelee(always, world, thrall, orc, BodyPart.HEAD, true, "normal", false);
+        assertTrue(res.hit());
+        assertTrue(res.crit());
+        assertEquals(25, res.hitChance());
+        assertTrue(res.hitRoll() <= res.hitChance());
+        assertEquals(3, res.armorBlocked(), "Should record 3 armor bypassed on critical hit");
+    }
+
+    @Test
+    void criticalNarrativeFalloutPools() {
+        Dice dice = new Dice.Always(true);
+        var critRes = new CombatEngine.HitResult(true, 10, 25, 20, 3, BodyPart.HEAD, null, true, 5, 25,
+                false, false, false, Tag.BLIND, com.archon.system.environment.Destruction.Result.EMPTY);
+        String blindMsg = CombatNarrative.describeCrit(dice, BodyPart.HEAD, critRes, "Orc");
+        assertTrue(blindMsg.contains("Orc") && (blindMsg.contains("blind") || blindMsg.contains("darkness") || blindMsg.contains("vision")),
+                "Should pick from head blind pool: " + blindMsg);
+
+        var killRes = new CombatEngine.HitResult(true, 10, 25, 50, 3, BodyPart.TORSO, null, true, 5, 25,
+                true, false, false, null, com.archon.system.environment.Destruction.Result.EMPTY);
+        String killMsg = CombatNarrative.describeCrit(dice, BodyPart.TORSO, killRes, "Orc");
+        assertTrue(killMsg.contains("Orc") && (killMsg.contains("chest") || killMsg.contains("rib") || killMsg.contains("heart") || killMsg.contains("dead")),
+                "Should pick from torso kill pool: " + killMsg);
+    }
+
+    @Test
+    void aimedAttackCostsExtraAp() {
+        var catalog = com.archon.app.DefaultVerbs.create(com.archon.exec.EconomyRules.prototype());
+        var strikeDef = catalog.get("strike");
+        var shootDef = catalog.get("shoot");
+
+        // Untargeted strike: 2 AP
+        assertEquals(2, strikeDef.price().cost(new com.archon.command.Ast.Invocation("strike", java.util.List.of("o1"), java.util.Map.of())));
+        // Aimed strike with flag -a: 2 + 1 = 3 AP
+        assertEquals(3, strikeDef.price().cost(new com.archon.command.Ast.Invocation("strike", java.util.List.of("o1"), java.util.Map.of("aim", "head"))));
+        // Aimed strike with body path address: 2 + 1 = 3 AP
+        assertEquals(3, strikeDef.price().cost(new com.archon.command.Ast.Invocation("strike", java.util.List.of("o1/body/head"), java.util.Map.of())));
+        // Light power aimed: 1 + 1 = 2 AP
+        assertEquals(2, strikeDef.price().cost(new com.archon.command.Ast.Invocation("strike", java.util.List.of("o1"), java.util.Map.of("aim", "head", "power", "light"))));
+        // Heavy power aimed: 3 + 1 = 4 AP
+        assertEquals(4, strikeDef.price().cost(new com.archon.command.Ast.Invocation("strike", java.util.List.of("o1"), java.util.Map.of("aim", "head", "power", "heavy"))));
+
+        // Untargeted shoot: 2 AP
+        assertEquals(2, shootDef.price().cost(new com.archon.command.Ast.Invocation("shoot", java.util.List.of("o1"), java.util.Map.of())));
+        // Aimed shoot: 2 + 1 = 3 AP
+        assertEquals(3, shootDef.price().cost(new com.archon.command.Ast.Invocation("shoot", java.util.List.of("o1"), java.util.Map.of("aim", "head"))));
+        assertEquals(3, shootDef.price().cost(new com.archon.command.Ast.Invocation("shoot", java.util.List.of("o1/body/head"), java.util.Map.of())));
+    }
 }

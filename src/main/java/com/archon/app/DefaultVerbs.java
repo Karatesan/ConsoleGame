@@ -96,10 +96,12 @@ public final class DefaultVerbs {
                                 List.of("step e", "step nw -c", "step w ; strike o1"))),
                 new VerbDefinition(
                         "strike", new StrikeVerb(), List.of(aim, power, force),
-                        new ApCost.ByValue("power", Balance.NORMAL_AP_COST, Map.of(
-                                "light", Balance.LIGHT_AP_COST,
-                                "normal", Balance.NORMAL_AP_COST,
-                                "heavy", Balance.HEAVY_AP_COST)),
+                        new ApCost.Aimed(
+                                new ApCost.ByValue("power", Balance.NORMAL_AP_COST, Map.of(
+                                        "light", Balance.LIGHT_AP_COST,
+                                        "normal", Balance.NORMAL_AP_COST,
+                                        "heavy", Balance.HEAVY_AP_COST)),
+                                Balance.AIM_EXTRA_AP),
                         false, none, none,
                         new Documentation(
                                 "COMBAT", "[target]", "Melee attack or disarm attempt",
@@ -123,7 +125,9 @@ public final class DefaultVerbs {
                                         + "Fails when already nocked.",
                                 List.of("nock", "nock ; shoot g1"))),
                 new VerbDefinition(
-                        "shoot", new ShootVerb(), List.of(aim), two, false, none, none,
+                        "shoot", new ShootVerb(), List.of(aim),
+                        new ApCost.Aimed(two, Balance.AIM_EXTRA_AP),
+                        false, none, none,
                         new Documentation(
                                 "COMBAT", "<target>", "Ranged attack",
                                 "Fires a nocked arrow at an entity or body part with a clear line of fire. "

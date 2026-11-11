@@ -22,18 +22,19 @@ import static com.archon.model.Balance.*;
 public final class CombatEngine {
     private CombatEngine() {}
 
-    public record MeleeHitResult(boolean hit, int hitChance, int damage, BodyPart part, Item weapon, boolean killed,
-                                 boolean weaponDegraded, boolean crippledPart, boolean crit, boolean blindedTarget,
-                                 Destruction.Result destruction) {}
+    public record HitResult(boolean hit, int hitRoll, int hitChance, int damage, int armorBlocked,
+                             BodyPart part, Item weapon, boolean crit, int critRoll, int critChance,
+                             boolean killed, boolean weaponDegraded, boolean crippledPart,
+                             Tag statusApplied, Destruction.Result destruction) {
+        public boolean blindedTarget() {
+            return statusApplied == Tag.BLIND;
+        }
+    }
 
     public record DisarmResult(boolean success, Item weapon) {}
 
-    public record RangedHitResult(boolean hit, int hitChance, int damage, BodyPart part, boolean killed,
-                                  boolean crippledPart, boolean crit, boolean blindedTarget,
-                                  Destruction.Result destruction) {}
-
-    public static MeleeHitResult resolveMelee(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
-                                              boolean aimed, String power, boolean force) {
+    public static HitResult resolveMelee(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
+                                         boolean aimed, String power, boolean force) {
         int powerHitMod = "light".equals(power) ? LIGHT_HIT_MOD : "heavy".equals(power) ? HEAVY_HIT_MOD : NORMAL_HIT_MOD;
         int aimMod = (aimed && part != null) ? part.hitMod : 0;
         int hitChance = BASE_HIT_CHANCE + aimMod + powerHitMod - effectiveEvasion(target);
@@ -48,9 +49,10 @@ public final class CombatEngine {
         }
 
         hitChance = Balance.clampChance(hitChance);
+        Dice.Roll hitRoll = dice.check(hitChance);
         Item weapon = attacker.mainHand();
-        if (!dice.chance(hitChance)) {
-            return new MeleeHitResult(false, hitChance, 0, part, weapon, false, false, false, false, false, Destruction.Result.EMPTY);
+        if (!hitRoll.hit()) {
+            return new HitResult(false, hitRoll.roll(), hitChance, 0, 0, part, weapon, false, 0, 0, false, false, false, null, Destruction.Result.EMPTY);
         }
 
         int baseDamage = rollMeleeDamage(dice, attacker);
@@ -64,14 +66,16 @@ public final class CombatEngine {
         // Fallout 2 Critical Hit Math: Base + Targeted Shot Crit Bonus
         int critBonus = (aimed && part != null) ? part.critBonus : 0;
         int critChance = Balance.clampChance(BASE_CRIT_CHANCE + critBonus);
-        boolean crit = dice.chance(critChance);
+        Dice.Roll critRoll = dice.check(critChance);
+        boolean crit = critRoll.hit();
         if (crit) {
             multiplier *= CRIT_DMG_MULT;
         }
 
         // Critical hits bypass armor (Fallout 2 "Ignores Armor" rule)
-        int armor = crit ? 0 : effectiveArmor(target);
-        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armor);
+        int rawArmor = effectiveArmor(target);
+        int armorBlocked = crit ? 0 : rawArmor;
+        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armorBlocked);
         target.takeDamage(damage);
 
         boolean weaponDegraded = force && weapon != null;
@@ -81,12 +85,17 @@ public final class CombatEngine {
 
         boolean killed = !target.alive();
         boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, power);
-        boolean blindedTarget = !killed && part != null && rollBlind(dice, target, part);
+        Tag statusApplied = null;
+        if (!killed && part != null && rollBlind(dice, target, part)) {
+            statusApplied = Tag.BLIND;
+        }
         Destruction.Result destruction = Destruction.Result.EMPTY;
         if (killed) {
             destruction = Destruction.onKilled(world, target);
         }
-        return new MeleeHitResult(true, hitChance, damage, part, weapon, killed, weaponDegraded, crippledPart, crit, blindedTarget, destruction);
+        return new HitResult(true, hitRoll.roll(), hitChance, damage, crit ? rawArmor : armorBlocked,
+                part, weapon, crit, critRoll.roll(), critChance, killed, weaponDegraded, crippledPart,
+                statusApplied, destruction);
     }
 
     public static int rollMeleeDamage(Dice dice, Actor attacker) {
@@ -124,7 +133,7 @@ public final class CombatEngine {
         return new DisarmResult(true, weapon);
     }
 
-    public static RangedHitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part, boolean aimed) {
+    public static HitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part, boolean aimed) {
         int distance = target.pos().chebyshev(attacker.pos());
         int rangeModifier = distance <= RANGED_POINT_BLANK_DIST ? RANGED_POINT_BLANK_MOD
                 : distance <= RANGED_OPTIMAL_DIST ? RANGED_OPTIMAL_MOD
@@ -135,8 +144,9 @@ public final class CombatEngine {
         int aimMod = (aimed && part != null) ? part.hitMod : 0;
         int hitChance = Balance.clampChance(BASE_HIT_CHANCE + aimMod + rangeModifier + armPenalty + blindPenalty - effectiveEvasion(target));
 
-        if (!dice.chance(hitChance)) {
-            return new RangedHitResult(false, hitChance, 0, part, false, false, false, false, Destruction.Result.EMPTY);
+        Dice.Roll hitRoll = dice.check(hitChance);
+        if (!hitRoll.hit()) {
+            return new HitResult(false, hitRoll.roll(), hitChance, 0, 0, part, null, false, 0, 0, false, false, false, null, Destruction.Result.EMPTY);
         }
 
         Item weapon = attacker.mainHand();
@@ -148,24 +158,31 @@ public final class CombatEngine {
         // Fallout 2 Critical Hit Math: Base + Targeted Shot Crit Bonus
         int critBonus = (aimed && part != null) ? part.critBonus : 0;
         int critChance = Balance.clampChance(BASE_CRIT_CHANCE + critBonus);
-        boolean crit = dice.chance(critChance);
+        Dice.Roll critRoll = dice.check(critChance);
+        boolean crit = critRoll.hit();
         if (crit) {
             multiplier *= CRIT_DMG_MULT;
         }
 
         // Critical hits bypass armor (Fallout 2 "Ignores Armor" rule)
-        int armor = crit ? 0 : effectiveArmor(target);
-        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armor);
+        int rawArmor = effectiveArmor(target);
+        int armorBlocked = crit ? 0 : rawArmor;
+        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armorBlocked);
         target.takeDamage(damage);
 
         boolean killed = !target.alive();
         boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, "normal");
-        boolean blindedTarget = !killed && part != null && rollBlind(dice, target, part);
+        Tag statusApplied = null;
+        if (!killed && part != null && rollBlind(dice, target, part)) {
+            statusApplied = Tag.BLIND;
+        }
         Destruction.Result destruction = Destruction.Result.EMPTY;
         if (killed) {
             destruction = Destruction.onKilled(world, target);
         }
-        return new RangedHitResult(true, hitChance, damage, part, killed, crippledPart, crit, blindedTarget, destruction);
+        return new HitResult(true, hitRoll.roll(), hitChance, damage, crit ? rawArmor : armorBlocked,
+                part, weapon, crit, critRoll.roll(), critChance, killed, false, crippledPart,
+                statusApplied, destruction);
     }
 
     private static int effectiveArmor(Entity target) {

@@ -48,6 +48,8 @@ public final class Balance {
     public static final double HEAVY_DMG_MULT    = 1.6;
     public static final int HEAVY_CRIPPLE_CHANCE = 60;
 
+    public static final int AIM_EXTRA_AP         = 1;
+
     // --- Melee & Ranged Combat ---
     public static final int BASE_HIT_CHANCE          = 70;
     public static final int BASE_CRIT_CHANCE         = 5;

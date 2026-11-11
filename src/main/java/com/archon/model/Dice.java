@@ -4,7 +4,14 @@ import java.util.Random;
 
 /** Injected so tests are fully deterministic. */
 public interface Dice {
-    boolean chance(int percent);
+    record Roll(boolean hit, int roll, int target) {}
+
+    Roll check(int percent);
+
+    default boolean chance(int percent) {
+        return check(percent).hit();
+    }
+
     int between(int lo, int hi);
 
     final class Seeded implements Dice {
@@ -15,9 +22,10 @@ public interface Dice {
         }
 
         @Override
-        public boolean chance(int percent) {
+        public Roll check(int percent) {
             validatePercent(percent);
-            return r.nextInt(100) < percent;
+            int roll = 1 + r.nextInt(100);
+            return new Roll(roll <= percent, roll, percent);
         }
 
         @Override
@@ -35,9 +43,9 @@ public interface Dice {
         }
 
         @Override
-        public boolean chance(int percent) {
+        public Roll check(int percent) {
             validatePercent(percent);
-            return hit;
+            return new Roll(hit, hit ? Math.min(1, percent) : Math.max(100, percent + 1), percent);
         }
 
         @Override

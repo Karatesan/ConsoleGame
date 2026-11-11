@@ -5,6 +5,7 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
 import com.archon.system.combat.CombatEngine;
+import com.archon.system.combat.CombatNarrative;
 import com.archon.system.spatial.SpatialService;
 
 public final class ShootVerb implements Verb {
@@ -42,30 +43,6 @@ public final class ShootVerb implements Verb {
         c.thrall.fireNocked();
 
         var result = CombatEngine.resolveRanged(c.world.dice(), c.world, c.thrall, target, part, aimed);
-        if (!result.hit()) {
-            c.say("Arrow flies wide of " + target.name() + ".");
-            return ExitCode.MISS;
-        }
-
-        String crit = result.crit() ? "CRITICAL! " : "";
-        String targetDesc = target.name() + (part == null ? "" : "'s " + part.path);
-        c.say(crit + "Arrow strikes " + targetDesc + ". " + result.damage() + " dmg.");
-        if (result.crippledPart() && part != null) {
-            c.say(target.name() + "'s " + part.path + " is crippled!");
-        }
-        if (result.blindedTarget()) {
-            c.say(target.name() + " is blinded!");
-        }
-        if (result.killed()) {
-            if (target.kind() == Entity.Kind.CREATURE) {
-                c.say(target.name() + " falls.");
-            } else {
-                c.say(target.name() + " is destroyed.");
-            }
-            for (String note : result.destruction().messages()) {
-                c.say(note);
-            }
-        }
-        return ExitCode.SUCCESS;
+        return CombatNarrative.narrateRanged(c, c.world.dice(), target, result);
     }
 }

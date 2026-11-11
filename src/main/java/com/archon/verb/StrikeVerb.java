@@ -3,6 +3,7 @@ package com.archon.verb;
 import com.archon.address.Resolved;
 import com.archon.model.*;
 import com.archon.system.combat.CombatEngine;
+import com.archon.system.combat.CombatNarrative;
 
 import java.util.Locale;
 import java.util.Set;
@@ -66,34 +67,8 @@ public final class StrikeVerb implements Verb {
         var result = CombatEngine.resolveMelee(
                 c.world.dice(), c.world, c.thrall, entity, part, aimed, power, c.inv.hasFlag("force")
         );
-        String targetDesc = entity.name() + (part == null ? "" : "'s " + part.path);
-        if (!result.hit()) {
-            c.say("Strike at " + targetDesc + " — MISS.");
-            return ExitCode.MISS;
-        }
-        String crit = result.crit() ? "CRITICAL! " : "";
-        c.say(String.format(
-                "%s%s strikes %s. %d dmg.",
-                crit,
-                result.weapon() == null ? "Bare limb" : result.weapon().name(),
-                targetDesc, result.damage()
-        ));
-        if (result.crippledPart() && part != null) {
-            c.say(entity.name() + "'s " + part.path + " is crippled!");
-        }
-        if (result.blindedTarget()) {
-            c.say(entity.name() + " is blinded!");
-        }
-        if (result.killed()) {
-            if (entity.kind() == Entity.Kind.CREATURE) {
-                c.say(entity.name() + " falls.");
-            } else {
-                c.say(entity.name() + " is destroyed.");
-            }
-            for (String note : result.destruction().messages()) {
-                c.say(note);
-            }
-        }
-        return ExitCode.SUCCESS;
+        return CombatNarrative.narrateMelee(
+                c, c.world.dice(), result.weapon() == null ? "Bare limb" : result.weapon().name(), entity, result
+        );
     }
 }
