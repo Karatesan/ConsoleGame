@@ -157,8 +157,8 @@ class DestructionTest {
         Interrupts interrupts = new Interrupts(() -> ReactionSystem.fire(testWorld), bus);
         Executor exec = new Executor(testWorld, bus, round, catalog, interrupts, () -> SimulationSystem.tick(testWorld, bus));
 
-        // b1 is at (2,5), adjacent to Thrall at (3,4)
-        // b1 has 8 HP. Thrall's weapon does 4-8 + strength. Let's strike it twice or lower its HP to 1.
+        // b1 is at (2,5); position Thrall cardinally adjacent at (2,4) to strike b1
+        testWorld.thrall().moveTo(new Vec2(2, 4));
         testWorld.get("b1").takeDamage(7); // b1 now has 1 HP
 
         exec.submit("strike b1");
@@ -170,7 +170,8 @@ class DestructionTest {
         assertFalse(narratives.stream().anyMatch(s -> s.contains("Oil Barrel falls.")),
                 "Props should not say 'falls.'");
 
-        // Now test creature: o1 has 24 HP, reduce to 1 HP
+        // Now test creature: o1 is at (3,5), cardinally adjacent to (3,4)
+        testWorld.thrall().moveTo(new Vec2(3, 4));
         testWorld.get("o1").takeDamage(23);
         narratives.clear();
 

@@ -3,27 +3,56 @@ package com.archon.verb;
 import com.archon.address.Resolved;
 import com.archon.command.Ast;
 import com.archon.event.EventBus;
+import com.archon.exec.RoundState;
 import com.archon.model.ItemLocation;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
 import com.archon.system.environment.Substances;
 import com.archon.system.item.ItemMoves;
+import com.archon.system.physics.ThermalState;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class VerbContext extends ValidationContext {
 
     public final EventBus bus;
     public final Material materialIn;
+    public final RoundState round;
+    public final boolean pipedOutput;
+    public final List<String> log = new ArrayList<>();
     public Material materialOut;
 
     public VerbContext(World world, Ast.Invocation inv, EventBus bus, Material materialIn) {
+        this(world, inv, bus, materialIn, null, false);
+    }
+
+    public VerbContext(World world, Ast.Invocation inv, EventBus bus, Material materialIn, RoundState round) {
+        this(world, inv, bus, materialIn, round, false);
+    }
+
+    public VerbContext(World world, Ast.Invocation inv, EventBus bus, Material materialIn, RoundState round, boolean pipedOutput) {
         super(world, inv, materialIn != null);
         this.bus = bus;
         this.materialIn = materialIn;
+        this.round = round;
+        this.pipedOutput = pipedOutput;
     }
 
     public void say(String text) {
         bus.narrate(text);
+    }
+
+    public void sayAll(List<String> log) {
+        for (int i = 0; i < log.size(); i++) {
+            say(log.get(i));
+        }
+    }
+
+    public void flushLog() {
+        sayAll(log);
+        log.clear();
     }
 
     public ExitCode rejectBlocked(String reason) {
@@ -86,7 +115,7 @@ public final class VerbContext extends ValidationContext {
         return item;
     }
 
-    public Vec2 selectDeliveryPos(boolean isThrow) {
+    public Resolved.Target selectDeliveryTarget(boolean isThrow) {
         Resolved.Target target = resolveTarget(inv.arg(pipedInput ? 0 : 1));
         if (target == null) return null;
 
@@ -103,6 +132,22 @@ public final class VerbContext extends ValidationContext {
         }
 
         Substances.requireDestination(world, target.pos());
-        return target.pos();
+        return target;
+    }
+
+    public static boolean isFloorDelivery(Resolved.Target target) {
+        return target instanceof Resolved.OnTile ot && "floor".equals(ot.layer());
+    }
+
+    public boolean payBloodCost(String spell, int hpCost) {
+        ThermalState.damageEntity(world, thrall, hpCost, true, log);
+        if (!thrall.alive()) {
+            say(spell + " drains the last of " + thrall.name() + "'s life (" + hpCost + " HP)!");
+            flushLog();
+            return false;
+        }
+        log.add(spell + " drains " + hpCost + " HP from " + thrall.name()
+                + " (" + thrall.hp() + "/" + thrall.maxHp() + " HP).");
+        return true;
     }
 }

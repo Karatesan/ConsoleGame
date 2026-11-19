@@ -4,8 +4,11 @@ import com.archon.model.BodyPart;
 import com.archon.model.Dice;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
+import com.archon.system.physics.EntityReactions;
 import com.archon.verb.ExitCode;
 import com.archon.verb.VerbContext;
+
+import java.util.List;
 
 public final class CombatNarrative {
     private CombatNarrative() {}
@@ -172,84 +175,133 @@ public final class CombatNarrative {
         return String.format(pool[idx], targetName);
     }
 
-    private static String formatBadge(CombatEngine.HitResult res) {
-        if (!res.hit()) {
-            return " [" + res.hitChance() + "% chance]";
-        }
-        if (res.crit()) {
-            if (res.armorBlocked() > 0) {
-                return " [" + res.critChance() + "% crit | armor bypassed]";
-            }
-            return " [" + res.critChance() + "% crit]";
-        }
-        if (res.armorBlocked() > 0) {
-            return " [" + res.hitChance() + "% chance | " + res.armorBlocked() + " blocked]";
-        }
-        return " [" + res.hitChance() + "% chance]";
-    }
-
     public static ExitCode narrateMelee(VerbContext c, Dice dice, String weaponName, Entity target, CombatEngine.HitResult res) {
-        BodyPart part = res.part();
-        String targetDesc = target.name() + (part == null ? "" : "'s " + part.path);
-        if (!res.hit()) {
-            c.say("Strike at " + targetDesc + " — MISS" + formatBadge(res) + ".");
-            return ExitCode.MISS;
-        }
-
-        if (res.crit()) {
-            c.say("CRITICAL! " + describeCrit(dice, part, res, target.name()) + " " + res.damage() + " dmg" + formatBadge(res) + ".");
-        } else {
-            c.say(weaponName + " strikes " + targetDesc + ". " + res.damage() + " dmg" + formatBadge(res) + ".");
-        }
-
-        if (res.crippledPart() && part != null) {
-            c.say(target.name() + "'s " + part.path + " is crippled!");
-        }
-        if (res.blindedTarget()) {
-            c.say(target.name() + " is blinded!");
-        }
-        if (res.killed()) {
-            if (target.kind() == Entity.Kind.CREATURE) {
-                c.say(target.name() + " falls.");
-            } else {
-                c.say(target.name() + " is destroyed.");
-            }
-            for (String note : res.destruction().messages()) {
-                c.say(note);
-            }
-        }
-        return ExitCode.SUCCESS;
+        return narrateHit(c, dice, weaponName, target, res);
     }
 
     public static ExitCode narrateRanged(VerbContext c, Dice dice, Entity target, CombatEngine.HitResult res) {
+        return narrateHit(c, dice, "Arrow", target, res);
+    }
+
+    public static String formatRolls(boolean hit, int hitChance, int hitRoll, boolean crit, int critChance, int critRoll) {
+        if (hitRoll <= 0) {
+            return "[auto-hit]";
+        }
+        String hitPart = hitChance + "% | roll " + (101 - hitRoll) + " vs " + (101 - hitChance) + "+";
+        if (!hit || !crit || critChance <= 0 || critRoll <= 0) {
+            return "[" + hitPart + "]";
+        }
+        return "[" + hitPart + " | crit " + critChance + "%: " + (101 - critRoll) + " vs " + (101 - critChance) + "+]";
+    }
+
+    public static String formatArmor(int armorBlocked, boolean armorBypassed) {
+        if (armorBypassed && armorBlocked > 0) return " (armor bypassed)";
+        if (armorBlocked > 0) return " (" + armorBlocked + " blocked)";
+        return "";
+    }
+
+    public static String formatAttack(
+            String source, String targetName, String zone,
+            boolean hit, int hitChance, int hitRoll,
+            boolean crit, int critChance, int critRoll, int critTier,
+            int damage, int armorBlocked, boolean armorBypassed) {
+        String target = zone == null ? targetName : targetName + "'s " + zone;
+        String rolls = formatRolls(hit, hitChance, hitRoll, crit, critChance, critRoll);
+        if (!hit) {
+            return source + " misses " + target + ". " + rolls;
+        }
+        String prefix = crit ? (critTier > 1 ? "CRITICAL T" + critTier + "! " : "CRITICAL! ") : "";
+        String dmgPart = damage > 0 ? " for " + damage + " dmg" + formatArmor(armorBlocked, armorBypassed) : "";
+        return prefix + source + " hits " + target + dmgPart + ". " + rolls;
+    }
+
+    public static String formatAttack(String source, Entity target, CombatEngine.HitResult res) {
         BodyPart part = res.part();
+        return formatAttack(
+                source, target.name(), part == null ? null : part.path,
+                res.hit(), res.hitChance(), res.hitRoll(),
+                res.crit(), res.critChance(), res.hit() ? res.critRoll() : 0, res.crit() ? 1 : 0,
+                res.damage(), res.armorBlocked(), res.crit());
+    }
+
+    public static String formatAutoHit(
+            String source, String targetName, int damage, int armorBlocked, boolean armorBypassed) {
+        return formatAttack(source, targetName, null, true, 100, 0, false, 0, 0, 0,
+                damage, armorBlocked, armorBypassed);
+    }
+
+    public static void narrateAutoHit(
+            VerbContext c, String source, String targetName, int damage, int armorBlocked, boolean armorBypassed) {
+        c.say(formatAutoHit(source, targetName, damage, armorBlocked, armorBypassed));
+        c.flushLog();
+    }
+
+    public static void narrateAutoHit(VerbContext c, String source, Entity target, EntityReactions.Hit hit) {
+        narrateAutoHit(c, source, target.name(), hit.damage(), hit.armorBlocked(), hit.armorBypassed());
+    }
+
+    public static void narrateSpellHit(
+            VerbContext c, String source, Entity target, BodyPart zone, boolean aimed,
+            SpellCombat.RollResult roll, int damage, EntityReactions.Hit hit) {
+        c.say(formatAttack(
+                source, target.name(), aimed && zone != null ? zone.path : null,
+                true, roll.hitChance(), roll.hitRoll(),
+                roll.crit(), roll.critChance(), roll.critRoll(), roll.severityTier(),
+                damage, hit.armorBlocked(), hit.armorBypassed()));
+        c.flushLog();
+    }
+
+    public static void narrateSpellMiss(
+            VerbContext c, String source, Entity target, BodyPart zone, SpellCombat.RollResult roll) {
+        c.say(formatAttack(
+                source, target.name(), zone != null ? zone.path : null,
+                false, roll.hitChance(), roll.hitRoll(),
+                false, 0, 0, 0,
+                0, 0, false));
+        c.flushLog();
+    }
+
+    public static void insertHit(List<String> log, int index, String source, Entity target, CombatEngine.HitResult res) {
+        int i = index;
+        log.add(i++, formatAttack(source, target, res));
         if (!res.hit()) {
-            c.say("Arrow flies wide of " + target.name() + formatBadge(res) + ".");
+            return;
+        }
+        BodyPart part = res.part();
+        if (res.crippledPart() && part != null) {
+            log.add(i++, target.name() + "'s " + part.path + " is crippled!");
+        }
+        if (res.blindedTarget()) {
+            log.add(i++, target.name() + " is blinded!");
+        }
+        if (res.killed() && i == log.size()) {
+            log.add(i++, target.name() + (target.kind() == Entity.Kind.CREATURE ? " falls." : " is destroyed."));
+            List<String> notes = res.destruction().messages();
+            for (int n = 0; n < notes.size(); n++) {
+                log.add(i++, notes.get(n));
+            }
+        }
+    }
+
+    private static ExitCode narrateHit(VerbContext c, Dice dice, String source, Entity target, CombatEngine.HitResult res) {
+        BodyPart part = res.part();
+        c.say(formatAttack(source, target, res));
+
+        if (!res.hit()) {
             return ExitCode.MISS;
         }
-
-        String targetDesc = target.name() + (part == null ? "" : "'s " + part.path);
-        if (res.crit()) {
-            c.say("CRITICAL! " + describeCrit(dice, part, res, target.name()) + " " + res.damage() + " dmg" + formatBadge(res) + ".");
-        } else {
-            c.say("Arrow strikes " + targetDesc + ". " + res.damage() + " dmg" + formatBadge(res) + ".");
-        }
-
         if (res.crippledPart() && part != null) {
             c.say(target.name() + "'s " + part.path + " is crippled!");
         }
         if (res.blindedTarget()) {
             c.say(target.name() + " is blinded!");
         }
+        if (res.crit()) {
+            c.say(describeCrit(dice, part, res, target.name()));
+        }
         if (res.killed()) {
-            if (target.kind() == Entity.Kind.CREATURE) {
-                c.say(target.name() + " falls.");
-            } else {
-                c.say(target.name() + " is destroyed.");
-            }
-            for (String note : res.destruction().messages()) {
-                c.say(note);
-            }
+            c.say(target.name() + (target.kind() == Entity.Kind.CREATURE ? " falls." : " is destroyed."));
+            c.sayAll(res.destruction().messages());
         }
         return ExitCode.SUCCESS;
     }

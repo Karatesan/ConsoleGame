@@ -1,4 +1,4 @@
-    package com.archon.system.combat;
+package com.archon.system.combat;
 
 import com.archon.model.Actor;
 import com.archon.model.Balance;
@@ -12,6 +12,9 @@ import com.archon.model.Tag;
 import com.archon.model.World;
 import com.archon.system.environment.Destruction;
 import com.archon.system.item.ItemMoves;
+import com.archon.system.physics.ThermalState;
+
+import java.util.List;
 
 import static com.archon.model.Balance.*;
 
@@ -35,6 +38,11 @@ public final class CombatEngine {
 
     public static HitResult resolveMelee(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
                                          boolean aimed, String power, boolean force) {
+        return resolveMelee(dice, world, attacker, target, part, aimed, power, force, null);
+    }
+
+    public static HitResult resolveMelee(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
+                                         boolean aimed, String power, boolean force, List<String> log) {
         int powerHitMod = "light".equals(power) ? LIGHT_HIT_MOD : "heavy".equals(power) ? HEAVY_HIT_MOD : NORMAL_HIT_MOD;
         int aimMod = (aimed && part != null) ? part.hitMod : 0;
         int hitChance = BASE_HIT_CHANCE + aimMod + powerHitMod - effectiveEvasion(target);
@@ -43,6 +51,9 @@ public final class CombatEngine {
         }
         if (attacker.has(Tag.BLIND)) {
             hitChance -= BLIND_HIT_PENALTY;
+        }
+        if (attacker.has(Tag.DAZED)) {
+            hitChance += DAZED_HIT_PENALTY;
         }
         if (target instanceof Actor actor && actor.isGuarded() && !force) {
             hitChance -= GUARD_MELEE_HIT_PENALTY;
@@ -62,40 +73,8 @@ public final class CombatEngine {
         if (attacker.isCrippled(BodyPart.ARM_R)) {
             multiplier *= CRIPPLED_ARM_DMG_MULT;
         }
-
-        // Fallout 2 Critical Hit Math: Base + Targeted Shot Crit Bonus
-        int critBonus = (aimed && part != null) ? part.critBonus : 0;
-        int critChance = Balance.clampChance(BASE_CRIT_CHANCE + critBonus);
-        Dice.Roll critRoll = dice.check(critChance);
-        boolean crit = critRoll.hit();
-        if (crit) {
-            multiplier *= CRIT_DMG_MULT;
-        }
-
-        // Critical hits bypass armor (Fallout 2 "Ignores Armor" rule)
-        int rawArmor = effectiveArmor(target);
-        int armorBlocked = crit ? 0 : rawArmor;
-        int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armorBlocked);
-        target.takeDamage(damage);
-
-        boolean weaponDegraded = force && weapon != null;
-        if (weaponDegraded) {
-            weapon.wear(FORCE_WEAPON_WEAR);
-        }
-
-        boolean killed = !target.alive();
-        boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, power);
-        Tag statusApplied = null;
-        if (!killed && part != null && rollBlind(dice, target, part)) {
-            statusApplied = Tag.BLIND;
-        }
-        Destruction.Result destruction = Destruction.Result.EMPTY;
-        if (killed) {
-            destruction = Destruction.onKilled(world, target);
-        }
-        return new HitResult(true, hitRoll.roll(), hitChance, damage, crit ? rawArmor : armorBlocked,
-                part, weapon, crit, critRoll.roll(), critChance, killed, weaponDegraded, crippledPart,
-                statusApplied, destruction);
+        return finishAttack(dice, world, attacker, target, part, aimed, power, force,
+                hitRoll, hitChance, weapon, baseDamage, multiplier, log);
     }
 
     public static int rollMeleeDamage(Dice dice, Actor attacker) {
@@ -134,6 +113,11 @@ public final class CombatEngine {
     }
 
     public static HitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part, boolean aimed) {
+        return resolveRanged(dice, world, attacker, target, part, aimed, null);
+    }
+
+    public static HitResult resolveRanged(Dice dice, World world, Actor attacker, Entity target, BodyPart part,
+                                          boolean aimed, List<String> log) {
         int distance = target.pos().chebyshev(attacker.pos());
         int rangeModifier = distance <= RANGED_POINT_BLANK_DIST ? RANGED_POINT_BLANK_MOD
                 : distance <= RANGED_OPTIMAL_DIST ? RANGED_OPTIMAL_MOD
@@ -141,8 +125,9 @@ public final class CombatEngine {
         int armPenalty = (attacker.isCrippled(BodyPart.ARM_L) || attacker.isCrippled(BodyPart.ARM_R))
                 ? -CRIPPLED_ARM_HIT_PENALTY : 0;
         int blindPenalty = attacker.has(Tag.BLIND) ? -BLIND_HIT_PENALTY : 0;
+        int dazedPenalty = attacker.has(Tag.DAZED) ? DAZED_HIT_PENALTY : 0;
         int aimMod = (aimed && part != null) ? part.hitMod : 0;
-        int hitChance = Balance.clampChance(BASE_HIT_CHANCE + aimMod + rangeModifier + armPenalty + blindPenalty - effectiveEvasion(target));
+        int hitChance = Balance.clampChance(BASE_HIT_CHANCE + aimMod + rangeModifier + armPenalty + blindPenalty + dazedPenalty - effectiveEvasion(target));
 
         Dice.Roll hitRoll = dice.check(hitChance);
         if (!hitRoll.hit()) {
@@ -154,6 +139,17 @@ public final class CombatEngine {
                 ? dice.between(weapon.minDamage(), weapon.maxDamage())
                 : dice.between(RANGED_DMG_MIN, RANGED_DMG_MAX);
         double multiplier = part != null ? part.damageMult : 1.0;
+        return finishAttack(dice, world, attacker, target, part, aimed, "normal", false,
+                hitRoll, hitChance, weapon, baseDamage, multiplier, log);
+    }
+
+    private static HitResult finishAttack(
+            Dice dice, World world, Actor attacker, Entity target, BodyPart part,
+            boolean aimed, String power, boolean force, Dice.Roll hitRoll, int hitChance,
+            Item weapon, int baseDamage, double multiplier, List<String> log) {
+        if (isUsingNumbedWeapon(attacker)) {
+            multiplier *= NUMB_ARM_DMG_MULT;
+        }
 
         // Fallout 2 Critical Hit Math: Base + Targeted Shot Crit Bonus
         int critBonus = (aimed && part != null) ? part.critBonus : 0;
@@ -170,8 +166,13 @@ public final class CombatEngine {
         int damage = Math.max(MIN_DAMAGE, (int) Math.round(baseDamage * multiplier) - armorBlocked);
         target.takeDamage(damage);
 
+        boolean weaponDegraded = force && weapon != null;
+        if (weaponDegraded) {
+            weapon.wear(FORCE_WEAPON_WEAR);
+        }
+
         boolean killed = !target.alive();
-        boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, "normal");
+        boolean crippledPart = !killed && part != null && rollCripple(dice, target, part, power);
         Tag statusApplied = null;
         if (!killed && part != null && rollBlind(dice, target, part)) {
             statusApplied = Tag.BLIND;
@@ -179,10 +180,25 @@ public final class CombatEngine {
         Destruction.Result destruction = Destruction.Result.EMPTY;
         if (killed) {
             destruction = Destruction.onKilled(world, target);
+        } else {
+            ThermalState.onCreatureDamaged(world, target, damage, false, log);
+            killed = !target.alive();
         }
         return new HitResult(true, hitRoll.roll(), hitChance, damage, crit ? rawArmor : armorBlocked,
-                part, weapon, crit, critRoll.roll(), critChance, killed, false, crippledPart,
+                part, weapon, crit, critRoll.roll(), critChance, killed, weaponDegraded, crippledPart,
                 statusApplied, destruction);
+    }
+
+    private static boolean isUsingNumbedWeapon(Actor attacker) {
+        if (!attacker.has(Tag.NUMB_ARM) || attacker.numbArmPart == null) {
+            return false;
+        }
+        Item right = attacker.inventory().equipped(EquipmentSlot.HAND_RIGHT);
+        if (right != null) {
+            return attacker.numbArmPart == BodyPart.ARM_R;
+        }
+        Item left = attacker.inventory().equipped(EquipmentSlot.HAND_LEFT);
+        return left != null && attacker.numbArmPart == BodyPart.ARM_L;
     }
 
     private static int effectiveArmor(Entity target) {
@@ -192,7 +208,10 @@ public final class CombatEngine {
                 : base;
     }
 
-    private static int effectiveEvasion(Entity target) {
+    public static int effectiveEvasion(Entity target) {
+        if (target == null || target.kind() != Entity.Kind.CREATURE) {
+            return 0;
+        }
         int eva = target.evasion();
         if (target instanceof Actor a && a.isCrippled(BodyPart.HEAD)) {
             eva -= CRIPPLED_HEAD_EVA_PENALTY;
@@ -202,6 +221,11 @@ public final class CombatEngine {
         }
         if (target.has(Tag.PRONE)) {
             eva -= PRONE_EVA_PENALTY;
+        }
+        if (target.has(Tag.FROZEN)) {
+            eva += EVA_FROZEN;
+        } else if (target.has(Tag.CHILLED)) {
+            eva += EVA_CHILLED;
         }
         return eva;
     }

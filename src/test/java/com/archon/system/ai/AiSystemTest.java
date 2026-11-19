@@ -9,10 +9,13 @@ import com.archon.exec.Executor;
 import com.archon.exec.Interrupts;
 import com.archon.exec.RoundState;
 import com.archon.model.Actor;
+import com.archon.model.Balance;
 import com.archon.model.BodyPart;
+import com.archon.model.CreatureStats;
 import com.archon.model.Dice;
 import com.archon.model.EquipmentSlot;
 import com.archon.model.Tag;
+import com.archon.model.Thrall;
 import com.archon.model.Vec2;
 import com.archon.model.World;
 import com.archon.system.combat.CombatEngine;
@@ -20,6 +23,7 @@ import com.archon.system.combat.ReactionSystem;
 import com.archon.system.environment.Ignition;
 import com.archon.system.environment.SimulationSystem;
 import com.archon.system.environment.Substances;
+import com.archon.system.physics.ThermalState;
 import com.archon.system.spatial.SpatialService;
 import com.archon.verb.VerbCatalog;
 import org.junit.jupiter.api.Test;
@@ -81,8 +85,11 @@ class AiSystemTest {
         orc.moveTo(new Vec2(3, 4));
 
         AiSystem.tick(world, new EventBus());
-        assertEquals(1, orc.pos().chebyshev(world.thrall().pos()),
-                "Orc should route around the (3,3) wall in 2 steps to reach adjacency with (3,2)");
+        assertEquals(2, Math.abs(orc.pos().x() - world.thrall().pos().x()) + Math.abs(orc.pos().y() - world.thrall().pos().y()),
+                "Orc must route cardinally around (3,3) wall in 2 steps without diagonal corner-cutting");
+        AiSystem.tick(world, new EventBus());
+        assertEquals(1, orc.pos().manhattan(world.thrall().pos()),
+                "Orc should reach cardinal melee adjacency on round 2");
     }
 
     @Test
@@ -133,8 +140,9 @@ class AiSystemTest {
         World world = Scenario.testRoom(new Dice.Always(true));
         Executor exec = executor(world);
 
-        // Pour oil on Thrall's current tile (3,4), then step out of it
-        Substances.spill(world, new Vec2(3, 4), Tag.OIL);
+        // Pour oil on Thrall's current floor tile (3,4) via @self/floor, then step out of it
+        exec.submit("pour flask_oil @self/floor");
+        assertFalse(world.thrall().has(Tag.OIL), "@self/floor should oil the floor only, not Thrall");
         assertFalse(world.thrall().has(Tag.PRONE), "Standing still on poured oil does not slip");
 
         exec.submit("step e");
@@ -166,13 +174,140 @@ class AiSystemTest {
         orc.ignite();
         world.map().addTag(orc.pos(), Tag.BURNING);
 
+        // G8: Water spill on occupied tile extinguishes burning occupant only; floorOnly spill extinguishes burning tile
         Substances.spill(world, orc.pos(), Tag.WATER);
         assertFalse(orc.has(Tag.BURNING), "Water should extinguish burning occupant");
-        assertFalse(world.tile(orc.pos()).has(Tag.BURNING), "Water should extinguish burning tile");
-        assertTrue(orc.has(Tag.WET), "Water should apply WET tag");
+        assertTrue(world.tile(orc.pos()).has(Tag.BURNING), "Occupant-targeted spill leaves floor untouched");
+        assertTrue(world.tile(orc.pos()).has(Tag.STEAM), "Extinguishing fire should produce STEAM");
+        assertFalse(orc.has(Tag.WET), "G8 extinguish leaves creature Dry at BODY_TEMP");
+
+        Substances.spill(world, orc.pos(), Tag.WATER, true, null);
+        assertFalse(world.tile(orc.pos()).has(Tag.BURNING), "Floor-targeted spill should extinguish burning tile");
+
+        // Second Water spill on Dry creature applies WET (which blocks ignition)
+        Substances.spill(world, orc.pos(), Tag.WATER);
+        assertTrue(orc.has(Tag.WET), "Water on Dry creature should apply WET tag");
 
         assertFalse(Ignition.entity(orc), "WET entity should resist ignition");
         assertFalse(orc.has(Tag.BURNING));
         assertFalse(orc.has(Tag.WET), "Resisting ignition should evaporate WET");
+    }
+
+    @Test
+    void greaseFireHoldsThreeRoundsBeforeCoolingOnCreatureAndTile() {
+        World w = new World(10, 10, new Dice.Always(false));
+        w.installThrall(new Thrall(new Vec2(1, 1), 40));
+        Actor orc = new Actor("o1", "Orc", 'O', new Vec2(8, 8), new CreatureStats(80, 0, 0));
+        orc.cripple(BodyPart.LEGS);
+        w.add(orc);
+
+        orc.applyTag(Tag.OIL);
+        orc.applyTag(Tag.BURNING);
+        orc.oilTurns = Balance.OIL_TURNS;
+        orc.temp = Balance.BURN_CAP;
+
+        Vec2 tilePos = new Vec2(5, 5);
+        ThermalState.setOilSlick(w, tilePos);
+        ThermalState.igniteTile(w, tilePos);
+        EventBus bus = new EventBus();
+
+        for (int r = 1; r <= 3; r++) {
+            SimulationSystem.tick(w, bus);
+            assertTrue(orc.has(Tag.BURNING), "Creature grease fire must still burn on round " + r);
+            assertEquals(Balance.BURN_CAP, orc.temp, "Creature grease fire must hold BURN_CAP on round " + r);
+            assertEquals(Balance.OIL_TURNS - r, orc.oilTurns);
+            assertTrue(w.tile(tilePos).has(Tag.BURNING), "Tile grease fire must still burn on round " + r);
+            assertEquals(Balance.BURN_CAP, w.tile(tilePos).temp, "Tile grease fire must hold BURN_CAP on round " + r);
+            assertEquals(Balance.OIL_TURNS - r, w.tile(tilePos).oilTurns);
+        }
+
+        SimulationSystem.tick(w, bus);
+        assertTrue(orc.has(Tag.BURNING), "Round 4 cools 250 -> 220 >= IGNITE_TEMP");
+        assertEquals(Balance.BURN_CAP - Balance.CREATURE_HOT_COOL_STEP, orc.temp);
+        assertFalse(w.tile(tilePos).has(Tag.BURNING), "Round 4 cools tile 250 -> 190 < IGNITE_TEMP");
+        assertFalse(w.tile(tilePos).has(Tag.OIL));
+
+        SimulationSystem.tick(w, bus);
+        assertFalse(orc.has(Tag.BURNING), "Round 5 cools 220 -> 190 < IGNITE_TEMP and extinguishes");
+        assertFalse(orc.has(Tag.OIL));
+        assertEquals(Balance.BODY_TEMP, orc.temp);
+    }
+
+    @Test
+    void blindLingerFrozenCausticBlockAndAiSnapFreezeHaltsTurn() {
+        World w = new World(10, 10, new Dice.Always(false));
+        w.installThrall(new Thrall(new Vec2(2, 2), 40));
+        Executor exec = executor(w);
+
+        // Blind lingers 1 full round after leaving gas
+        ThermalState.spawnGas(w, new Vec2(3, 2), Tag.STEAM);
+        exec.submit("step e");
+        assertTrue(w.thrall().has(Tag.BLIND));
+        exec.submit("step e");
+        assertEquals(new Vec2(4, 2), w.thrall().pos());
+        assertTrue(w.thrall().has(Tag.BLIND));
+
+        exec.submit("pass");
+        assertTrue(w.thrall().has(Tag.BLIND), "BLIND must linger for 1 full round after leaving gas");
+
+        exec.submit("pass");
+        assertFalse(w.thrall().has(Tag.BLIND), "BLIND should clear after the linger round ends");
+
+        // FROZEN ice shell blocks CAUSTIC_GAS round-end damage and armor shred
+        Actor frozen = new Actor("f1", "Frozen", 'O', new Vec2(2, 7), new CreatureStats(30, 3, 0));
+        frozen.applyTag(Tag.FROZEN);
+        frozen.applyTag(Tag.STUNNED);
+        frozen.temp = -25;
+        w.add(frozen);
+        ThermalState.spawnGas(w, new Vec2(2, 7), Tag.CAUSTIC_GAS);
+        SimulationSystem.tick(w, new EventBus());
+        assertEquals(30, frozen.hp());
+        assertEquals(3, frozen.armor());
+        assertFalse(frozen.has(Tag.CORRODED));
+
+        // AI snap-freezing mid-turn on WATER tile entry halts remaining actions
+        World aiWorld = new World(10, 10, new Dice.Seeded(1L));
+        aiWorld.installThrall(new Thrall(new Vec2(2, 2), 40));
+        Actor orc = new Actor("o1", "Orc", 'O', new Vec2(4, 2), new CreatureStats(24, 2, 0));
+        orc.temp = 0;
+        orc.applyTag(Tag.CHILLED);
+        aiWorld.add(orc);
+        ThermalState.setWaterPuddle(aiWorld, new Vec2(3, 2));
+
+        AiSystem.tick(aiWorld, new EventBus());
+        assertEquals(new Vec2(3, 2), orc.pos());
+        assertTrue(orc.has(Tag.FROZEN));
+        assertTrue(orc.has(Tag.STUNNED));
+        assertEquals(40, aiWorld.thrall().hp(), "Snap-frozen AI must not strike after freezing mid-turn");
+        assertFalse(orc.isGuarded(), "Snap-frozen AI must not raise guard after freezing mid-turn");
+    }
+
+    @Test
+    void dazedEnemySuffersHitPenaltyForTwoRoundsThenRecovers() {
+        World w = new World(10, 10, new Dice.Always(false));
+        w.installThrall(new Thrall(new Vec2(2, 2), 40));
+        Actor orc = new Actor("o1", "Orc", 'O', new Vec2(3, 2), new CreatureStats(30, 0, 0));
+        orc.applyTag(Tag.DAZED);
+        orc.dazedTurns = Balance.DAZED_TURNS;
+        w.add(orc);
+
+        List<String> lines = new java.util.ArrayList<>();
+        EventBus bus = new EventBus();
+        bus.subscribe(ev -> { if (ev instanceof GameEvent.ActorBeat b) lines.addAll(b.lines()); });
+
+        SimulationSystem.tick(w, bus);
+        assertTrue(lines.stream().anyMatch(s -> s.contains("[50% |")), "Round 1 dazed orc has 50% hit chance: " + lines);
+        assertTrue(orc.has(Tag.DAZED));
+        assertEquals(1, orc.dazedTurns);
+
+        lines.clear();
+        SimulationSystem.tick(w, bus);
+        assertTrue(lines.stream().anyMatch(s -> s.contains("[50% |")), "Round 2 dazed orc still has 50% hit chance: " + lines);
+        assertFalse(orc.has(Tag.DAZED));
+        assertEquals(0, orc.dazedTurns);
+
+        lines.clear();
+        SimulationSystem.tick(w, bus);
+        assertTrue(lines.stream().anyMatch(s -> s.contains("[70% |")), "Round 3 recovered orc returns to 70% hit chance: " + lines);
     }
 }

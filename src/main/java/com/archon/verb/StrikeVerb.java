@@ -43,7 +43,12 @@ public final class StrikeVerb implements Verb {
         if (hand != null && target instanceof Resolved.OnLocation) {
             return c.rejectBlocked("nothing in that hand to disarm");
         }
-        if (!c.checkReachable(target)) return ExitCode.BLOCKED;
+        if (target.pos().manhattan(c.thrall.pos()) != 1) {
+            return c.rejectBlocked("target at " + target.pos() + " is not cardinally adjacent");
+        }
+        if (c.thrall.has(Tag.BLIND) && target.pos().manhattan(c.thrall.pos()) > Balance.BLIND_MAX_RANGE) {
+            return c.rejectBlocked("blinded — cannot strike beyond " + Balance.BLIND_MAX_RANGE + " tile");
+        }
 
         if (hand != null) {
             Actor owner = hand.owner();
@@ -65,10 +70,12 @@ public final class StrikeVerb implements Verb {
 
         String power = c.inv.flag("power") == null ? "normal" : c.inv.flag("power").toLowerCase(Locale.ROOT);
         var result = CombatEngine.resolveMelee(
-                c.world.dice(), c.world, c.thrall, entity, part, aimed, power, c.inv.hasFlag("force")
+                c.world.dice(), c.world, c.thrall, entity, part, aimed, power, c.inv.hasFlag("force"), c.log
         );
-        return CombatNarrative.narrateMelee(
+        ExitCode code = CombatNarrative.narrateMelee(
                 c, c.world.dice(), result.weapon() == null ? "Bare limb" : result.weapon().name(), entity, result
         );
+        c.flushLog();
+        return code;
     }
 }

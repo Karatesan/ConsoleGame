@@ -3,6 +3,7 @@ package com.archon.event;
 import com.archon.model.Vec2;
 import com.archon.verb.ExitCode;
 import java.util.List;
+import java.util.Objects;
 
 public sealed interface GameEvent {
     record RoundStart(int round, int ap)                                              implements GameEvent {}
@@ -24,7 +25,9 @@ public sealed interface GameEvent {
     record LineBroke(int stageIndex, String reason, int allocation, int penalty,
                      int forfeited, int apLeft, String hint)                          implements GameEvent {}
     record InterruptFired(String source, String description, int damage)               implements GameEvent {}
-    record Narrative(String text)                                                     implements GameEvent {}
+    record Narrative(String text)                                                     implements GameEvent {
+        public Narrative { Objects.requireNonNull(text, "narrative text"); }
+    }
     record Redraw()                                                                   implements GameEvent {}
     record ThrallDied()                                                               implements GameEvent {}
 }

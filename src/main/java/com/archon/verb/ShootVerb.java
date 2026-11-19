@@ -1,6 +1,7 @@
 package com.archon.verb;
 
 import com.archon.address.Resolved;
+import com.archon.model.Balance;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.Tag;
@@ -27,8 +28,8 @@ public final class ShootVerb implements Verb {
         if (!c.thrall.isNocked()) {
             return c.rejectBlocked("nothing nocked");
         }
-        if (c.thrall.has(Tag.BLIND)) {
-            return c.rejectBlocked("blinded — cannot aim ranged weapon");
+        if (c.thrall.has(Tag.BLIND) && target.pos().chebyshev(c.thrall.pos()) > Balance.BLIND_MAX_RANGE) {
+            return c.rejectBlocked("blinded — cannot target beyond " + Balance.BLIND_MAX_RANGE + " tile");
         }
         if (!SpatialService.lineOfFire(c.world, c.thrall.pos(), target.pos())) {
             return c.rejectBlocked("no straight line of fire");
@@ -42,7 +43,9 @@ public final class ShootVerb implements Verb {
         }
         c.thrall.fireNocked();
 
-        var result = CombatEngine.resolveRanged(c.world.dice(), c.world, c.thrall, target, part, aimed);
-        return CombatNarrative.narrateRanged(c, c.world.dice(), target, result);
+        var result = CombatEngine.resolveRanged(c.world.dice(), c.world, c.thrall, target, part, aimed, c.log);
+        ExitCode code = CombatNarrative.narrateRanged(c, c.world.dice(), target, result);
+        c.flushLog();
+        return code;
     }
 }

@@ -9,6 +9,7 @@ import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
 import com.archon.system.combat.CombatEngine;
+import com.archon.system.physics.ThermalState;
 import com.archon.system.spatial.SpatialService;
 
 import java.util.ArrayList;
@@ -48,7 +49,7 @@ public final class Destruction {
             Item item = prop.removeContents();
             if (item.substance() != null) {
                 spilledSubstance = item.consumeSubstance();
-                Substances.spill(world, pos, spilledSubstance);
+                Substances.spill(world, pos, spilledSubstance, true, null);
                 String sub = spilledSubstance.name().toLowerCase(Locale.ROOT);
                 messages.add(Character.toUpperCase(sub.charAt(0)) + sub.substring(1) + " spills across the floor.");
             } else {
@@ -64,9 +65,11 @@ public final class Destruction {
             if (tile != null) {
                 if (tile.has(Tag.WATER)) {
                     world.map().removeTag(pos, Tag.WATER);
+                    world.map().removeTag(pos, Tag.LIQUID);
+                    world.map().removeTag(pos, Tag.CONDUCTIVE);
                     messages.add("The embers are doused by water.");
                 } else {
-                    world.map().addTag(pos, Tag.BURNING);
+                    ThermalState.igniteTile(world, pos);
                     ignitedTile = true;
                     messages.add("Fire takes hold of the floor.");
                     Entity occupant = SpatialService.entityAt(world, pos);

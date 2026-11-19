@@ -3,6 +3,7 @@ package com.archon.model;
 public record Vec2(int x, int y) {
     public Vec2 plus(Vec2 o) { return new Vec2(x + o.x, y + o.y); }
     public int chebyshev(Vec2 o) { return Math.max(Math.abs(x - o.x), Math.abs(y - o.y)); }
+    public int manhattan(Vec2 o) { return Math.abs(x - o.x) + Math.abs(y - o.y); }
 
     /** Returns null if not a known direction token. */
     public static Vec2 dir(String d) {

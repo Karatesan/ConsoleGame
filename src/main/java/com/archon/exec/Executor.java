@@ -4,11 +4,16 @@ import com.archon.command.Ast;
 import com.archon.command.CommandParser;
 import com.archon.event.EventBus;
 import com.archon.event.GameEvent;
+import com.archon.model.Actor;
+import com.archon.model.Tag;
 import com.archon.model.World;
 import com.archon.system.combat.Reaction;
+import com.archon.system.physics.ThermalState;
+import com.archon.system.physics.TileReactions;
 import com.archon.verb.*;
 
-import java.util.function.Supplier;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class Executor {
 
@@ -54,6 +59,10 @@ public final class Executor {
             return;
         }
 
+        if (isBlockedByFrozenOrStunned(line)) {
+            return;
+        }
+
         Validator.Plan plan = validator.quote(line, round);
         if (plan.requiredAp() > round.ap()) {
             String reason = String.format("insufficient AP: %d AP tax + %d AP allocation = %d. Available: %d.",
@@ -79,6 +88,9 @@ public final class Executor {
         boolean terminalExecuted = false;
 
         for (int i = 0; i < line.stages().size(); i++) {
+            if (!world.thrall().alive()) {
+                break;
+            }
             Ast.Stage stage = line.stages().get(i);
             int stageNum = i + 1;
 
@@ -88,31 +100,64 @@ public final class Executor {
                 continue;
             }
 
-            if (paidExecuted && validator.paidStage(stage)) {
+            if (paidExecuted && triggersInterrupts(stage)) {
                 Reaction reaction = interrupts.fire().orElse(null);
                 if (reaction != null) {
+                    onInterruptDamage(reaction);
                     breakLine(stageNum, reaction.sourceName() + " (READIED) interrupted the sequence", plan);
                     return;
                 }
             }
 
+            int cost = validator.stageCost(stage);
             bus.post(new GameEvent.StageStart(stageNum, line.stages().size(), stage.render()));
+            Actor thrall = world.thrall();
+            boolean releaseChannelPipe = thrall != null && stage.pipeline().size() > 1
+                    && "channel".equals(stage.pipeline().get(0).verb())
+                    && !stage.pipeline().get(0).hasFlag("force")
+                    && !stage.pipeline().get(0).hasFlag("blood");
+            Tag savedChannel = releaseChannelPipe ? thrall.channeledPayload : null;
+            int savedChannelTurns = releaseChannelPipe ? thrall.channelTurns : 0;
+
+            int failedAt = -1;
             Material material = null;
             for (int p = 0; p < stage.pipeline().size(); p++) {
                 Ast.Invocation inv = stage.pipeline().get(p);
                 if (p > 0 && material == null) {
                     bus.narrate("no material was produced for " + inv.verb());
                     lastCode = ExitCode.BLOCKED;
+                    failedAt = p;
                     break;
                 }
 
                 VerbDefinition def = catalog.get(inv.verb());
-                VerbContext ctx = new VerbContext(world, inv, bus, material);
+                VerbContext ctx = new VerbContext(world, inv, bus, material, round, p < stage.pipeline().size() - 1);
                 lastCode = def.action().execute(ctx);
-                paidExecuted |= !def.free();
+                boolean invPaid = !def.free() && !"pass".equals(inv.verb())
+                        && !("channel".equals(inv.verb()) && inv.hasFlag("blood"));
+                paidExecuted |= invPaid;
 
-                if (lastCode != ExitCode.SUCCESS) break;
+                if (lastCode != ExitCode.SUCCESS) {
+                    failedAt = p;
+                    break;
+                }
                 material = ctx.materialOut;
+            }
+            if (releaseChannelPipe && lastCode == ExitCode.BLOCKED && failedAt == 1) {
+                thrall.channeledPayload = savedChannel;
+                thrall.channelTurns = savedChannelTurns;
+            } else if (lastCode == ExitCode.BLOCKED && thrall != null && thrall.alive()
+                    && material instanceof Material.OfSubstance(Tag sub)) {
+                List<String> unconsumedLog = new ArrayList<>();
+                if (sub == Tag.FIRE || sub == Tag.INFERNO) {
+                    ThermalState.detonateUnstableSiphon(world, thrall, sub, unconsumedLog);
+                } else if (sub == Tag.WATER || sub == Tag.OIL || sub == Tag.ACID) {
+                    unconsumedLog.add("Uncontained " + ThermalState.payloadLabel(sub) + " spills over " + thrall.name() + "!");
+                    TileReactions.spillSubstance(world, thrall.pos(), sub, unconsumedLog);
+                }
+                for (int u = 0; u < unconsumedLog.size(); u++) {
+                    bus.narrate(unconsumedLog.get(u));
+                }
             }
 
             if (lastCode == ExitCode.INTERRUPT) {
@@ -120,13 +165,55 @@ public final class Executor {
                 return;
             }
 
-            int cost = validator.stageCost(stage);
             charged += cost;
-            terminalExecuted |= (lastCode == ExitCode.SUCCESS && catalog.get(stage.last().verb()).terminal());
+            Ast.Invocation lastInv = stage.last();
+            boolean isTerminal = catalog.get(lastInv.verb()).terminal()
+                    && !("pass".equals(lastInv.verb()) && lastInv.hasFlag("roll"));
+            terminalExecuted |= (lastCode == ExitCode.SUCCESS && isTerminal);
             bus.post(new GameEvent.StageResult(stageNum, line.stages().size(), stage.render(), lastCode, cost, round.ap() - charged));
         }
 
         completeLine(plan, charged, paidExecuted, terminalExecuted);
+    }
+
+    private boolean triggersInterrupts(Ast.Stage stage) {
+        return validator.paidStage(stage) && !"pass".equals(stage.last().verb());
+    }
+
+    private boolean isBlockedByFrozenOrStunned(Ast.Line line) {
+        Actor thrall = world.thrall();
+        if (thrall == null || (!thrall.has(Tag.FROZEN) && !thrall.has(Tag.STUNNED))) {
+            return false;
+        }
+        List<Ast.Stage> stages = line.stages();
+        for (int s = 0; s < stages.size(); s++) {
+            List<Ast.Invocation> pipeline = stages.get(s).pipeline();
+            for (int p = 0; p < pipeline.size(); p++) {
+                Ast.Invocation inv = pipeline.get(p);
+                VerbDefinition def = catalog.get(inv.verb());
+                boolean allowedPlainPass = "pass".equals(inv.verb()) && !inv.hasFlag("roll");
+                boolean allowedUtility = def.free() && !"pass".equals(inv.verb())
+                        && !"channel".equals(inv.verb()) && !inv.hasFlag("blood");
+                if (!allowedPlainPass && !allowedUtility) {
+                    String state = thrall.has(Tag.FROZEN) ? "frozen" : "stunned";
+                    bus.post(new GameEvent.Rejected(ExitCode.BLOCKED,
+                            "Thrall is " + state + " and cannot act.",
+                            "only free inspection commands and pass are allowed"));
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void onInterruptDamage(Reaction reaction) {
+        if (reaction.damage() > 0 && world.thrall() != null && world.thrall().alive()) {
+            List<String> concLog = new ArrayList<>();
+            ThermalState.onCreatureDamaged(world, world.thrall(), reaction.damage(), false, concLog);
+            for (int i = 0; i < concLog.size(); i++) {
+                bus.narrate(concLog.get(i));
+            }
+        }
     }
 
     private static boolean shouldRun(Ast.Op op, ExitCode lastCode) {
@@ -147,9 +234,12 @@ public final class Executor {
 
     private void completeLine(Validator.Plan plan, int charged, boolean paidExecuted, boolean terminalExecuted) {
         if (!plan.free()) {
-            round.spend(charged);
+            round.spend(Math.min(charged, round.ap()));
             if (paidExecuted && world.thrall().alive()) {
-                interrupts.fire();
+                Reaction reaction = interrupts.fire().orElse(null);
+                if (reaction != null) {
+                    onInterruptDamage(reaction);
+                }
             }
             bus.post(new GameEvent.LineComplete(charged, plan.tax(), plan.allocation() - charged, round.ap()));
         }

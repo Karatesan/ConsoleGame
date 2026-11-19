@@ -30,6 +30,11 @@ public class Actor extends Entity {
     private boolean guarded;
     private boolean nocked;
 
+    public int magic;
+    public Tag channeledPayload;
+    public int channelTurns;
+    public boolean bloodSurgedThisRound;
+
     public Actor(String id, String name, char glyph, Vec2 pos, CreatureStats stats) {
         this(validatedStats(stats), id, name, glyph, pos);
     }
@@ -45,6 +50,8 @@ public class Actor extends Entity {
                 stats.armor(),
                 stats.evasion());
         this.strength = stats.strength();
+        this.magic = stats.magic();
+        this.thermalMass = stats.thermalMass();
 
         for (BodyPart bodyPart : BodyPart.values()) {
             crippled.put(bodyPart, false);
@@ -112,6 +119,7 @@ public class Actor extends Entity {
     public void resetRoundState() {
         readiedSpent = false;
         guarded = false;
+        bloodSurgedThisRound = false;
     }
 
     public boolean isNocked() {

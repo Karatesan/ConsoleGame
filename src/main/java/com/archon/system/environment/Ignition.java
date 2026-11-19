@@ -8,8 +8,11 @@ import com.archon.model.Item;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
+import com.archon.system.physics.ThermalState;
+import com.archon.system.physics.TileReactions;
 import com.archon.system.spatial.SpatialService;
 
+import java.util.List;
 import java.util.Objects;
 
 /** Eligibility and effects of direct ignition, separate from periodic fire spread. */
@@ -28,16 +31,25 @@ public final class Ignition {
         Objects.requireNonNull(entity, "entity");
         if (entity.has(Tag.WET)) {
             entity.removeTag(Tag.WET);
+            entity.wetTurns = 0;
             return false;
         }
-        if (!entity.has(Tag.FLAMMABLE)) {
+        if (entity.has(Tag.FROZEN)) {
+            ThermalState.exitFrozen(entity);
             return false;
         }
-        entity.ignite();
+        if (!entity.has(Tag.FLAMMABLE) && !entity.has(Tag.OIL)) {
+            return false;
+        }
+        ThermalState.igniteEntity(entity);
         return true;
     }
 
     public static boolean tile(World world, Vec2 at) {
+        return tile(world, at, null);
+    }
+
+    public static boolean tile(World world, Vec2 at, List<String> log) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(at, "position");
 
@@ -47,13 +59,20 @@ public final class Ignition {
         }
         if (tile.has(Tag.WATER)) {
             world.map().removeTag(at, Tag.WATER);
+            world.map().removeTag(at, Tag.LIQUID);
+            world.map().removeTag(at, Tag.CONDUCTIVE);
             return false;
         }
+        if (tile.has(Tag.OIL_MIST)) {
+            TileReactions.detonateOilMist(world, null, at, false, null, log);
+            return true;
+        }
+        boolean litItems = TileReactions.igniteGroundItems(tile, log);
         if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
-            return false;
+            return litItems;
         }
 
-        world.map().addTag(at, Tag.BURNING);
+        ThermalState.igniteTile(world, at);
         Entity occupant = SpatialService.entityAt(world, at);
         if (occupant != null) {
             entity(occupant);

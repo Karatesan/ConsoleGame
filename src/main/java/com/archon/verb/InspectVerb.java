@@ -37,10 +37,22 @@ public final class InspectVerb implements Verb {
 
     private static String formatEntity(Entity entity, BodyPart focus) {
         StringBuilder out = new StringBuilder(entity.name() + " \"" + entity.id()
-                + "\" — HP " + entity.hp() + "/" + entity.maxHp() + ", Armor " + entity.armor());
+                + "\" — HP " + entity.hp() + "/" + entity.maxHp() + ", Armor " + entity.armor()
+                + ", Temp " + entity.temp + "C, ThermalMass " + entity.thermalMass);
+        if (entity instanceof Actor actor) {
+            out.append(", Magic ").append(actor.magic).append(", Str ").append(actor.strength());
+        }
         out.append("\n  Tags: ").append(entity.tags());
+        String durations = formatDurations(entity);
+        if (!durations.isEmpty()) {
+            out.append("\n  Durations: ").append(durations);
+        }
 
         if (entity instanceof Actor actor) {
+            if (actor.channeledPayload != null) {
+                out.append("\n  Channel: ").append(actor.channeledPayload)
+                        .append(" (").append(actor.channelTurns).append(" turns)");
+            }
             if (actor.mainHand() != null) {
                 out.append("\n  Holding: ").append(actor.mainHand().name());
             }
@@ -62,10 +74,42 @@ public final class InspectVerb implements Verb {
         return out.toString();
     }
 
+    static String formatDurations(Entity e) {
+        StringBuilder sb = new StringBuilder();
+        appendDur(sb, "wet", e.wetTurns);
+        appendDur(sb, "oil", e.oilTurns);
+        appendDur(sb, "propBurn", e.propBurnTurns);
+        appendDur(sb, "bleed", e.bleedTurns);
+        appendDur(sb, "dazed", e.dazedTurns);
+        if (e.numbArmTurns > 0) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append("numbArm(").append(e.numbArmPart != null ? e.numbArmPart.path : "?")
+                    .append(")=").append(e.numbArmTurns).append('t');
+        }
+        appendDur(sb, "crippled", e.crippledTurns);
+        appendDur(sb, "stun", e.stunTurns);
+        appendDur(sb, "blindLinger", e.blindLingerTurns);
+        return sb.toString();
+    }
+
+    private static void appendDur(StringBuilder sb, String name, int turns) {
+        if (turns > 0) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(name).append('=').append(turns).append('t');
+        }
+    }
+
     private static String formatTile(World world, Resolved.OnTile target) {
         GameMap.Tile tile = world.tile(target.pos());
+        boolean hasGas = tile.has(Tag.STEAM) || tile.has(Tag.CAUSTIC_GAS) || tile.has(Tag.OIL_MIST)
+                || tile.gasTemp != Balance.AMBIENT_TEMP;
         return target.pos() + " " + (tile.isWall() ? "WALL" : "floor")
+                + (target.layer() != null ? " [" + target.layer() + "]" : "")
                 + " — tags " + tile.tags()
+                + ", temp " + tile.temp + "C"
+                + (hasGas ? ", gasTemp " + tile.gasTemp + "C" : "")
+                + (tile.oilTurns > 0 ? ", oilTurns " + tile.oilTurns : "")
+                + (tile.burnTurns > 0 ? ", burnTurns " + tile.burnTurns : "")
                 + (tile.ground().isEmpty() ? "" : ", ground " + tile.ground());
     }
 }

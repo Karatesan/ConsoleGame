@@ -1,8 +1,9 @@
 package com.archon.model;
 
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -10,6 +11,8 @@ public final class World {
 
     private final GameMap map;
     private final Map<String, Entity> entities = new LinkedHashMap<>();
+    private final List<Entity> entityList = new ArrayList<>();
+    private final List<Entity> entitiesView = Collections.unmodifiableList(entityList);
     private final Dice dice;
     private Thrall thrall;
     private int roundNumber = 1;
@@ -65,8 +68,8 @@ public final class World {
         this.thrall = thrall;
     }
 
-    public Collection<Entity> entities() {
-        return Collections.unmodifiableCollection(entities.values());
+    public List<Entity> entities() {
+        return entitiesView;
     }
 
     public boolean inBounds(Vec2 p) {
@@ -94,6 +97,7 @@ public final class World {
         }
 
         entities.put(id, entity);
+        entityList.add(entity);
     }
 
     public Entity get(String id) {

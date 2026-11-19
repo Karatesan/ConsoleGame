@@ -223,6 +223,12 @@ public final class CommandManual {
                   Successful production of no material blocks the next consumer.
                   There is no implicit forwarding of consumed input or fallback to operands.
                   Materials do not cross ;, &&, or ||. Earlier effects are not rolled back.
+                  Magic pipeline examples:
+                    siphon br1 | bolt o1
+                    siphon o1 | channel
+                    channel | siphon br1 | bolt o1
+                    pull @4,4/stone | bolt -a head o1
+                    channel -f | push o1 2
                   Pour emits nothing and Ignite accepts nothing. Sequence them instead:
                     siphon b1/contents | pour @o1 && ignite @o1
                 
@@ -230,6 +236,7 @@ public final class CommandManual {
                   Must be the final invocation, including on free-only lines.
                   End the round only when actually executed successfully.
                   A skipped terminal or failed upstream producer does not end the round.
+                  'pass' is terminal; 'pass -r' (roll to smother flames) is non-terminal.
                 
                 REACTIONS:
                   Check between executed paid stages and after normally completed paid work.
@@ -247,6 +254,9 @@ public final class CommandManual {
                   @self                The thrall's current tile.
                   @<entityId>          The tile occupied by an entity, for example @o1.
                   @<dir><distance>     Relative tile, for example @e2 or @sw1.
+                  @<tile>/<item>       Specific ground item on a tile, for example @3,4/iron_dagger or @e2/stone.
+                  @<tile>/gas          Gas cloud layer on a tile (or /steam, /oil_mist, /caustic).
+                  @<tile>/floor        Floor liquid/ice layer on a tile (or /water, /oil, /acid, /ice).
                 
                 THRALL INVENTORY:
                   /pack                The pack location, not a selected item.
@@ -292,7 +302,13 @@ public final class CommandManual {
                   A submission containing paid work is paid even if that work is later skipped.
                 
                 ALLOCATION:
-                  A pipeline allocates its final invocation's price, not the sum inside it.
+                  A pipeline sums the AP cost of every invocation inside it:
+                    e.g. siphon (2) | bolt (1) = 3 AP, pull (2) | bolt -a head (2) = 4 AP.
+                  CHILLED and CRIPPLED each add +1 AP per step; stepping while PRONE
+                  stands up in place for 1 AP.
+                  'channel -b' (Blood Surge, 0 AP) costs HP to grant +%d AP once per round
+                  (usable past %d AP) and never triggers line tax.
+                  'pass -r' (0 AP) drops prone to smother flames without ending the round.
                   A line allocates every stage, including conditional stages.
                   Allocation plus tax must be affordable before commitment.
                   Singles permit adaptation; complex lines commit more work in advance.
@@ -318,6 +334,7 @@ public final class CommandManual {
                 PASS:
                   A successfully executed terminal requests the end of the round.
                   The application discards remaining AP when advancing the round.
-                """.formatted(rules.roundAp(), rules.untaxedLines(), rules.lineTax(), rules.breakPenalty());
+                """.formatted(rules.roundAp(), rules.untaxedLines(), rules.lineTax(),
+                        com.archon.model.Balance.BLOOD_SURGE_AP, rules.roundAp(), rules.breakPenalty());
     }
 }

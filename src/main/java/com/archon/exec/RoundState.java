@@ -34,8 +34,19 @@ public final class RoundState {
         ap -= amount;
     }
 
+    public void gain(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("gain must be non-negative: " + amount);
+        }
+        ap += amount;
+    }
+
     public void countLine() {
         linesUsed = Math.incrementExact(linesUsed);
+    }
+
+    public void resetLinesUsed() {
+        linesUsed = 0;
     }
 
     public int reset() {

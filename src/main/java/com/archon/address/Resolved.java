@@ -2,6 +2,8 @@ package com.archon.address;
 
 import com.archon.model.*;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,7 +29,11 @@ public sealed interface Resolved {
         public Vec2 pos() { return location.pos(); }
     }
 
-    record OnTile(Vec2 pos) implements Target {}
+    record OnTile(Vec2 pos, String layer) implements Target {
+        public OnTile(Vec2 pos) {
+            this(pos, null);
+        }
+    }
 
     record Failure(String reason, boolean syntax) implements Resolved {
         static Failure syntax(String reason) { return new Failure(reason, true); }
@@ -121,10 +127,34 @@ public sealed interface Resolved {
         if (spec.isBlank()) {
             return Failure.syntax("empty tile specification");
         }
-        if (spec.contains("/")) {
-            return Failure.syntax("tile address does not take a path");
+        int slash = spec.indexOf('/');
+        String tileSpec = slash < 0 ? spec : spec.substring(0, slash);
+        String path = slash < 0 ? null : spec.substring(slash + 1);
+        if (tileSpec.isBlank()) {
+            return Failure.syntax("empty tile specification");
+        }
+        if (path != null && (path.isBlank() || path.contains("/"))) {
+            return Failure.syntax("invalid tile path \"" + spec + "\"");
         }
 
+        Resolved base = resolveTileAnchor(tileSpec, world);
+        if (!(base instanceof OnTile(Vec2 pos, var ignored)) || path == null) {
+            return base;
+        }
+
+        String key = path.toLowerCase(Locale.ROOT);
+        String layer = normalizeLayer(key);
+        if (layer != null) {
+            return new OnTile(pos, layer);
+        }
+        Item item = findGroundItem(world.tile(pos), key);
+        if (item != null) {
+            return new OnItem(item, new ItemLocation.Ground(pos));
+        }
+        return Failure.world("no ground item or layer \"" + path + "\" at " + pos);
+    }
+
+    private static Resolved resolveTileAnchor(String spec, World world) {
         try {
             if (spec.contains(",")) {
                 Matcher coords = COORDINATES.matcher(spec.trim());
@@ -147,13 +177,40 @@ public sealed interface Resolved {
         }
 
         Entity anchor = spec.equalsIgnoreCase("self") ? world.thrall() : world.get(spec);
-        if (anchor == null) {
-            return Failure.world("unknown tile reference \"" + spec + "\"; use @x,y, @self, @e2, or @entityId");
+        if (anchor != null) {
+            if (!anchor.alive()) {
+                return Failure.world(anchor.id() + " is no longer alive");
+            }
+            return bounded(anchor.pos().x(), anchor.pos().y(), world);
         }
-        if (!anchor.alive()) {
-            return Failure.world(anchor.id() + " is no longer alive");
+
+        return Failure.world("unknown tile reference \"" + spec + "\"; use @x,y, @self, @e2, or @entityId");
+    }
+
+    private static String normalizeLayer(String key) {
+        return switch (key) {
+            case "gas", "floor", "steam", "oil_mist", "water", "oil", "acid", "ice" -> key;
+            case "caustic", "caustic_gas" -> "caustic";
+            default -> null;
+        };
+    }
+
+    private static Item findGroundItem(GameMap.Tile tile, String key) {
+        if (tile == null) return null;
+        List<Item> ground = tile.ground();
+        Item partial = null;
+        for (int i = 0; i < ground.size(); i++) {
+            Item item = ground.get(i);
+            String id = item.id().toLowerCase(Locale.ROOT);
+            String name = item.name().toLowerCase(Locale.ROOT);
+            if (id.equals(key) || name.equals(key)) {
+                return item;
+            }
+            if (partial == null && (id.contains(key) || name.contains(key))) {
+                partial = item;
+            }
         }
-        return bounded(anchor.pos().x(), anchor.pos().y(), world);
+        return partial;
     }
 
     private static Resolved bounded(long x, long y, World world) {

@@ -9,8 +9,11 @@ import com.archon.model.Prop;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
+import com.archon.system.physics.ThermalState;
+import com.archon.system.physics.TileReactions;
 import com.archon.system.spatial.SpatialService;
 
+import java.util.List;
 import java.util.Objects;
 
 /** Immediate finite extraction, container consumption, and substance application. */
@@ -33,9 +36,27 @@ public final class Substances {
 
         if (source instanceof Resolved.OnTile) {
             GameMap.Tile tile = requireDestination(world, source.pos());
-            Tag substance = tile.has(Tag.OIL) ? Tag.OIL : tile.has(Tag.WATER) ? Tag.WATER : null;
-            if (substance != null && !world.map().removeTag(source.pos(), substance)) {
-                throw new IllegalStateException("selected substance disappeared during extraction");
+            Tag substance = tile.has(Tag.OIL) ? Tag.OIL
+                    : tile.has(Tag.ACID) ? Tag.ACID
+                    : tile.has(Tag.WATER) ? Tag.WATER
+                    : ThermalState.gasTag(tile);
+            if (substance != null) {
+                if (substance == Tag.STEAM || substance == Tag.CAUSTIC_GAS || substance == Tag.OIL_MIST) {
+                    ThermalState.clearGas(world, source.pos());
+                } else {
+                    if (!world.map().removeTag(source.pos(), substance)) {
+                        throw new IllegalStateException("selected substance disappeared during extraction");
+                    }
+                    if (substance == Tag.OIL) {
+                        world.map().removeTag(source.pos(), Tag.FLAMMABLE);
+                        tile.oilTurns = 0;
+                    } else if (substance == Tag.WATER) {
+                        world.map().removeTag(source.pos(), Tag.CONDUCTIVE);
+                    }
+                    if (!tile.has(Tag.WATER) && !tile.has(Tag.OIL) && !tile.has(Tag.ACID)) {
+                        world.map().removeTag(source.pos(), Tag.LIQUID);
+                    }
+                }
             }
             return substance;
         }
@@ -45,20 +66,36 @@ public final class Substances {
 
     /** Keeps the container and returns the consumed substance, or null when empty. */
     public static Tag pour(World world, Vec2 at, Item container) {
+        return pour(world, at, container, null);
+    }
+
+    public static Tag pour(World world, Vec2 at, Item container, List<String> log) {
+        return pour(world, at, container, false, log);
+    }
+
+    public static Tag pour(World world, Vec2 at, Item container, boolean floorOnly, List<String> log) {
         Objects.requireNonNull(container, "container");
         requireDestination(world, at);
 
         Tag substance = container.consumeSubstance();
         if (substance != null) {
-            apply(world, at, substance);
+            TileReactions.spillSubstance(world, at, substance, floorOnly, log);
         }
         return substance;
     }
 
     public static void spill(World world, Vec2 at, Tag substance) {
+        spill(world, at, substance, false, null);
+    }
+
+    public static void spill(World world, Vec2 at, Tag substance, List<String> log) {
+        spill(world, at, substance, false, log);
+    }
+
+    public static void spill(World world, Vec2 at, Tag substance, boolean floorOnly, List<String> log) {
         Objects.requireNonNull(substance, "substance");
         requireDestination(world, at);
-        apply(world, at, substance);
+        TileReactions.spillSubstance(world, at, substance, floorOnly, log);
     }
 
     /** Invalid coordinates are programmer errors and must be detected before consumption. */
@@ -80,28 +117,5 @@ public final class Substances {
             case Resolved.OnEntity(Prop prop) -> prop.contents();
             default -> null;
         };
-    }
-
-    private static void apply(World world, Vec2 at, Tag substance) {
-        GameMap map = world.map();
-        map.addTag(at, Tag.LIQUID);
-        map.addTag(at, substance);
-
-        Entity occupant = SpatialService.entityAt(world, at);
-        if (substance == Tag.OIL) {
-            map.addTag(at, Tag.FLAMMABLE);
-            if (occupant != null) {
-                occupant.applyTag(Tag.FLAMMABLE);
-                occupant.removeTag(Tag.WET);
-            }
-        }
-        if (substance == Tag.WATER) {
-            map.addTag(at, Tag.CONDUCTIVE);
-            map.removeTag(at, Tag.BURNING);
-            if (occupant != null) {
-                occupant.extinguish();
-                occupant.applyTag(Tag.WET);
-            }
-        }
     }
 }

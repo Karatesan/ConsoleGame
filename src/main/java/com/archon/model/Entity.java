@@ -20,6 +20,12 @@ public class Entity {
     private final Set<Tag> tags = EnumSet.noneOf(Tag.class);
     private boolean identified;
 
+    public int temp;
+    public double thermalMass = 1.0;
+    public int wetTurns, oilTurns, propBurnTurns, bleedTurns, dazedTurns, numbArmTurns, crippledTurns, stunTurns, blindLingerTurns;
+    public BodyPart numbArmPart;
+    public boolean deepFreezeTriggered;
+
     public Entity(String id, String name, char glyph, Kind kind, Vec2 pos, int hp, int armor, int evasion) {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("id cannot be null or blank");
@@ -40,6 +46,7 @@ public class Entity {
         this.maxHp = hp;
         this.armor = armor;
         this.evasion = evasion;
+        this.temp = this.kind == Kind.CREATURE ? Balance.BODY_TEMP : Balance.AMBIENT_TEMP;
     }
 
     public String id() {
@@ -96,6 +103,9 @@ public class Entity {
 
     public Entity with(Tag... values) {
         Collections.addAll(tags, values);
+        if (tags.contains(Tag.LIT) && temp < Balance.BURN_CAP) {
+            temp = Balance.BURN_CAP;
+        }
         return this;
     }
 
@@ -151,6 +161,9 @@ public class Entity {
 
     public void applyTag(Tag tag) {
         tags.add(tag);
+        if (tag == Tag.LIT && temp < Balance.BURN_CAP) {
+            temp = Balance.BURN_CAP;
+        }
     }
 
     public void removeTag(Tag tag) {

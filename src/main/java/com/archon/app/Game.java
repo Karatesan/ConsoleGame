@@ -23,7 +23,12 @@ public final class Game {
     private final AliasProcessor aliases = new AliasProcessor();
 
     public Game(long seed) {
-        world = Scenario.testRoom(new Dice.Seeded(seed));
+        this(seed, true);
+    }
+
+    public Game(long seed, boolean magicArena) {
+        Dice dice = new Dice.Seeded(seed);
+        world = magicArena ? Scenario.magicArena(dice) : Scenario.testRoom(dice);
         round = new RoundState(EconomyRules.prototype());
         VerbCatalog catalog = DefaultVerbs.create(round.rules());
         Interrupts interrupts = new Interrupts(() -> ReactionSystem.fire(world), bus);

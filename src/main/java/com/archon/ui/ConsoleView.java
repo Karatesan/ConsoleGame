@@ -5,12 +5,8 @@ import com.archon.exec.RoundState;
 import com.archon.model.EquipmentSlot;
 import com.archon.model.Inventory;
 import com.archon.model.Item;
-import com.archon.model.Tag;
 import com.archon.model.Thrall;
 import com.archon.model.World;
-
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public final class ConsoleView implements View {
 
@@ -154,30 +150,43 @@ public final class ConsoleView implements View {
             }
         }
         int t = y * s.w + x;
-        return s.wall[t] ? "####" : s.burning[t] ? "*" : s.oil[t] ? "~" : s.loot[t] ? "%" : ".";
+        return s.wall[t] ? "####"
+                : s.burning[t] ? "*"
+                : s.causticGas[t] ? "!"
+                : s.oilMist[t] ? "?"
+                : s.steam[t] ? "^"
+                : s.toxicTar[t] ? "&"
+                : s.acid[t] ? "a"
+                : s.ice[t] ? "="
+                : s.water[t] ? "w"
+                : s.oil[t] ? "~"
+                : s.loot[t] ? "%" : ".";
     }
 
     private String hud(World world, RoundState round) {
         Thrall thrall = world.thrall();
-        String conditions = Stream.of(Tag.BURNING, Tag.WET, Tag.FROZEN, Tag.CORRODED, Tag.PRONE, Tag.STUNNED,
-                Tag.BLIND).filter(thrall::has).map(Tag::name).collect(Collectors.joining(", "));
-        String pips = ("* ".repeat(round.ap()) + "o ".repeat(round.rules().roundAp() - round.ap())).stripTrailing();
+        String pips = ("* ".repeat(Math.max(0, round.ap()))
+                + "o ".repeat(Math.max(0, round.rules().roundAp() - round.ap()))).stripTrailing();
+        String channel = thrall.channeledPayload == null
+                ? "none"
+                : thrall.channeledPayload.name() + " (" + thrall.channelTurns + "t)";
         String taxInfo = thrall.alive()
                 ? String.format("   (Paid lines: %d | Next tax: %d AP)",
                         round.linesUsed(), round.rules().taxForNextLine(round.linesUsed()))
                 : "";
 
         return String.format(
-                "HP %d/%d   AP [%s] %d/%d%s%n"
+                "HP %d/%d   AP [%s] %d/%d   Magic %d   Temp %dC   Channel: %s%s%n"
                         + "Hands: [R] %s   [L] %s   Pack: %d/%d%n"
                         + "Status: Guard %s | Arrow %s | Conditions: %s%n",
-                thrall.hp(), thrall.maxHp(), pips, round.ap(), round.rules().roundAp(), taxInfo,
+                thrall.hp(), thrall.maxHp(), pips, round.ap(), round.rules().roundAp(),
+                thrall.magic, thrall.temp, channel, taxInfo,
                 name(thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT)),
                 name(thrall.inventory().equipped(EquipmentSlot.HAND_LEFT)),
                 thrall.inventory().pack().size(), Inventory.PACK_MAX,
                 thrall.isGuarded() ? "raised" : "down",
                 thrall.isNocked() ? "nocked" : "not nocked",
-                conditions.isEmpty() ? "none" : conditions);
+                Scene.formatShortConds(thrall));
     }
 
     private String name(Item item) {

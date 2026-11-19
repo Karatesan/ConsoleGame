@@ -23,8 +23,12 @@ public final class Repl {
     }
 
     public void run(long seed) {
+        run(seed, true);
+    }
+
+    public void run(long seed, boolean magicArena) {
         try (ConsoleInput input = new ConsoleInput()) {
-            Game game = new Game(seed);
+            Game game = new Game(seed, magicArena);
             View view = new ConsoleView();
             Presenter presenter = new Presenter(view, game.world);
             game.bus.subscribe(presenter::handle);

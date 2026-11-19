@@ -39,6 +39,17 @@ public final class Item {
         return new Item(id, name, EnumSet.of(Tag.GLASS, Tag.BREAKABLE), substance, 1, 0, 0);
     }
 
+    public static Item torch(String id, boolean lit) {
+        EnumSet<Tag> tags = lit
+                ? EnumSet.of(Tag.WOOD, Tag.FLAMMABLE, Tag.LIT)
+                : EnumSet.of(Tag.WOOD, Tag.FLAMMABLE);
+        return new Item(id, "torch", tags, null, 20, 1, 2);
+    }
+
+    public static Item stone(String id) {
+        return new Item(id, "throwing stone", EnumSet.of(Tag.STONE), null, 1, 2, 2);
+    }
+
     public String id() { return id; }
     public String name() { return name; }
     public Set<Tag> tags() { return tags; }

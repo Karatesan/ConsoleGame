@@ -38,6 +38,18 @@ public final class DefaultVerbs {
         FlagSpec careful = new FlagSpec(
                 "careful", "c", null, null,
                 "Use careful movement pricing.");
+        FlagSpec roll = new FlagSpec(
+                "roll", "r", null, null,
+                "Drop prone and roll over the ground to smother flames.");
+        FlagSpec thermal = new FlagSpec(
+                "thermal", "t", null, null,
+                "Extract thermal heat instead of matter, condensing gas or freezing water.");
+        FlagSpec channelForce = new FlagSpec(
+                "force", "f", null, null,
+                "Store or emit telekinetic force focus.");
+        FlagSpec blood = new FlagSpec(
+                "blood", "b", null, null,
+                "Spend caster HP for forbidden blood magic.");
 
         VerbCatalog catalog = new VerbCatalog(List.of(
                 new VerbDefinition(
@@ -80,20 +92,22 @@ public final class DefaultVerbs {
                                 "Requests a full redraw of the current view.",
                                 List.of("map"))),
                 new VerbDefinition(
-                        "pass", new PassVerb(), List.of(), zero, true, none, none,
+                        "pass", new PassVerb(), List.of(roll),
+                        new ApCost.ByPresence("roll", 0, Balance.AP_PASS_R),
+                        true, none, none,
                         new Documentation(
-                                "FREE UTILITIES", "", "End the current round",
-                                "Ends the round, forfeiting unspent AP. Must be the final command.",
-                                List.of("pass", "strike o1 ; pass"))),
+                                "FREE UTILITIES", "[-r]", "End the current round or roll to smother flames",
+                                "Ends the round, forfeiting unspent AP. With -r, drops prone and rolls to smother flames without ending the round.",
+                                List.of("pass", "pass -r", "strike o1 ; pass"))),
                 new VerbDefinition(
                         "step", new StepVerb(), List.of(careful),
                         new ApCost.ByPresence("careful", 1, 2),
                         false, none, none,
                         new Documentation(
                                 "MOVEMENT", "<dir>", "Advance one tile",
-                                "Moves n, s, e, w, ne, nw, se, or sw. Walls and occupants block movement. "
+                                "Moves n, s, e, or w. Walls and occupants block movement. "
                                         + "Movement may trigger readied reactions.",
-                                List.of("step e", "step nw -c", "step w ; strike o1"))),
+                                List.of("step e", "step n -c", "step w ; strike o1"))),
                 new VerbDefinition(
                         "strike", new StrikeVerb(), List.of(aim, power, force),
                         new ApCost.Aimed(
@@ -170,18 +184,62 @@ public final class DefaultVerbs {
                                         + "entity or floor tile. Keeps emptied containers and emits no material.",
                                 List.of("pour flask_oil @self", "siphon b1/contents | pour @o1"))),
                 new VerbDefinition(
-                        "siphon", new SiphonVerb(), List.of(), one, false, none, substances,
+                        "siphon", new SiphonVerb(), List.of(thermal, blood),
+                        new ApCost.ByPresence("blood", Balance.AP_SIPHON, Balance.AP_SIPHON_BLOOD),
+                        false, none, substances,
                         new Documentation(
-                                "ENVIRONMENT & ELEMENTAL", "<source>", "Extract one liquid portion",
-                                "Consumes substance from a selected container or one liquid tag from a "
-                                        + "reachable floor tile. Emits the extracted substance.",
-                                List.of("siphon b1/contents", "siphon @self",
-                                        "siphon b1/contents | pour @o1"))),
+                                "ENVIRONMENT & ELEMENTAL", "[-t|-b] <source>", "Extract fire, matter, or thermal heat",
+                                "Extracts fire (inferno), heat from creatures/thermal (-t), water/oil/acid/gas payloads, "
+                                        + "or drains blood from living targets (-b, bonus & consumes BLEEDING). "
+                                        + "Unpiped thermal energy (heat/inferno) blasts the caster's tile; "
+                                        + "unpiped liquids spill over the caster.",
+                                List.of("siphon br1 | bolt o1", "siphon @3,3 -t | bolt o1",
+                                        "siphon -b o1"))),
+                new VerbDefinition(
+                        "bolt", new BoltVerb(), List.of(aim, blood),
+                        new ApCost.Aimed(
+                                new ApCost.ByPresence("blood", Balance.AP_BOLT_KIN, Balance.AP_BOLT_BLOOD),
+                                1),
+                        false, Set.of(ITEM, SUBSTANCE), none,
+                        new Documentation(
+                                "ENVIRONMENT & ELEMENTAL", "[-a <part>|-b] <target>", "Fire a single-target psionic bolt",
+                                "Delivers kinetic force, piped items/elements, or auto-hit Bloodlance (-b) to a target.",
+                                List.of("bolt o1", "bolt -a head o1", "siphon br1 | bolt o1", "bolt -b o1"))),
+                new VerbDefinition(
+                        "blast", new BlastVerb(), List.of(blood),
+                        new ApCost.ByPresence("blood", Balance.AP_BLAST, Balance.AP_BLAST_BLOOD),
+                        false, substances, none,
+                        new Documentation(
+                                "ENVIRONMENT & ELEMENTAL", "[-b] <epicenter>", "Detonate a 5-tile cardinal cross",
+                                "Saturates a 5-tile cross with kinetic crush, piped elements, or LoS Crimson Nova (-b).",
+                                List.of("blast @5,5", "siphon br1 | blast @5,5", "blast -b @5,5"))),
+                new VerbDefinition(
+                        "push", new PushVerb(false), List.of(),
+                        new ApCost.Fixed(Balance.AP_PUSH), false, substances, none,
+                        new Documentation(
+                                "ENVIRONMENT & ELEMENTAL", "<target> [n]", "Telekinetically shove target away",
+                                "Moves creatures, wood props, gases, or liquids away along cardinal LoF.",
+                                List.of("push o1 2", "push @3,4/gas 3", "channel -f | push o1 4"))),
+                new VerbDefinition(
+                        "pull", new PushVerb(true), List.of(),
+                        new ApCost.Fixed(Balance.AP_PULL), false, substances, items,
+                        new Documentation(
+                                "ENVIRONMENT & ELEMENTAL", "<target> [n]", "Telekinetically pull target toward caster",
+                                "Pulls creatures, props, gases, liquids, or catches loose ground items.",
+                                List.of("pull o1 2", "pull @4,4/stone | bolt o1", "channel -f | pull @e2/stone | bolt -a head o1"))),
+                new VerbDefinition(
+                        "channel", new ChannelVerb(), List.of(channelForce, blood),
+                        new ApCost.ByPresence("force", Balance.AP_CHANNEL_THERMAL, Balance.AP_CHANNEL_FORCE),
+                        false, substances, substances,
+                        new Documentation(
+                                "ENVIRONMENT & ELEMENTAL", "[-f|-b]", "Focus buffer or Blood Surge",
+                                "Stores/releases heat/inferno or force focus (-f), promotes heat with siphon, or surges +AP (-b).",
+                                List.of("siphon br1 | channel", "channel | bolt o1", "channel -f | push o1 4", "channel -b"))),
                 new VerbDefinition(
                         "ignite", new IgniteVerb(), List.of(), one, false, none, none,
                         new Documentation(
-                                "ENVIRONMENT & ELEMENTAL", "<entity|tile>", "Ignite a target",
-                                "Requires a lit item in hand and a reachable whole entity or floor tile. "
+                                "ENVIRONMENT & ELEMENTAL", "<entity|item|tile>", "Ignite a target",
+                                "Requires a lit item in hand and a reachable entity, item, or floor tile. "
                                         + "Does not consume piped material; sequence it after pouring.",
                                 List.of("ignite o1", "ignite @o1",
                                         "siphon b1/contents | pour @o1 && ignite @o1")))

@@ -91,6 +91,11 @@ public final class GameMap {
         private final Set<Tag> tagsView;
         private final List<Item> groundView;
 
+        public int temp = Balance.AMBIENT_TEMP;
+        public int gasTemp = Balance.AMBIENT_TEMP;
+        public int oilTurns = 0;
+        public int burnTurns = 0;
+
         private Tile() {
             tags = EnumSet.noneOf(Tag.class);
             ground = new ArrayList<>();

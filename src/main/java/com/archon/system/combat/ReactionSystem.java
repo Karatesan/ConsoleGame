@@ -29,7 +29,7 @@ public final class ReactionSystem {
             }
 
             boolean triggered = switch (readied.trigger()) {
-                case ON_ADJACENCY -> actor.pos().chebyshev(target.pos()) <= 1;
+                case ON_ADJACENCY -> actor.pos().manhattan(target.pos()) == 1;
                 case ON_MOVEMENT_IN_LOS -> !actor.has( com.archon.model.Tag.BLIND)
                         && SpatialService.lineOfFire(world, actor.pos(), target.pos());
             };

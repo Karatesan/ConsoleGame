@@ -36,7 +36,7 @@
                                 .toList());
                 case Resolved.OnLocation ignored -> "(empty)";
                 case Resolved.OnItem(var item, var ignored) -> "  " + item.id() + "  " + item.tags();
-                case Resolved.OnTile(var pos) -> world.tile(pos).ground().toString();
+                case Resolved.OnTile(var pos, var ignored) -> world.tile(pos).ground().toString();
                 default -> null;
             };
         }
