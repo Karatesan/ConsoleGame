@@ -1,9 +1,12 @@
 package com.archon.ui;
 
+import com.archon.model.Actor;
 import com.archon.model.Balance;
 import com.archon.model.BodyPart;
 import com.archon.model.Entity;
+import com.archon.model.EquipmentSlot;
 import com.archon.model.GameMap;
+import com.archon.model.Item;
 import com.archon.model.Tag;
 import com.archon.model.Thrall;
 import com.archon.model.Vec2;
@@ -17,6 +20,9 @@ import java.util.List;
  * Entity 0 is always the Thrall.
  */
 public final class Scene {
+    public static final byte LOOT_NONE = 0, LOOT_BLADE = 1, LOOT_FLASK_OIL = 2,
+            LOOT_FLASK_WATER = 3, LOOT_FLASK_ACID = 4, LOOT_STONE = 5;
+
     private static final Tag[] COND_TAGS = {
             Tag.BURNING, Tag.WET, Tag.OIL, Tag.BLEEDING, Tag.CHILLED, Tag.FROZEN,
             Tag.CORRODED, Tag.DAZED, Tag.NUMB_ARM, Tag.CRIPPLED, Tag.STUNNED, Tag.BLIND, Tag.PRONE
@@ -25,6 +31,8 @@ public final class Scene {
     public final int w, h;
     public final boolean[] wall, burning, oil, loot;
     public final boolean[] water, ice, acid, toxicTar, steam, causticGas, oilMist;
+    public final byte[] lootKind;
+    public final float[] light;
 
     public final int n;
     public final String[] id, name;
@@ -32,6 +40,7 @@ public final class Scene {
     public final Entity.Kind[] kind;
     public final int[] x, y, hp, maxHp, entityTemp;
     public final boolean[] burningEntity, frozenEntity, stunnedEntity, bleedingEntity;
+    public final boolean[] proneEntity, wetEntity, oiledEntity, litEntity, overwatchEntity;
 
     public final int magic, concentration, temp;
     public final String channel, shortConds;
@@ -52,6 +61,8 @@ public final class Scene {
         steam = new boolean[size];
         causticGas = new boolean[size];
         oilMist = new boolean[size];
+        lootKind = new byte[size];
+        light = new float[size];
         for (int ty = 0; ty < h; ty++) {
             for (int tx = 0; tx < w; tx++) {
                 GameMap.Tile t = world.tile(new Vec2(tx, ty));
@@ -59,7 +70,9 @@ public final class Scene {
                 wall[i] = t.isWall();
                 burning[i] = t.has(Tag.BURNING);
                 oil[i] = t.has(Tag.OIL);
-                loot[i] = !t.ground().isEmpty();
+                List<Item> ground = t.ground();
+                loot[i] = !ground.isEmpty();
+                lootKind[i] = classifyLoot(ground);
                 water[i] = t.has(Tag.WATER);
                 ice[i] = t.has(Tag.ICE);
                 acid[i] = t.has(Tag.ACID);
@@ -96,8 +109,49 @@ public final class Scene {
         frozenEntity = new boolean[n];
         stunnedEntity = new boolean[n];
         bleedingEntity = new boolean[n];
+        proneEntity = new boolean[n];
+        wetEntity = new boolean[n];
+        oiledEntity = new boolean[n];
+        litEntity = new boolean[n];
+        overwatchEntity = new boolean[n];
         put(0, thrall);
         for (int e = 0; e < entities.size(); e++) put(e + 1, entities.get(e));
+
+        computeLighting();
+    }
+
+    private static byte classifyLoot(List<Item> ground) {
+        if (ground.isEmpty()) return LOOT_NONE;
+        Item top = ground.get(0);
+        if (top.substance() == Tag.OIL) return LOOT_FLASK_OIL;
+        if (top.substance() == Tag.WATER) return LOOT_FLASK_WATER;
+        if (top.substance() == Tag.ACID) return LOOT_FLASK_ACID;
+        if (top.has(Tag.METAL) || top.maxDamage() >= 3) return LOOT_BLADE;
+        return LOOT_STONE;
+    }
+
+    private void computeLighting() {
+        for (int ty = 0; ty < h; ty++) {
+            for (int tx = 0; tx < w; tx++) {
+                float lum = 0.34f;
+                for (int eIdx = 0; eIdx < n; eIdx++) {
+                    if (hp[eIdx] <= 0) continue;
+                    boolean emit = litEntity[eIdx] || (eIdx == 0 && concentration > 0);
+                    if (!emit) continue;
+                    float power = litEntity[eIdx] ? 0.85f : 0.55f;
+                    int dx = tx - x[eIdx], dy = ty - y[eIdx];
+                    lum += power / (1f + 0.28f * (dx * dx + dy * dy));
+                }
+                for (int by = 0; by < h; by++) {
+                    for (int bx = 0; bx < w; bx++) {
+                        if (!burning[by * w + bx]) continue;
+                        int dx = tx - bx, dy = ty - by;
+                        lum += 0.75f / (1f + 0.32f * (dx * dx + dy * dy));
+                    }
+                }
+                light[ty * w + tx] = Math.min(1.15f, Math.max(0.34f, lum));
+            }
+        }
     }
 
     private void put(int i, Entity e) {
@@ -114,6 +168,19 @@ public final class Scene {
         frozenEntity[i] = e.has(Tag.FROZEN);
         stunnedEntity[i] = e.has(Tag.STUNNED);
         bleedingEntity[i] = e.has(Tag.BLEEDING);
+        proneEntity[i] = e.has(Tag.PRONE);
+        wetEntity[i] = e.has(Tag.WET);
+        oiledEntity[i] = e.has(Tag.OIL);
+        litEntity[i] = e.has(Tag.LIT) || e.has(Tag.BURNING) || hasLitEquipment(e);
+        overwatchEntity[i] = e instanceof Actor a && a.readied() != null && !a.isReadiedSpent();
+    }
+
+    private static boolean hasLitEquipment(Entity e) {
+        if (!(e instanceof Actor a)) return false;
+        Item right = a.inventory().equipped(EquipmentSlot.HAND_RIGHT);
+        if (right != null && (right.has(Tag.LIT) || right.has(Tag.BURNING))) return true;
+        Item left = a.inventory().equipped(EquipmentSlot.HAND_LEFT);
+        return left != null && (left.has(Tag.LIT) || left.has(Tag.BURNING));
     }
 
     static String formatShortConds(Thrall thrall) {
