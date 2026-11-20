@@ -39,12 +39,16 @@ import java.util.List;
  * targeting telegraphs, and procedural synth audio (F1 sprites/classic, F2 audio mute).
  */
 public final class GdxView extends ApplicationAdapter implements View {
-    public static final int WIN_W = 1100, WIN_H = 720;
-    private static final int TILE = 48, MAP_X = 32, MAP_Y = 28, LINE_H = 22, MAX_FLOATERS = 16;
-    private static final int INPUT_TOP = WIN_H - 54, INPUT_H = 34, SCROLLBAR_W = 8, JUMP_PILL_H = 22;
-    private static final float SLIDE = 0.4f, FLOAT_LIFE = 1.6f, SCROLL_LINES = 1.0f;
+    public static final int WIN_W = 1140, WIN_H = 820;
+    private static final int TILE = 64, MAP_X = 32, MAP_Y = 26, LINE_H = 22, MAX_FLOATERS = 16;
+    private static final int INPUT_TOP = WIN_H - 48, INPUT_H = 34, SCROLLBAR_W = 8, JUMP_PILL_H = 22;
+    private static final float SLIDE = 0.4f, GHOST_LIFE = 0.8f, FLOAT_LIFE = 1.6f, SCROLL_LINES = 1.0f;
     private static final int MAX_PARTICLES = 192, MAX_FX = 16, MAX_ENT = 32;
-    private static final int FX_BOLT = 1, FX_RING = 2, FX_PROJ = 3;
+    private static final int FX_BLOOD_BOLT = 1, FX_PSIONIC_SPIKE = 2, FX_PROJ = 3,
+            FX_FIREBALL = 4, FX_ELEM_BOLT = 5, FX_RING = 6, FX_CROSS = 7, FX_DRAIN = 8;
+    private static final int ELEM_FORCE = 0, ELEM_FIRE = 1, ELEM_WATER = 2,
+            ELEM_ACID = 3, ELEM_OIL = 4, ELEM_BLOOD = 5, ELEM_ITEM = 6;
+    private static final int[] CROSS_DX = {0, 0, 0, 1, -1}, CROSS_DY = {0, -1, 1, 0, 0};
 
     private static final Color BG = Color.valueOf("090B0E"), PANEL = Color.valueOf("11151C"),
             BORDER = Color.valueOf("232B38"), FLOOR = Color.valueOf("131820"), FLOOR_ALT = Color.valueOf("151A23"),
@@ -53,9 +57,11 @@ public final class GdxView extends ApplicationAdapter implements View {
             OIL = Color.valueOf("1F1A12"), OIL_RIM = Color.valueOf("3D311E"), FIRE = Color.valueOf("F07148"),
             EMBER = Color.valueOf("FACC15"), WATER_COL = Color.valueOf("1E4E79"), ICE_COL = Color.valueOf("7EC8E3"),
             ACID_COL = Color.valueOf("5FA832"), TAR_COL = Color.valueOf("3B2F2F"),
-            STEAM_COL = Color.valueOf("C8D6E5"), CAUSTIC_COL = Color.valueOf("A3E635"),
+            STEAM_COL = Color.valueOf("C8D6E5"), SUPERHEATED_COL = Color.valueOf("F0B88A"),
+            ACID_GLOW = Color.valueOf("A3E635"),
             MIST_COL = Color.valueOf("D97706"), STUN_COL = Color.valueOf("FACC15"),
             BLEED_COL = Color.valueOf("DC2626"), BOLT_COL = Color.valueOf("67E8F9"),
+            BLOOD_BRIGHT = Color.valueOf("F43F5E"), BLOOD_DEEP = Color.valueOf("991B1B"),
             THRALL = Color.valueOf("4CC9B0"), CREATURE = Color.valueOf("E05A5A"),
             PROP = Color.valueOf("D4A359"), DOOR = Color.valueOf("8C7A6B"),
             TEXT = Color.valueOf("D8DEE9"), MUTED = Color.valueOf("5E6C80"), SAGE = Color.valueOf("68B088");
@@ -121,7 +127,7 @@ public final class GdxView extends ApplicationAdapter implements View {
     private final Color[] partCol = new Color[MAX_PARTICLES];
     private int nextPart;
 
-    private final int[] fxKind = new int[MAX_FX];
+    private final int[] fxKind = new int[MAX_FX], fxParam = new int[MAX_FX];
     private final float[] fxX0 = new float[MAX_FX], fxY0 = new float[MAX_FX],
             fxX1 = new float[MAX_FX], fxY1 = new float[MAX_FX],
             fxAge = new float[MAX_FX], fxMaxAge = new float[MAX_FX];
@@ -132,7 +138,7 @@ public final class GdxView extends ApplicationAdapter implements View {
             lungeX = new float[MAX_ENT], lungeY = new float[MAX_ENT], lungeAge = new float[MAX_ENT];
     private float shakeTime, shakeMag, shakeX, shakeY;
     private final int[] targetX = new int[8], targetY = new int[8];
-    private int vfxRng = 0x13572468;
+    private int vfxRng = 0x13572468, pipeElem = ELEM_FORCE;
 
     private final StringBuilder input = new StringBuilder();
     private int cursor;
@@ -367,6 +373,16 @@ public final class GdxView extends ApplicationAdapter implements View {
 
     int cursorPos() { return cursor; }
 
+    int recentFxKind(int back) {
+        int idx = ((nextFx - 1 - back) % MAX_FX + MAX_FX) % MAX_FX;
+        return fxAge[idx] < fxMaxAge[idx] ? fxKind[idx] : 0;
+    }
+
+    int recentFxParam(int back) {
+        int idx = ((nextFx - 1 - back) % MAX_FX + MAX_FX) % MAX_FX;
+        return fxParam[idx];
+    }
+
     void recall(int i) {
         input.setLength(0);
         if (i < history.size()) input.append(history.get(i));
@@ -391,6 +407,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         curGroup = G_PLAYER;
         curBlock = nextBlock++;
         openStage = null;
+        pipeElem = ELEM_FORCE;
         addRow(K_CMD, G_PLAYER, "> " + raw, THRALL, null, null);
         game.submit(raw);
         dirty = true;
@@ -436,8 +453,10 @@ public final class GdxView extends ApplicationAdapter implements View {
     @Override
     public void handle(GameEvent event) {
         switch (event) {
+            case GameEvent.LineStart e -> pipeElem = ELEM_FORCE;
             case GameEvent.Narrative e -> {
                 String text = e.text();
+                pipeElem = detectNarrativeElem(text, pipeElem);
                 if (text.contains("EXPLOD") || text.contains("detonat") || text.contains("shatter")) {
                     shakeTime = Math.max(shakeTime, 0.28f);
                     shakeMag = Math.max(shakeMag, 5f);
@@ -592,50 +611,188 @@ public final class GdxView extends ApplicationAdapter implements View {
         }
     }
 
+    private static int detectNarrativeElem(String text, int fallback) {
+        if (text.contains("Bloodlance") || text.contains("Crimson Nova") || text.contains("Blood Drain")
+                || text.contains("Blood Surge") || text.contains("absorbs blood") || text.contains("absorbs spilled blood")) {
+            return ELEM_BLOOD;
+        }
+        if (text.contains("Inferno") || text.contains("Heat ") || text.contains("draws inferno")
+                || text.contains("draws heat") || text.contains("channeled inferno") || text.contains("channeled heat")) {
+            return ELEM_FIRE;
+        }
+        if (text.contains("Acid ") || text.contains("acid flask")
+                || text.contains("draws acid") || text.contains("channeled acid")) {
+            return ELEM_ACID;
+        }
+        if (text.contains("Water ") || text.contains("Steam") || text.contains("Superheated") || text.contains("water flask")
+                || text.contains("draws water") || text.contains("draws steam") || text.contains("channeled water")
+                || text.contains("channeled steam")) {
+            return ELEM_WATER;
+        }
+        if (text.contains("Oil ") || text.contains("Oil_mist") || text.contains("oil flask")
+                || text.contains("draws oil") || text.contains("draws oil_mist") || text.contains("channeled oil")) {
+            return ELEM_OIL;
+        }
+        if (text.contains("Kinetic") || text.contains("draws force") || text.contains("channeled force")) {
+            return ELEM_FORCE;
+        }
+        return fallback;
+    }
+
+    private int inferStageElement(String cmd, String verb, int nTargets) {
+        if (cmd.contains(" -b") || cmd.endsWith("-b") || cmd.contains("--blood")) return ELEM_BLOOD;
+        if ("channel".equals(verb) && (cmd.contains(" -f") || cmd.endsWith("-f") || cmd.contains("--force"))) {
+            return ELEM_FORCE;
+        }
+        if (("siphon".equals(verb) || "pull".equals(verb) || "take".equals(verb)) && nTargets > 0) {
+            int tx = targetX[0], ty = targetY[0];
+            int t = ty * cur.w + tx;
+            if ("siphon".equals(verb)) {
+                for (int i = 0; i < cur.n; i++) {
+                    if (cur.hp[i] > 0 && cur.x[i] == tx && cur.y[i] == ty) {
+                        if (cur.litEntity[i] || cur.burningEntity[i] || cur.kind[i] == Entity.Kind.CREATURE) return ELEM_FIRE;
+                        if (cur.glyph[i] == 'B') return ELEM_OIL;
+                    }
+                }
+                if (cur.burning[t]) return ELEM_FIRE;
+            }
+            if (cur.lootKind[t] == Scene.LOOT_FLASK_OIL) return ELEM_OIL;
+            if (cur.lootKind[t] == Scene.LOOT_FLASK_ACID) return ELEM_ACID;
+            if (cur.lootKind[t] == Scene.LOOT_FLASK_WATER) return ELEM_WATER;
+            if ("siphon".equals(verb)) {
+                if (cur.oil[t] || cur.oilMist[t]) return ELEM_OIL;
+                if (cur.acid[t]) return ELEM_ACID;
+                if (cur.water[t] || cur.steam[t] || cur.superheatedSteam[t]) return ELEM_WATER;
+            } else if (cur.lootKind[t] != Scene.LOOT_NONE) {
+                return ELEM_ITEM;
+            }
+        }
+        if ("channel".equals(verb) && pipeElem == ELEM_FORCE && cur.channel != null) {
+            if (cur.channel.startsWith("FIRE") || cur.channel.startsWith("INFERNO")) return ELEM_FIRE;
+            if (cur.channel.startsWith("ACID")) return ELEM_ACID;
+            if (cur.channel.startsWith("WATER") || cur.channel.startsWith("STEAM") || cur.channel.startsWith("SUPERHEATED")) return ELEM_WATER;
+            if (cur.channel.startsWith("OIL")) return ELEM_OIL;
+        }
+        return pipeElem;
+    }
+
+    private static Color elemColor(int elem) {
+        return switch (elem) {
+            case ELEM_FIRE -> FIRE;
+            case ELEM_WATER -> ICE_COL;
+            case ELEM_ACID -> ACID_GLOW;
+            case ELEM_OIL -> MIST_COL;
+            case ELEM_BLOOD -> BLOOD_BRIGHT;
+            case ELEM_ITEM -> PROP;
+            default -> BOLT_COL;
+        };
+    }
+
+    private void spawnCrossBurst(int ex, int ey, int countPerTile, Color col, float baseVy) {
+        for (int c = 0; c < CROSS_DX.length; c++) {
+            int cx = ex + CROSS_DX[c], cy = ey + CROSS_DY[c];
+            if (cx >= 0 && cx < cur.w && cy >= 0 && cy < cur.h && !cur.wall[cy * cur.w + cx]) {
+                spawnBurst(cx + 0.5f, cy + 0.5f, countPerTile, col, baseVy);
+            }
+        }
+    }
+
     private void triggerStageVfx(String cmd) {
         if (cur == null || cmd == null || cmd.isBlank()) return;
+        int len = cmd.length(), segStart = 0;
+        while (segStart < len) {
+            int bar = cmd.indexOf('|', segStart);
+            int segEnd = bar < 0 ? len : bar;
+            String seg = cmd.substring(segStart, segEnd).trim();
+            if (!seg.isEmpty()) triggerInvocationVfx(seg);
+            if (bar < 0) break;
+            segStart = bar + 1;
+        }
+        pipeElem = ELEM_FORCE;
+    }
+
+    private void triggerInvocationVfx(String cmd) {
         int nTargets = findTargets(cmd, cur, targetX, targetY, targetX.length);
         float sx = cur.x[0] + 0.5f, sy = cur.y[0] + 0.5f;
-        float tx = nTargets > 0 ? targetX[0] + 0.5f : sx;
-        float ty = nTargets > 0 ? targetY[0] + 0.5f : sy;
+        int ex = nTargets > 0 ? targetX[0] : cur.x[0];
+        int ey = nTargets > 0 ? targetY[0] : cur.y[0];
+        float tx = ex + 0.5f, ty = ey + 0.5f;
 
         String verb = firstWord(cmd);
+        int elem = inferStageElement(cmd, verb, nTargets);
+        pipeElem = elem;
         switch (verb) {
             case "bolt" -> {
-                Color bc = cmd.contains("-f") ? FIRE : cmd.contains("-a") ? ACID_COL : BOLT_COL;
-                if (nTargets > 0) spawnFx(FX_BOLT, sx, sy, tx, ty, 0.35f, bc);
-                spawnBurst(tx, ty, 12, bc, -0.5f);
-                audio.play(SynthAudio.ZAP, 0.60f);
+                if (elem == ELEM_FIRE) {
+                    if (nTargets > 0) spawnFx(FX_FIREBALL, sx, sy, tx, ty, 0.34f, FIRE, ELEM_FIRE);
+                    spawnBurst(tx, ty, 20, EMBER, -0.9f);
+                    audio.play(SynthAudio.BOOM, 0.40f);
+                    audio.play(SynthAudio.ZAP, 0.45f);
+                } else if (elem == ELEM_BLOOD) {
+                    if (nTargets > 0) spawnFx(FX_BLOOD_BOLT, sx, sy, tx, ty, 0.36f, BLOOD_BRIGHT, ELEM_BLOOD);
+                    spawnBurst(tx, ty, 18, BLOOD_BRIGHT, -0.4f);
+                    spawnBurst(sx, sy, 8, BLOOD_DEEP, -0.6f);
+                    audio.play(SynthAudio.ZAP, 0.60f);
+                } else if (elem == ELEM_ACID || elem == ELEM_WATER || elem == ELEM_OIL || elem == ELEM_ITEM) {
+                    Color ec = elemColor(elem);
+                    if (nTargets > 0) spawnFx(FX_ELEM_BOLT, sx, sy, tx, ty, 0.32f, ec, elem);
+                    spawnBurst(tx, ty, 14, ec, -0.5f);
+                    audio.play(elem == ELEM_ITEM ? SynthAudio.SHOOT : SynthAudio.SPLASH, 0.60f);
+                } else {
+                    if (nTargets > 0) spawnFx(FX_PSIONIC_SPIKE, sx, sy, tx, ty, 0.36f, BOLT_COL, ELEM_FORCE);
+                    spawnBurst(tx, ty, 14, Color.WHITE, -0.5f);
+                    audio.play(SynthAudio.ZAP, 0.60f);
+                }
             }
             case "blast" -> {
-                spawnFx(FX_RING, tx, ty, 2.2f, 0f, 0.45f, FIRE);
-                spawnBurst(tx, ty, 24, EMBER, -0.8f);
+                Color ec = elemColor(elem);
+                spawnFx(FX_CROSS, tx, ty, tx, ty, 0.48f, ec, elem);
+                spawnFx(FX_RING, tx, ty, 2.2f, 0f, 0.45f, ec, elem);
+                if (elem == ELEM_BLOOD) {
+                    spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, BLOOD_DEEP, elem);
+                    spawnCrossBurst(ex, ey, 6, BLOOD_BRIGHT, -0.4f);
+                } else if (elem == ELEM_FIRE) {
+                    spawnCrossBurst(ex, ey, 6, EMBER, -0.9f);
+                } else {
+                    spawnCrossBurst(ex, ey, 5, ec, -0.6f);
+                }
                 shakeTime = Math.max(shakeTime, 0.24f);
                 shakeMag = Math.max(shakeMag, 4f);
                 audio.play(SynthAudio.BOOM, 0.65f);
             }
             case "push", "pull" -> {
                 if (nTargets > 0) {
-                    spawnFx(FX_RING, tx, ty, 1.4f, 0f, 0.35f, THRALL);
+                    spawnFx(FX_RING, tx, ty, 1.4f, 0f, 0.35f, THRALL, elem);
                     spawnFx(FX_PROJ, verb.equals("push") ? sx : tx, verb.equals("push") ? sy : ty,
-                            verb.equals("push") ? tx : sx, verb.equals("push") ? ty : sy, 0.22f, THRALL);
+                            verb.equals("push") ? tx : sx, verb.equals("push") ? ty : sy, 0.22f, THRALL, elem);
                 }
                 audio.play(SynthAudio.ZAP, 0.42f);
             }
             case "throw", "shoot" -> {
-                if (nTargets > 0) spawnFx(FX_PROJ, sx, sy, tx, ty, 0.28f, PROP);
+                Color pc = cmd.contains("acid") ? ACID_GLOW : cmd.contains("water") ? ICE_COL
+                        : cmd.contains("oil") ? MIST_COL : PROP;
+                if (nTargets > 0) spawnFx(FX_PROJ, sx, sy, tx, ty, 0.28f, pc, elem);
                 audio.play(SynthAudio.SHOOT, 0.55f);
             }
             case "siphon" -> {
-                if (nTargets > 0) spawnFx(FX_PROJ, tx, ty, sx, sy, 0.30f, THRALL);
+                Color sc = elem == ELEM_FORCE ? THRALL : elemColor(elem);
+                if (elem == ELEM_BLOOD) {
+                    if (nTargets > 0) spawnFx(FX_DRAIN, tx, ty, sx, sy, 0.42f, BLOOD_BRIGHT, elem);
+                    spawnFx(FX_RING, sx, sy, 1.0f, 0f, 0.35f, BLOOD_BRIGHT, elem);
+                    spawnBurst(tx, ty, 14, BLOOD_BRIGHT, -0.4f);
+                } else if (nTargets > 0) {
+                    spawnFx(FX_DRAIN, tx, ty, sx, sy, 0.34f, sc, elem);
+                    spawnBurst(tx, ty, 10, sc, -0.5f);
+                }
                 audio.play(SynthAudio.SPLASH, 0.55f);
             }
             case "pour" -> {
-                if (nTargets > 0) spawnFx(FX_PROJ, sx, sy, tx, ty, 0.25f, WATER_COL);
+                Color pc = elem == ELEM_FORCE ? WATER_COL : elemColor(elem);
+                if (nTargets > 0) spawnFx(FX_PROJ, sx, sy, tx, ty, 0.25f, pc, elem);
                 audio.play(SynthAudio.SPLASH, 0.55f);
             }
             case "ignite" -> {
-                spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, FIRE);
+                spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, FIRE, ELEM_FIRE);
                 spawnBurst(tx, ty, 16, FIRE, -1.0f);
                 audio.play(SynthAudio.BOOM, 0.42f);
             }
@@ -648,8 +805,15 @@ public final class GdxView extends ApplicationAdapter implements View {
                 }
             }
             case "channel" -> {
-                spawnFx(FX_RING, sx, sy, 1.1f, 0f, 0.35f, BOLT_COL);
-                audio.play(SynthAudio.ZAP, 0.35f);
+                if (elem == ELEM_BLOOD) {
+                    spawnFx(FX_RING, sx, sy, 1.4f, 0f, 0.40f, BLOOD_BRIGHT, elem);
+                    spawnBurst(sx, sy, 18, BLOOD_BRIGHT, -0.9f);
+                    audio.play(SynthAudio.ZAP, 0.45f);
+                } else {
+                    Color cc = elem == ELEM_FORCE ? BOLT_COL : elemColor(elem);
+                    spawnFx(FX_RING, sx, sy, 1.1f, 0f, 0.35f, cc, elem);
+                    audio.play(SynthAudio.ZAP, 0.35f);
+                }
             }
             default -> { }
         }
@@ -726,8 +890,8 @@ public final class GdxView extends ApplicationAdapter implements View {
                     if (s.newlyBurning(tx, ty, p)) {
                         spawnBurst(tx + 0.5f, ty + 0.5f, 16, FIRE, -1.1f);
                     }
-                    if ((s.steam[t] && !p.steam[t]) || (s.causticGas[t] && !p.causticGas[t]) || (s.oilMist[t] && !p.oilMist[t])) {
-                        Color gc = s.causticGas[t] ? CAUSTIC_COL : s.oilMist[t] ? MIST_COL : STEAM_COL;
+                    if ((s.steam[t] && !p.steam[t]) || (s.superheatedSteam[t] && !p.superheatedSteam[t]) || (s.oilMist[t] && !p.oilMist[t])) {
+                        Color gc = s.superheatedSteam[t] ? SUPERHEATED_COL : s.oilMist[t] ? MIST_COL : STEAM_COL;
                         spawnBurst(tx + 0.5f, ty + 0.5f, 8, gc, -0.4f);
                     }
                 }
@@ -767,6 +931,10 @@ public final class GdxView extends ApplicationAdapter implements View {
     }
 
     private void spawnFx(int kind, float x0, float y0, float x1, float y1, float maxAge, Color col) {
+        spawnFx(kind, x0, y0, x1, y1, maxAge, col, ELEM_FORCE);
+    }
+
+    private void spawnFx(int kind, float x0, float y0, float x1, float y1, float maxAge, Color col, int param) {
         fxKind[nextFx] = kind;
         fxX0[nextFx] = x0;
         fxY0[nextFx] = y0;
@@ -774,6 +942,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         fxY1[nextFx] = y1;
         fxAge[nextFx] = 0f;
         fxMaxAge[nextFx] = maxAge;
+        fxParam[nextFx] = param;
         fxCol[nextFx].set(col);
         nextFx = (nextFx + 1) % MAX_FX;
     }
@@ -820,13 +989,13 @@ public final class GdxView extends ApplicationAdapter implements View {
                     Color fc = nextRand01() < 0.4f ? EMBER : FIRE;
                     spawnParticle(x + 0.2f + nextRand01() * 0.6f, y + 0.3f + nextRand01() * 0.4f,
                             (nextRand01() - 0.5f) * 0.3f, -0.8f - nextRand01() * 0.6f, 0.55f, 3f, fc);
-                } else if ((cur.steam[t] || cur.causticGas[t] || cur.oilMist[t]) && nextRand01() < 0.22f) {
-                    Color gc = cur.causticGas[t] ? CAUSTIC_COL : cur.oilMist[t] ? MIST_COL : STEAM_COL;
+                } else if ((cur.steam[t] || cur.superheatedSteam[t] || cur.oilMist[t]) && nextRand01() < 0.22f) {
+                    Color gc = cur.superheatedSteam[t] ? SUPERHEATED_COL : cur.oilMist[t] ? MIST_COL : STEAM_COL;
                     spawnParticle(x + 0.15f + nextRand01() * 0.7f, y + 0.2f + nextRand01() * 0.6f,
                             (nextRand01() - 0.5f) * 0.25f, -0.35f, 0.75f, 4f, gc);
                 } else if (cur.acid[t] && nextRand01() < 0.14f) {
                     spawnParticle(x + 0.2f + nextRand01() * 0.6f, y + 0.3f + nextRand01() * 0.4f,
-                            0f, -0.45f, 0.45f, 2.5f, CAUSTIC_COL);
+                            0f, -0.45f, 0.45f, 2.5f, ACID_GLOW);
                 }
             }
         }
@@ -1137,42 +1306,23 @@ public final class GdxView extends ApplicationAdapter implements View {
         }
 
         // HUD status bars
-        float hudX = sideX() + 16, barX = hudX + 100;
+        float hudX = sideX() + 16, barX = hudX + 92;
         float hpBarY = WIN_H - (MAP_Y + 44) - (fontH + 10) / 2f;
         float apBarY = WIN_H - (MAP_Y + 68) - (fontH + 10) / 2f;
         shapes.setColor(BAR_BG);
-        shapes.rect(barX, hpBarY, 150, 10);
+        shapes.rect(barX, hpBarY, 120, 10);
         shapes.setColor(hp * 3 <= maxHp ? CREATURE : THRALL);
-        shapes.rect(barX, hpBarY, 150 * MathUtils.clamp(hp / (float) Math.max(1, maxHp), 0f, 1f), 10);
+        shapes.rect(barX, hpBarY, 120 * MathUtils.clamp(hp / (float) Math.max(1, maxHp), 0f, 1f), 10);
         int maxPips = Math.max(roundAp, ap);
-        int pipStep = maxPips > 6 ? 18 : 22;
-        int pipW = maxPips > 6 ? 14 : 16;
+        int pipStep = maxPips > 6 ? 16 : 19;
+        int pipW = maxPips > 6 ? 12 : 14;
         for (int p = 0; p < maxPips; p++) {
             shapes.setColor(p < ap ? THRALL : BAR_BG);
             shapes.rect(barX + p * pipStep, apBarY, pipW, 10);
         }
         shapes.setColor(BORDER);
-        shapes.rect(sideX() + 12, WIN_H - (MAP_Y + 148), sideW() - 24, 1);
-
-        // Roster rows
-        float rowTop = MAP_Y + 158;
-        float rBarX = sideX() + sideW() - 175;
-        for (int i = 0; i < cur.n; i++) {
-            if (cur.hp[i] <= 0) continue;
-            rowTop += LINE_H;
-            float midY = WIN_H - rowTop - fontH / 2f;
-            if (cur.id[i].equals(actingId)) {
-                shapes.setColor(BORDER.r, BORDER.g, BORDER.b, 0.65f);
-                shapes.rect(sideX() + 8, midY - LINE_H / 2f, sideW() - 16, LINE_H - 1);
-            }
-            Color c = colorOf(cur, i);
-            shapes.setColor(c.r, c.g, c.b, 0.9f);
-            shapes.rect(sideX() + 14, midY - 6, 3, 12);
-            shapes.setColor(BAR_BG);
-            shapes.rect(rBarX, midY - 3, 46, 6);
-            shapes.setColor(c);
-            shapes.rect(rBarX, midY - 3, 46 * (cur.hp[i] / (float) cur.maxHp[i]), 6);
-        }
+        shapes.rect(sideX() + 12, WIN_H - (MAP_Y + 152), sideW() - 24, 1);
+        shapes.rect(sideX() + 12, WIN_H - (MAP_Y + 238), sideW() - 24, 1);
 
         // Structured log cards & banners
         int scroll = scrollLines();
@@ -1245,12 +1395,13 @@ public final class GdxView extends ApplicationAdapter implements View {
                     batch.draw(atlas.regions[front ? PixelAtlas.WALL_FRONT : PixelAtlas.WALL_TOP], sx, sy, TILE, TILE);
                 } else {
                     batch.draw(atlas.regions[(x + y) % 2 == 0 ? PixelAtlas.FLOOR_0 : PixelAtlas.FLOOR_1], sx, sy, TILE, TILE);
-                    if (cur.toxicTar[t]) {
-                        batch.draw(atlas.regions[PixelAtlas.TAR_TILE], sx, sy, TILE, TILE);
-                    } else if (cur.ice[t]) {
+                    if (cur.ice[t]) {
                         batch.draw(atlas.regions[PixelAtlas.ICE_TILE], sx, sy, TILE, TILE);
-                        if (cur.acid[t]) batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], sx + 9, sy + 9, TILE - 18, TILE - 18);
+                        if (cur.tar[t]) batch.draw(atlas.regions[PixelAtlas.TAR_TILE], sx + 9, sy + 9, TILE - 18, TILE - 18);
+                        else if (cur.acid[t]) batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], sx + 9, sy + 9, TILE - 18, TILE - 18);
                         else if (cur.oil[t]) batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], sx + 9, sy + 9, TILE - 18, TILE - 18);
+                    } else if (cur.tar[t]) {
+                        batch.draw(atlas.regions[PixelAtlas.TAR_TILE], sx, sy, TILE, TILE);
                     } else if (cur.acid[t]) {
                         batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], sx, sy, TILE, TILE);
                     } else if (cur.water[t]) {
@@ -1266,8 +1417,8 @@ public final class GdxView extends ApplicationAdapter implements View {
                     batch.draw(atlas.regions[PixelAtlas.spriteForLoot(cur.lootKind[t])], sx + 10, sy + 8 + bob, TILE - 20, TILE - 20);
                 }
 
-                if (cur.steam[t] || cur.causticGas[t] || cur.oilMist[t]) {
-                    Color gc = cur.causticGas[t] ? CAUSTIC_COL : cur.oilMist[t] ? MIST_COL : STEAM_COL;
+                if (cur.steam[t] || cur.superheatedSteam[t] || cur.oilMist[t]) {
+                    Color gc = cur.superheatedSteam[t] ? SUPERHEATED_COL : cur.oilMist[t] ? MIST_COL : STEAM_COL;
                     float drift = MathUtils.sin(time * 2.2f + x * 1.1f + y) * 3f;
                     batch.setColor(gc.r, gc.g, gc.b, 0.48f);
                     batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], sx + drift, sy + 2, TILE, TILE);
@@ -1296,22 +1447,27 @@ public final class GdxView extends ApplicationAdapter implements View {
 
             int spr = PixelAtlas.spriteForEntity(cur, i, animFrame);
             int p = prevIdx[i];
-            if (p >= 0 && cur.moved(i, prev)) {
-                batch.setColor(1f, 1f, 1f, 0.28f);
+            if (p >= 0 && cur.moved(i, prev) && anim < GHOST_LIFE) {
+                float ga = 0.35f * (1f - anim / GHOST_LIFE);
+                batch.setColor(1f, 1f, 1f, ga);
                 batch.draw(atlas.regions[spr], mapScreenX(prev.x[p]), mapScreenY(prev.y[p]), TILE, TILE);
             }
 
             if (i < MAX_ENT && hitFlash[i] > 0) {
                 batch.setColor(1f, 0.95f, 0.95f, 1f);
             } else if (cur.frozenEntity[i]) {
-                batch.setColor(0.55f, 0.88f, 1f, 1f);
+                batch.setColor(0.28f, 0.68f, 1f, 1f);
             } else {
                 float eLum = MathUtils.clamp(cur.light[cur.y[i] * cur.w + cur.x[i]] + 0.22f, 0.62f, 1f);
                 batch.setColor(eLum, eLum, eLum, 1f);
             }
-            float h = cur.proneEntity[i] ? TILE * 0.64f : TILE;
-            batch.draw(atlas.regions[spr], px, py, TILE, h);
+            float rot = cur.proneEntity[i] ? 90f : 0f;
+            batch.draw(atlas.regions[spr], px, py, TILE * 0.5f, TILE * 0.5f, TILE, TILE, 1f, 1f, rot);
 
+            if (cur.frozenEntity[i]) {
+                batch.setColor(0.55f, 0.90f, 1f, 0.38f);
+                batch.draw(atlas.regions[PixelAtlas.ICE_TILE], px + 4, py + 4, TILE - 8, TILE - 8);
+            }
             if (cur.burningEntity[i]) {
                 batch.setColor(1f, 1f, 1f, 0.80f);
                 batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], px, py + 4, TILE, TILE);
@@ -1332,7 +1488,99 @@ public final class GdxView extends ApplicationAdapter implements View {
             }
         }
 
-        // 3. Particles
+        // 3. Sprite-based spell VFX (bolts, fireballs, psionic blur, elemental/blood cross bursts)
+        for (int i = 0; i < MAX_FX; i++) {
+            if (fxAge[i] >= fxMaxAge[i]) continue;
+            float u = fxAge[i] / fxMaxAge[i];
+            float a = 1f - u;
+            Color fc = fxCol[i];
+            if (fxKind[i] == FX_PSIONIC_SPIKE) {
+                float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
+                float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
+                float tipU = Math.min(1f, u * 2.4f);
+                float px = MathUtils.lerp(x0, x1, tipU), py = MathUtils.lerp(y0, y1, tipU);
+                float dx = px - x0, dy = py - y0;
+                float len = Math.max(8f, (float) Math.hypot(dx, dy));
+                float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+                float mx = (x0 + px) * 0.5f, my = (y0 + py) * 0.5f;
+                float corrW = len + 28f, corrH = 38f;
+                batch.setColor(0.55f, 0.85f, 1f, 0.28f * a);
+                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], mx - corrW * 0.5f, my - corrH * 0.5f,
+                        corrW * 0.5f, corrH * 0.5f, corrW, corrH, 1f, 1f, angle);
+                for (int rIdx = 1; rIdx <= 4; rIdx++) {
+                    float rt = rIdx * 0.25f;
+                    float rx = MathUtils.lerp(x0, px, rt), ry = MathUtils.lerp(y0, py, rt);
+                    float rw = 10f + u * 14f, rh = 26f + u * 34f;
+                    batch.setColor(0.85f, 0.96f, 1f, 0.34f * a);
+                    batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], rx - rw * 0.5f, ry - rh * 0.5f,
+                            rw * 0.5f, rh * 0.5f, rw, rh, 1f, 1f, angle);
+                }
+            } else if (fxKind[i] == FX_BLOOD_BOLT) {
+                float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
+                float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
+                float dx = x1 - x0, dy = y1 - y0;
+                float len = Math.max(8f, (float) Math.hypot(dx, dy));
+                float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+                float mx = (x0 + x1) * 0.5f, my = (y0 + y1) * 0.5f;
+                float corrW = len + 20f, corrH = 32f;
+                batch.setColor(0.75f, 0.08f, 0.14f, 0.28f * a);
+                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], mx - corrW * 0.5f, my - corrH * 0.5f,
+                        corrW * 0.5f, corrH * 0.5f, corrW, corrH, 1f, 1f, angle);
+            } else if (fxKind[i] == FX_FIREBALL) {
+                float fx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], u));
+                float fy = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], u));
+                batch.setColor(1f, 0.55f, 0.15f, 0.45f * a + 0.2f);
+                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], fx - TILE * 0.45f, fy - TILE * 0.45f, TILE * 0.9f, TILE * 0.9f);
+                batch.setColor(1f, 1f, 1f, 0.95f);
+                batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], fx - TILE * 0.38f, fy - TILE * 0.38f, TILE * 0.76f, TILE * 0.76f);
+            } else if (fxKind[i] == FX_ELEM_BOLT) {
+                float fx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], u));
+                float fy = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], u));
+                float pu = Math.max(0f, u - 0.16f);
+                float tx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], pu));
+                float ty = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], pu));
+                batch.setColor(fc.r, fc.g, fc.b, 0.42f * a);
+                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], tx - TILE * 0.3f, ty - TILE * 0.3f, TILE * 0.6f, TILE * 0.6f);
+                batch.setColor(fc.r, fc.g, fc.b, 0.62f * a + 0.15f);
+                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], fx - TILE * 0.44f, fy - TILE * 0.44f, TILE * 0.88f, TILE * 0.88f);
+                int spr = switch (fxParam[i]) {
+                    case ELEM_ACID -> PixelAtlas.ACID_0 + animFrame;
+                    case ELEM_WATER -> PixelAtlas.WATER_0 + animFrame;
+                    case ELEM_OIL -> PixelAtlas.OIL_SLICK;
+                    default -> PixelAtlas.LOOT_STONE;
+                };
+                batch.setColor(1f, 1f, 1f, 0.96f);
+                batch.draw(atlas.regions[spr], fx - TILE * 0.34f, fy - TILE * 0.34f, TILE * 0.68f, TILE * 0.68f);
+            } else if (fxKind[i] == FX_CROSS) {
+                int ex = MathUtils.floor(fxX0[i]), ey = MathUtils.floor(fxY0[i]);
+                int elem = fxParam[i];
+                for (int c = 0; c < CROSS_DX.length; c++) {
+                    int cx = ex + CROSS_DX[c], cy = ey + CROSS_DY[c];
+                    if (cx < 0 || cx >= cur.w || cy < 0 || cy >= cur.h || cur.wall[cy * cur.w + cx]) continue;
+                    float tx = mapScreenX(cx), ty = mapScreenY(cy);
+                    batch.setColor(fc.r, fc.g, fc.b, (elem == ELEM_BLOOD ? 0.46f : 0.36f) * a);
+                    batch.draw(atlas.white, tx + 2, ty + 2, TILE - 4, TILE - 4);
+                    if (elem == ELEM_FIRE) {
+                        batch.setColor(1f, 1f, 1f, 0.88f * a);
+                        batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], tx + 4, ty + 4, TILE - 8, TILE - 8);
+                    } else if (elem == ELEM_ACID) {
+                        batch.setColor(1f, 1f, 1f, 0.85f * a);
+                        batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], tx + 4, ty + 4, TILE - 8, TILE - 8);
+                    } else if (elem == ELEM_WATER) {
+                        batch.setColor(1f, 1f, 1f, 0.85f * a);
+                        batch.draw(atlas.regions[PixelAtlas.WATER_0 + animFrame], tx + 4, ty + 4, TILE - 8, TILE - 8);
+                    } else if (elem == ELEM_OIL) {
+                        batch.setColor(1f, 1f, 1f, 0.85f * a);
+                        batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], tx + 4, ty + 4, TILE - 8, TILE - 8);
+                    } else {
+                        batch.setColor(fc.r, fc.g, fc.b, 0.55f * a);
+                        batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], tx + 2, ty + 2, TILE - 4, TILE - 4);
+                    }
+                }
+            }
+        }
+
+        // 4. Particles
         for (int i = 0; i < MAX_PARTICLES; i++) {
             if (partAge[i] >= partMaxAge[i]) continue;
             float a = 1f - partAge[i] / partMaxAge[i];
@@ -1360,14 +1608,15 @@ public final class GdxView extends ApplicationAdapter implements View {
                 } else {
                     shapes.setColor((x + y) % 2 == 0 ? FLOOR : FLOOR_ALT);
                     shapes.rect(sx + 1, sy + 1, TILE - 2, TILE - 2);
-                    if (cur.toxicTar[t]) {
-                        shapes.setColor(TAR_COL);
-                        shapes.rect(sx + 4, sy + 4, TILE - 8, TILE - 8);
-                    } else if (cur.ice[t]) {
+                    if (cur.ice[t]) {
                         shapes.setColor(ICE_COL);
                         shapes.rect(sx + 4, sy + 4, TILE - 8, TILE - 8);
-                        if (cur.acid[t]) { shapes.setColor(ACID_COL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
+                        if (cur.tar[t]) { shapes.setColor(TAR_COL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
+                        else if (cur.acid[t]) { shapes.setColor(ACID_COL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
                         else if (cur.oil[t]) { shapes.setColor(OIL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
+                    } else if (cur.tar[t]) {
+                        shapes.setColor(TAR_COL);
+                        shapes.rect(sx + 4, sy + 4, TILE - 8, TILE - 8);
                     } else if (cur.acid[t]) {
                         shapes.setColor(ACID_COL);
                         shapes.rect(sx + 5, sy + 5, TILE - 10, TILE - 10);
@@ -1382,7 +1631,7 @@ public final class GdxView extends ApplicationAdapter implements View {
                     }
                 }
                 if (cur.steam[t]) { shapes.setColor(STEAM_COL.r, STEAM_COL.g, STEAM_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
-                else if (cur.causticGas[t]) { shapes.setColor(CAUSTIC_COL.r, CAUSTIC_COL.g, CAUSTIC_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
+                else if (cur.superheatedSteam[t]) { shapes.setColor(SUPERHEATED_COL.r, SUPERHEATED_COL.g, SUPERHEATED_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
                 else if (cur.oilMist[t]) { shapes.setColor(MIST_COL.r, MIST_COL.g, MIST_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
                 if (cur.burning[t]) { shapes.setColor(FIRE.r, FIRE.g, FIRE.b, pulse * 0.45f); shapes.rect(sx + 3, sy + 3, TILE - 6, TILE - 6); }
                 if (cur.loot[t]) { shapes.setColor(PROP); shapes.rect(sx + TILE - 12, sy + 4, 6, 6); }
@@ -1411,9 +1660,9 @@ public final class GdxView extends ApplicationAdapter implements View {
         int logW = logW(), logY = logY(), sideY = WIN_H - MAP_Y - mapH(), inputY = WIN_H - INPUT_TOP - INPUT_H;
         int total = log.size(), visible = logLines(), scroll = scrollLines();
         int first = Math.max(0, total - visible - scroll);
-        float hudX = sideX() + 16, barX = hudX + 100;
+        float hudX = sideX() + 16, barX = hudX + 92;
         float apBarY = WIN_H - (MAP_Y + 68) - (fontH + 10) / 2f;
-        int maxPips = Math.max(roundAp, ap), pipStep = maxPips > 6 ? 18 : 22, pipW = maxPips > 6 ? 14 : 16;
+        int maxPips = Math.max(roundAp, ap), pipStep = maxPips > 6 ? 16 : 19, pipW = maxPips > 6 ? 12 : 14;
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -1455,8 +1704,8 @@ public final class GdxView extends ApplicationAdapter implements View {
             if (!pixelMode) {
                 Color c = colorOf(cur, i);
                 int p = prevIdx[i];
-                if (p >= 0 && cur.moved(i, prev)) {
-                    shapes.setColor(c.r, c.g, c.b, 0.35f);
+                if (p >= 0 && cur.moved(i, prev) && anim < GHOST_LIFE) {
+                    shapes.setColor(c.r, c.g, c.b, 0.38f * (1f - anim / GHOST_LIFE));
                     drawToken(shapes, cur.kind[i], mapScreenX(prev.x[p]), mapScreenY(prev.y[p]));
                 }
                 shapes.setColor(c.r, c.g, c.b, 0.9f);
@@ -1497,21 +1746,52 @@ public final class GdxView extends ApplicationAdapter implements View {
             float u = fxAge[i] / fxMaxAge[i];
             float a = 1f - u;
             Color fc = fxCol[i];
-            if (fxKind[i] == FX_BOLT) {
+            if (fxKind[i] == FX_BLOOD_BOLT) {
                 float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
                 float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
-                shapes.setColor(fc.r, fc.g, fc.b, a);
+                float len = Math.max(1f, (float) Math.hypot(x1 - x0, y1 - y0));
+                float nx = -(y1 - y0) / len, ny = (x1 - x0) / len;
                 float px = x0, py = y0;
                 for (int seg = 1; seg <= 5; seg++) {
                     float t = seg / 5f;
-                    float jitter = seg == 5 ? 0f : MathUtils.sin(time * 55f + seg * 2.1f + i) * 9f;
-                    float nx = MathUtils.lerp(x0, x1, t) + jitter;
-                    float ny = MathUtils.lerp(y0, y1, t) - jitter * 0.7f;
-                    shapes.line(px, py, nx, ny);
-                    shapes.line(px + 1, py + 1, nx + 1, ny + 1);
-                    px = nx;
-                    py = ny;
+                    float jitter = seg == 5 ? 0f : MathUtils.sin(time * 55f + seg * 2.1f + i) * 10f;
+                    float qx = MathUtils.lerp(x0, x1, t) + nx * jitter;
+                    float qy = MathUtils.lerp(y0, y1, t) + ny * jitter;
+                    shapes.setColor(BLOOD_DEEP.r, BLOOD_DEEP.g, BLOOD_DEEP.b, a * 0.85f);
+                    shapes.line(px + nx * 2f, py + ny * 2f, qx + nx * 2f, qy + ny * 2f);
+                    shapes.line(px - nx * 2f, py - ny * 2f, qx - nx * 2f, qy - ny * 2f);
+                    shapes.setColor(BLOOD_BRIGHT.r, BLOOD_BRIGHT.g, BLOOD_BRIGHT.b, a);
+                    shapes.line(px + nx, py + ny, qx + nx, qy + ny);
+                    shapes.line(px - nx, py - ny, qx - nx, qy - ny);
+                    shapes.line(px, py, qx, qy);
+                    px = qx;
+                    py = qy;
                 }
+                shapes.setColor(BLOOD_BRIGHT.r, BLOOD_BRIGHT.g, BLOOD_BRIGHT.b, a * 0.9f);
+                shapes.circle(x1, y1, 8f + 10f * u, 16);
+            } else if (fxKind[i] == FX_PSIONIC_SPIKE) {
+                float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
+                float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
+                float tipU = Math.min(1f, u * 2.4f);
+                float px = MathUtils.lerp(x0, x1, tipU), py = MathUtils.lerp(y0, y1, tipU);
+                float dx = x1 - x0, dy = y1 - y0;
+                float len = Math.max(1f, (float) Math.hypot(dx, dy));
+                float ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+                shapes.setColor(0.55f, 0.85f, 1f, a * 0.65f);
+                shapes.line(x0 + nx * 3f, y0 + ny * 3f, px + nx * 2f, py + ny * 2f);
+                shapes.line(x0 - nx * 3f, y0 - ny * 3f, px - nx * 2f, py - ny * 2f);
+                for (int w = 1; w <= 3; w++) {
+                    float wt = w * 0.30f;
+                    float wx = MathUtils.lerp(x0, px, wt), wy = MathUtils.lerp(y0, py, wt);
+                    shapes.circle(wx, wy, 4f + u * 11f, 14);
+                }
+                shapes.setColor(1f, 1f, 1f, a);
+                shapes.line(x0, y0, px, py);
+                float bx = px - ux * 15f, by = py - uy * 15f;
+                shapes.line(px + ux * 3f, py + uy * 3f, bx + nx * 5f, by + ny * 5f);
+                shapes.line(px + ux * 3f, py + uy * 3f, bx - nx * 5f, by - ny * 5f);
+                shapes.setColor(0.75f, 0.94f, 1f, a * 0.85f);
+                shapes.circle(x1, y1, 5f + 9f * u, 16);
             } else if (fxKind[i] == FX_RING) {
                 float cx = mapScreenX(fxX0[i]), cy = centerScreenY(fxY0[i]);
                 float rad = MathUtils.lerp(0.15f * TILE, fxX1[i] * TILE, Interpolation.pow2Out.apply(u));
@@ -1528,6 +1808,71 @@ public final class GdxView extends ApplicationAdapter implements View {
                 shapes.setColor(fc.r, fc.g, fc.b, 0.95f);
                 shapes.line(tx, ty, px, py);
                 shapes.circle(px, py, 4.5f, 10);
+            } else if (fxKind[i] == FX_FIREBALL) {
+                float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
+                float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
+                float px = MathUtils.lerp(x0, x1, u), py = MathUtils.lerp(y0, y1, u);
+                float pu = Math.max(0f, u - 0.22f);
+                float tx = MathUtils.lerp(x0, x1, pu), ty = MathUtils.lerp(y0, y1, pu);
+                shapes.setColor(EMBER.r, EMBER.g, EMBER.b, a);
+                shapes.line(tx, ty, px, py);
+                shapes.circle(px, py, 10f + 5f * MathUtils.sin(u * MathUtils.PI), 16);
+                shapes.setColor(FIRE.r, FIRE.g, FIRE.b, a * 0.8f);
+                shapes.circle(px, py, 16f, 18);
+            } else if (fxKind[i] == FX_ELEM_BOLT) {
+                float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
+                float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
+                float px = MathUtils.lerp(x0, x1, u), py = MathUtils.lerp(y0, y1, u);
+                float pu = Math.max(0f, u - 0.20f);
+                float tx = MathUtils.lerp(x0, x1, pu), ty = MathUtils.lerp(y0, y1, pu);
+                shapes.setColor(fc.r, fc.g, fc.b, a);
+                shapes.line(tx, ty, px, py);
+                shapes.circle(px, py, 9f + 4f * MathUtils.sin(u * MathUtils.PI), 14);
+                shapes.circle(px, py, 14f, 16);
+                if (u > 0.65f) {
+                    shapes.circle(x1, y1, (u - 0.65f) * TILE * 1.4f, 18);
+                }
+            } else if (fxKind[i] == FX_CROSS) {
+                int ex = MathUtils.floor(fxX0[i]), ey = MathUtils.floor(fxY0[i]);
+                int elem = fxParam[i];
+                shapes.setColor(fc.r, fc.g, fc.b, a);
+                for (int c = 0; c < CROSS_DX.length; c++) {
+                    int cx = ex + CROSS_DX[c], cy = ey + CROSS_DY[c];
+                    if (cx < 0 || cx >= cur.w || cy < 0 || cy >= cur.h || cur.wall[cy * cur.w + cx]) continue;
+                    float rx = mapScreenX(cx), ry = mapScreenY(cy);
+                    float pad = 4f + u * 4f;
+                    shapes.rect(rx + pad, ry + pad, TILE - pad * 2f, TILE - pad * 2f);
+                    if (elem == ELEM_BLOOD || elem == ELEM_FORCE) {
+                        shapes.line(rx + 8, ry + 8, rx + TILE - 8, ry + TILE - 8);
+                        shapes.line(rx + 8, ry + TILE - 8, rx + TILE - 8, ry + 8);
+                    }
+                }
+                if (elem == ELEM_BLOOD) {
+                    shapes.setColor(BLOOD_DEEP.r, BLOOD_DEEP.g, BLOOD_DEEP.b, a);
+                    shapes.circle(mapScreenX(fxX0[i]), centerScreenY(fxY0[i]), 0.4f * TILE + u * 1.1f * TILE, 20);
+                }
+            } else if (fxKind[i] == FX_DRAIN) {
+                float x0 = mapScreenX(fxX0[i]), y0 = centerScreenY(fxY0[i]);
+                float x1 = mapScreenX(fxX1[i]), y1 = centerScreenY(fxY1[i]);
+                float dx = x1 - x0, dy = y1 - y0;
+                float len = Math.max(1f, (float) Math.hypot(dx, dy));
+                float nx = -dy / len, ny = dx / len;
+                shapes.setColor(fc.r, fc.g, fc.b, a * 0.85f);
+                float px = x0, py = y0;
+                for (int seg = 1; seg <= 6; seg++) {
+                    float t = seg / 6f;
+                    float wave = seg == 6 ? 0f : MathUtils.sin(t * MathUtils.PI * 2f + time * 18f) * 7f;
+                    float wx = MathUtils.lerp(x0, x1, t) + nx * wave;
+                    float wy = MathUtils.lerp(y0, y1, t) + ny * wave;
+                    shapes.line(px, py, wx, wy);
+                    px = wx;
+                    py = wy;
+                }
+                for (int orb = 0; orb < 3; orb++) {
+                    float ou = MathUtils.clamp(u * 1.35f - orb * 0.16f, 0f, 1f);
+                    float wave = MathUtils.sin(ou * MathUtils.PI * 2f + time * 18f) * 7f;
+                    shapes.circle(MathUtils.lerp(x0, x1, ou) + nx * wave, MathUtils.lerp(y0, y1, ou) + ny * wave, 4.5f, 10);
+                }
             }
         }
         shapes.end();
@@ -1572,62 +1917,62 @@ public final class GdxView extends ApplicationAdapter implements View {
             text(floatText[i], mapScreenX(floatX[i]) + 14, WIN_H - mapScreenY(floatY[i]) - TILE + 6 - floatAge[i] * 24);
         }
 
-        // Right panel: HUD + aligned tactical roster
+        // Right panel: Compact Thrall HUD + Equipment / Pack
         float px = sideX() + 16, py = MAP_Y + 18;
         font.setColor(TEXT);
         text("ROUND " + round, px, py);
         if (!game.world.thrall().alive()) {
             font.setColor(CREATURE);
-            text("LINK SEVERED", px + 110, py);
+            text("LINK SEVERED", px + 96, py);
         } else if (thinking > 0) {
             font.setColor(PROP);
-            text("HOSTILES ACTING " + ".".repeat(thinking), px + 110, py);
+            text("HOSTILES" + ".".repeat(thinking), px + 96, py);
         } else {
             badgeFont.setColor(MUTED);
-            badgeFont.draw(batch, (pixelMode ? "F1:SPRITES" : "F1:CLASSIC") + (audio.muted ? "  F2:MUTE" : "  F2:SFX"),
-                    sideX() + sideW() - 150, WIN_H - py - 2);
+            badgeFont.draw(batch, (pixelMode ? "F1:SPR" : "F1:CLS") + (audio.muted ? "  F2:MUTE" : "  F2:SFX"),
+                    sideX() + sideW() - 120, WIN_H - py - 2);
         }
 
         font.setColor(MUTED);
         text("VITALITY", px, MAP_Y + 44);
         text("ACTION PTS", px, MAP_Y + 68);
         font.setColor(TEXT);
-        text(hp + "/" + maxHp, px + 262, MAP_Y + 44);
-        text(ap + "/" + roundAp, px + 262, MAP_Y + 68);
+        text(hp + "/" + maxHp, px + 220, MAP_Y + 44);
+        text(ap + "/" + roundAp, px + 220, MAP_Y + 68);
 
         font.setColor(MUTED);
         text("MAGIC", px, MAP_Y + 90);
-        text("TEMP", px + 140, MAP_Y + 90);
+        text("TEMP", px + 116, MAP_Y + 90);
         text("CHANNEL", px, MAP_Y + 110);
         text("CONDS", px, MAP_Y + 130);
         font.setColor(TEXT);
-        text(String.valueOf(cur.magic), px + 60, MAP_Y + 90);
-        text(cur.temp + "C", px + 190, MAP_Y + 90);
+        text(String.valueOf(cur.magic), px + 56, MAP_Y + 90);
+        text(cur.temp + "C", px + 164, MAP_Y + 90);
         String chanText = cur.concentration > 0
                 ? cur.channel + "  CONC " + cur.concentration + "%"
                 : cur.channel;
-        text(chanText, px + 76, MAP_Y + 110);
+        text(chanText, px + 74, MAP_Y + 110);
         font.setColor(cur.thrallStunned || cur.thrallFrozen ? CREATURE : TEXT);
-        text(cur.shortConds, px + 60, MAP_Y + 130);
+        String condLine = cur.shortConds.length() > 26 ? cur.shortConds.substring(0, 24) + ".." : cur.shortConds;
+        text(condLine, px + 58, MAP_Y + 130);
 
-        py = MAP_Y + 158;
-        float hpColX = sideX() + sideW() - 175, posColX = sideX() + sideW() - 52;
         font.setColor(MUTED);
-        text("ID", px + 6, py);
-        text("ENTITY", px + 54, py);
-        text("HP", hpColX, py);
-        text("POS", posColX, py);
+        text("EQUIPMENT", px, MAP_Y + 164);
+        text("R.HAND", px, MAP_Y + 188);
+        text("L.HAND", px, MAP_Y + 210);
+        font.setColor("empty".equals(cur.rightHand) ? MUTED : cur.rightHand.contains("[LIT]") ? PROP : TEXT);
+        text(cur.rightHand, px + 66, MAP_Y + 188);
+        font.setColor("empty".equals(cur.leftHand) ? MUTED : cur.leftHand.contains("[LIT]") ? PROP : TEXT);
+        text(cur.leftHand, px + 66, MAP_Y + 210);
 
-        for (int i = 0; i < cur.n; i++) {
-            if (cur.hp[i] <= 0) continue;
+        font.setColor(MUTED);
+        text("PACK (" + cur.packCount + "/" + cur.packMax + ")", px, MAP_Y + 248);
+        py = MAP_Y + 272;
+        for (int i = 0; i < cur.packItems.length; i++) {
+            String item = cur.packItems[i];
+            font.setColor(item.contains("[LIT]") ? PROP : TEXT);
+            text("- " + item, px + 4, py);
             py += LINE_H;
-            font.setColor(colorOf(cur, i));
-            text(i == 0 ? "self" : cur.id[i], px + 6, py);
-            font.setColor(TEXT);
-            text(cur.name[i], px + 54, py);
-            font.setColor(MUTED);
-            text(cur.hp[i] + "/" + cur.maxHp[i], hpColX + 54, py);
-            text(cur.x[i] + "," + cur.y[i], posColX, py);
         }
 
         // Structured 2-column combat log

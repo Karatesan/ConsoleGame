@@ -50,7 +50,11 @@ public final class SpatialService {
     }
 
     public static boolean hasGas(GameMap.Tile tile) {
-        return tile != null && (tile.has(Tag.STEAM) || tile.has(Tag.CAUSTIC_GAS) || tile.has(Tag.OIL_MIST));
+        return tile != null && (tile.has(Tag.STEAM) || tile.has(Tag.SUPERHEATED_STEAM) || tile.has(Tag.OIL_MIST));
+    }
+
+    public static boolean isOpaqueGas(GameMap.Tile tile) {
+        return tile != null && (tile.has(Tag.STEAM) || tile.has(Tag.OIL_MIST));
     }
 
     public static boolean lineOfSight(GameMap map, Vec2 a, Vec2 b) {
@@ -83,7 +87,7 @@ public final class SpatialService {
             if (x == b.x() && y == b.y()) break;
 
             GameMap.Tile tile = map.tile(new Vec2(x, y));
-            if (tile == null || tile.isWall() || (!ignoreGas && hasGas(tile))) {
+            if (tile == null || tile.isWall() || (!ignoreGas && isOpaqueGas(tile))) {
                 return false;
             }
         }
@@ -99,10 +103,10 @@ public final class SpatialService {
         return lineOfSight(world.map(), a, b, ignoreGas);
     }
 
-    /** First gas tile encountered along the ray from origin (exclusive) to target (inclusive), stopping before walls. */
+    /** First opaque gas tile encountered along the ray from origin (exclusive) to target (inclusive), stopping before walls. */
     public static Vec2 firstGasOnLine(World world, Vec2 origin, Vec2 target) {
         if (origin.equals(target)) {
-            return hasGas(world.tile(target)) ? target : null;
+            return isOpaqueGas(world.tile(target)) ? target : null;
         }
         int dx = Math.abs(target.x() - origin.x());
         int dy = Math.abs(target.y() - origin.y());
@@ -127,7 +131,7 @@ public final class SpatialService {
             if (tile == null || tile.isWall()) {
                 return null;
             }
-            if (hasGas(tile)) {
+            if (isOpaqueGas(tile)) {
                 return p;
             }
         }
@@ -182,7 +186,7 @@ public final class SpatialService {
         while (x != b.x() || y != b.y()) {
             Vec2 p = new Vec2(x, y);
             GameMap.Tile tile = world.tile(p);
-            if (tile == null || tile.isWall() || hasGas(tile) || entityAt(world, p) != null) {
+            if (tile == null || tile.isWall() || isOpaqueGas(tile) || entityAt(world, p) != null) {
                 return false;
             }
             x += sx;

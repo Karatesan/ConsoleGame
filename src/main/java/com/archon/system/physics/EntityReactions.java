@@ -186,7 +186,7 @@ public final class EntityReactions {
         } else if (target.has(Tag.BURNING)) {
             ThermalState.damageEntity(world, target, totalDmg, false, log);
             if (target.alive()) {
-                if (inferno) ThermalState.applyCreatureTempDelta(world, target, tempDelta, false, log);
+                ThermalState.applyCreatureTempDelta(world, target, tempDelta, false, log);
                 target.temp = Math.max(target.temp, Balance.BURN_CAP);
             }
         } else {
@@ -313,12 +313,7 @@ public final class EntityReactions {
         int scaled = scaleBlast(raw + ThermalState.magicBonus(caster), critMult, isBlast);
         int dmg = ignoreArmorOnCrit ? Math.max(1, scaled) : Math.max(1, scaled - rawArmor);
         ThermalState.addLog(log, target.name() + " is corroded (-" + Balance.ACID_ARMOR_SHRED + " armor -> " + rawArmor + ").");
-        boolean wasBurning = target.has(Tag.BURNING);
         ThermalState.damageEntity(world, target, dmg, false, log);
-        if (wasBurning) {
-            ThermalState.spawnGas(world, target.pos(), Tag.CAUSTIC_GAS);
-            ThermalState.addLog(log, "Acid boils into caustic gas!");
-        }
         return new Hit(dmg, rawArmor, ignoreArmorOnCrit, false);
     }
 

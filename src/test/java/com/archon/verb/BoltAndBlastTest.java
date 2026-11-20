@@ -104,8 +104,8 @@ class BoltAndBlastTest {
         Prop brLow = new Prop("br1", "Brazier", 'i', new Vec2(2, 6), 10);
         brLow.with(Tag.METAL, Tag.LIT);
         wLow.add(brLow);
-        exLow.submit("siphon br1 | bolt o1"); // Inferno min (6 - 1) + 1 = 6 dmg (armor bypassed)
-        assertEquals(40 - 2 - (Balance.DMG_INFERNO - Balance.BOLT_DMG_VAR + 1), orcLow.hp());
+        exLow.submit("siphon br1 | bolt o1"); // Inferno min (3 - 1) + 1 = 3 dmg (armor bypassed)
+        assertEquals(40 - 2 - (Math.max(1, Balance.DMG_INFERNO - Balance.BOLT_DMG_VAR) + 1), orcLow.hp());
 
         // Piped stone from ground fractures ICE and drops stone on target tile
         ex.submit("pass");
@@ -156,16 +156,28 @@ class BoltAndBlastTest {
         assertEquals(30, orc.hp());
         assertTrue(w.tile(orc.pos()).has(Tag.ACID));
 
-        // Elemental bolt intercepts first gas tile on ray
+        // Acid on floor triggers at start of Orc's turn before Orc escapes; then Fire bolt intercepts opaque Steam
         ex.submit("pass");
+        int hpAfterAcidTurnStart = orc.hp();
+        assertEquals(30 - Balance.CAUSTIC_DMG, hpAfterAcidTurnStart, "Orc takes acid pool DoT at start of its turn");
         orc.moveTo(new Vec2(6, 5));
         Prop brazier = new Prop("br1", "Brazier", 'i', new Vec2(2, 6), 10);
         brazier.with(Tag.METAL, Tag.LIT);
         w.add(brazier);
         ThermalState.spawnGas(w, new Vec2(4, 5), Tag.STEAM);
         ex.submit("siphon br1 | bolt o1");
-        assertFalse(w.tile(new Vec2(4, 5)).has(Tag.STEAM), "Fire bolt should consume Steam on ray");
-        assertEquals(30, orc.hp(), "Orc behind Steam should not take direct bolt damage");
+        assertFalse(w.tile(new Vec2(4, 5)).has(Tag.STEAM), "Fire bolt should convert Steam on ray");
+        assertTrue(w.tile(new Vec2(4, 5)).has(Tag.SUPERHEATED_STEAM), "Steam + Fire becomes superheated steam");
+        assertEquals(hpAfterAcidTurnStart, orc.hp(), "Orc behind opaque Steam should not take direct bolt damage");
+
+        // Subsequent bolt passes straight through transparent superheated steam and hits target
+        World wPass = newWorld(fixedRoll(40));
+        Executor exPass = exec(wPass);
+        Actor orcHit = new Actor("o1", "Orc", 'O', new Vec2(6, 5), new CreatureStats(30, 0, 0));
+        wPass.add(orcHit);
+        ThermalState.spawnSuperheatedSteam(wPass, new Vec2(4, 5), false);
+        exPass.submit("bolt o1");
+        assertTrue(orcHit.hp() < 30, "Bolt passes straight through transparent superheated steam");
     }
 
     @Test
@@ -229,16 +241,23 @@ class BoltAndBlastTest {
         assertFalse(frozen.has(Tag.FROZEN));
         assertEquals(30 - Balance.THERMAL_SHOCK_DMG - (Balance.FUEL_AIR_DMG_INFERNO + 1), frozen.hp());
 
-        // Acid blast on Caustic Gas expands 1 cardinal tile outward
-        World wCaustic = newWorld(fixedRoll(40));
-        Executor exCaustic = exec(wCaustic);
-        Vec2 causticCenter = new Vec2(8, 5);
-        ThermalState.spawnGas(wCaustic, causticCenter, Tag.CAUSTIC_GAS);
-        wCaustic.map().placeGroundItem(new Vec2(3, 5), Item.flask("fa", "acid flask", Tag.ACID));
-        exCaustic.submit("siphon @3,5 | blast @8,5");
-        assertTrue(wCaustic.tile(new Vec2(8, 4)).has(Tag.CAUSTIC_GAS));
-        assertTrue(wCaustic.tile(new Vec2(8, 6)).has(Tag.CAUSTIC_GAS));
-        assertTrue(wCaustic.tile(new Vec2(9, 5)).has(Tag.CAUSTIC_GAS));
+        // Inferno blast evaporates Acid pool and superheats Steam while still heating occupant
+        World wElem = newWorld(fixedRoll(40));
+        Executor exElem = exec(wElem);
+        Vec2 acidPos = new Vec2(7, 5);
+        Vec2 steamPos = new Vec2(8, 5);
+        ThermalState.setAcidPool(wElem, acidPos);
+        ThermalState.spawnGas(wElem, steamPos, Tag.STEAM);
+        Actor orcInSteam = new Actor("o_st", "Orc", 'O', steamPos, new CreatureStats(30, 0, 0));
+        wElem.add(orcInSteam);
+        Prop brazier2 = new Prop("br2", "Brazier", 'i', new Vec2(1, 5), 10);
+        brazier2.with(Tag.METAL, Tag.LIT);
+        wElem.add(brazier2);
+        exElem.submit("siphon br2 | blast @8,5");
+        assertFalse(wElem.tile(acidPos).has(Tag.ACID), "Inferno blast evaporates Acid pool");
+        assertFalse(wElem.tile(steamPos).has(Tag.STEAM));
+        assertTrue(wElem.tile(steamPos).has(Tag.SUPERHEATED_STEAM));
+        assertTrue(orcInSteam.temp >= Balance.BODY_TEMP + Balance.SUPERHEATED_STEAM_TEMP_DELTA);
     }
 
     @Test

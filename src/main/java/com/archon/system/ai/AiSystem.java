@@ -15,6 +15,7 @@ import com.archon.model.Vec2;
 import com.archon.model.World;
 import com.archon.system.combat.CombatEngine;
 import com.archon.system.combat.CombatNarrative;
+import com.archon.system.environment.SimulationSystem;
 import com.archon.system.item.ItemMoves;
 import com.archon.system.physics.TileDisplacement;
 import com.archon.system.spatial.SpatialService;
@@ -54,17 +55,25 @@ public final class AiSystem {
             actor.clearReadied();
             Vec2 from = actor.pos();
             List<String> log = new ArrayList<>();
-            takeTurn(world, actor, thrall, log);
+            SimulationSystem.applyCreatureStatusDots(world, actor, log);
+            if (actor.alive()) {
+                SimulationSystem.applyTileHazardDots(world, actor, log);
+            }
+            if (actor.alive()) {
+                takeTurn(world, actor, thrall, log);
+            }
             if (!log.isEmpty() || !from.equals(actor.pos())) {
                 bus.post(new GameEvent.ActorBeat(actor.id(), actor.name(), from, actor.pos(), log));
             }
         }
     }
 
-    private static int stepCost(Actor actor) {
+    private static int stepCost(World world, Actor actor) {
         int cost = 1;
         if (actor.has(Tag.CHILLED)) cost += CHILLED_AP_STEP;
         if (actor.has(Tag.CRIPPLED)) cost += CRIPPLED_AP_STEP;
+        GameMap.Tile tile = world.tile(actor.pos());
+        if (tile != null && tile.has(Tag.TAR)) cost += TAR_AP_STEP;
         return cost;
     }
 
@@ -73,7 +82,8 @@ public final class AiSystem {
     }
 
     private static boolean isHazard(GameMap.Tile tile) {
-        return tile.has(Tag.BURNING) || tile.has(Tag.CAUSTIC_GAS) || tile.has(Tag.OIL_MIST) || tile.has(Tag.ACID);
+        return tile.has(Tag.BURNING) || tile.has(Tag.OIL_MIST) || tile.has(Tag.ACID)
+                || tile.has(Tag.TAR) || tile.has(Tag.SUPERHEATED_STEAM);
     }
 
     private static void takeTurn(World world, Actor actor, Thrall thrall, List<String> log) {
@@ -90,7 +100,7 @@ public final class AiSystem {
             log.add(actor.name() + " stands up.");
         }
 
-        int moveCost = stepCost(actor);
+        int moveCost = stepCost(world, actor);
 
         // 1. Escape hazard tile if possible
         if (actions >= moveCost && isHazard(world.tile(actor.pos()))
@@ -126,7 +136,7 @@ public final class AiSystem {
 
     private static void actRanged(World world, Actor actor, Thrall thrall, Item bow, int actions, List<String> log) {
         int dist = actor.pos().manhattan(thrall.pos());
-        int moveCost = stepCost(actor);
+        int moveCost = stepCost(world, actor);
 
         // Kite away if Thrall closed into melee range
         if (dist <= 1 && actions >= moveCost && !actor.isCrippled(BodyPart.LEGS) && !actor.has(Tag.PRONE)) {
@@ -144,7 +154,8 @@ public final class AiSystem {
 
         boolean blind = actor.has(Tag.BLIND);
         if (blind) {
-            if (SpatialService.hasGas(world.tile(actor.pos())) && actions >= moveCost
+            moveCost = stepCost(world, actor);
+            if (SpatialService.isOpaqueGas(world.tile(actor.pos())) && actions >= moveCost
                     && !actor.isCrippled(BodyPart.LEGS) && !actor.has(Tag.PRONE)) {
                 Vec2 clearStep = bestStepOutOfGas(world, actor.pos(), thrall.pos());
                 if (clearStep != null) {
@@ -163,7 +174,8 @@ public final class AiSystem {
 
         boolean hasLof = actor.pos().manhattan(thrall.pos()) > 1
                 && SpatialService.lineOfFire(world, actor.pos(), thrall.pos());
-        while (actions >= moveCost && !hasLof && !actor.isCrippled(BodyPart.LEGS) && !actor.has(Tag.PRONE)) {
+        while (actions >= stepCost(world, actor) && !hasLof && !actor.isCrippled(BodyPart.LEGS) && !actor.has(Tag.PRONE)) {
+            moveCost = stepCost(world, actor);
             Vec2 vantage = bfsStep(world, actor.pos(), thrall.pos(), true, false);
             if (vantage == null) {
                 break;
@@ -222,9 +234,9 @@ public final class AiSystem {
     }
 
     private static void actMelee(World world, Actor actor, Thrall thrall, int actions, List<String> log) {
-        int moveCost = stepCost(actor);
-        while (actions >= moveCost && actor.pos().manhattan(thrall.pos()) > 1
+        while (actions >= stepCost(world, actor) && actor.pos().manhattan(thrall.pos()) > 1
                 && !actor.isCrippled(BodyPart.LEGS) && !actor.has(Tag.PRONE)) {
+            int moveCost = stepCost(world, actor);
             Vec2 step = bfsStep(world, actor.pos(), thrall.pos(), false, false);
             if (step == null) {
                 step = bfsStep(world, actor.pos(), thrall.pos(), false, true);
@@ -378,7 +390,7 @@ public final class AiSystem {
             Vec2 cand = from.plus(DIRS[i]);
             if (!SpatialService.passable(world, cand)) continue;
             GameMap.Tile tile = world.tile(cand);
-            if (isHazard(tile) || SpatialService.hasGas(tile)) continue;
+            if (isHazard(tile) || SpatialService.isOpaqueGas(tile)) continue;
             int score = scoreStep(cand.manhattan(target) - from.manhattan(target), false, tile);
             if (score > bestScore) {
                 bestScore = score;
@@ -391,7 +403,7 @@ public final class AiSystem {
     private static int scoreStep(int distDelta, boolean hazard, GameMap.Tile tile) {
         return distDelta * AI_STEP_DIST_WEIGHT
                 - (hazard ? AI_STEP_BURN_PENALTY : 0)
-                - (SpatialService.hasGas(tile) ? AI_STEP_OIL_PENALTY * 2 : 0)
+                - (SpatialService.isOpaqueGas(tile) ? AI_STEP_OIL_PENALTY * 2 : 0)
                 - (tile.has(Tag.OIL) ? AI_STEP_OIL_PENALTY : 0);
     }
 

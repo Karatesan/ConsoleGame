@@ -253,13 +253,13 @@ class AiSystemTest {
         exec.submit("pass");
         assertFalse(w.thrall().has(Tag.BLIND), "BLIND should clear after the linger round ends");
 
-        // FROZEN ice shell blocks CAUSTIC_GAS round-end damage and armor shred
+        // FROZEN ice shell blocks ACID round-start damage and armor shred
         Actor frozen = new Actor("f1", "Frozen", 'O', new Vec2(2, 7), new CreatureStats(30, 3, 0));
         frozen.applyTag(Tag.FROZEN);
         frozen.applyTag(Tag.STUNNED);
         frozen.temp = -25;
         w.add(frozen);
-        ThermalState.spawnGas(w, new Vec2(2, 7), Tag.CAUSTIC_GAS);
+        ThermalState.setAcidPool(w, new Vec2(2, 7));
         SimulationSystem.tick(w, new EventBus());
         assertEquals(30, frozen.hp());
         assertEquals(3, frozen.armor());
@@ -309,5 +309,52 @@ class AiSystemTest {
         lines.clear();
         SimulationSystem.tick(w, bus);
         assertTrue(lines.stream().anyMatch(s -> s.contains("[70% |")), "Round 3 recovered orc returns to 70% hit chance: " + lines);
+    }
+
+    @Test
+    void burnAndBleedDotsTickAtStartOfEntityTurnBeforeAttacking() {
+        World w = new World(10, 10, new Dice.Always(true));
+        w.installThrall(new Thrall(new Vec2(2, 2), 40));
+
+        Actor burningOrc = new Actor("o1", "BurnOrc", 'O', new Vec2(3, 2), new CreatureStats(Balance.BURN_TICK_DMG, 0, 0));
+        burningOrc.applyTag(Tag.BURNING);
+        burningOrc.temp = Balance.BURN_CAP;
+        w.add(burningOrc);
+
+        Actor bleedingRat = new Actor("r1", "BleedRat", 'r', new Vec2(1, 2), new CreatureStats(Balance.BLEED_DMG, 0, 0));
+        bleedingRat.applyTag(Tag.BLEEDING);
+        bleedingRat.bleedTurns = Balance.BLEED_TURNS;
+        w.add(bleedingRat);
+
+        SimulationSystem.tick(w, new EventBus());
+
+        assertFalse(burningOrc.alive(), "Burning orc should die at start of its turn before attacking");
+        assertFalse(bleedingRat.alive(), "Bleeding rat should die at start of its turn before attacking");
+        assertEquals(40, w.thrall().hp(), "Entities killed by start-of-turn DoTs must not hit Thrall first");
+    }
+
+    @Test
+    void acidFloorAndTarSlowTickAtStartOfEntityTurn() {
+        World w = new World(10, 10, new Dice.Always(true));
+        w.installThrall(new Thrall(new Vec2(2, 2), 40));
+
+        // Acid floor kills low-HP adjacent orc at start of its turn before it can attack or escape
+        Actor acidOrc = new Actor("o1", "AcidOrc", 'O', new Vec2(3, 2), new CreatureStats(Balance.CAUSTIC_DMG, 2, 0));
+        w.add(acidOrc);
+        ThermalState.setAcidPool(w, new Vec2(3, 2));
+
+        // Tar slows orc (+1 action to step out -> spends all 2 actions escaping, cannot guard/attack)
+        Actor tarOrc = new Actor("o2", "TarOrc", 'O', new Vec2(2, 4), new CreatureStats(20, 2, 0));
+        w.add(tarOrc);
+        ThermalState.setTar(w, new Vec2(2, 4));
+
+        AiSystem.tick(w, new EventBus());
+        assertFalse(acidOrc.alive(), "Acid floor should kill orc at start of turn before attacking");
+        assertEquals(40, w.thrall().hp());
+        assertEquals(20 - Balance.TAR_DMG, tarOrc.hp());
+        assertEquals(2, tarOrc.armor(), "Tar does not corrode armor");
+        assertFalse(tarOrc.has(Tag.CORRODED));
+        assertEquals(new Vec2(2, 3), tarOrc.pos(), "Tar orc spends 2 actions stepping out");
+        assertFalse(tarOrc.isGuarded(), "Escaping tar leaves 0 actions for guard or attack");
     }
 }

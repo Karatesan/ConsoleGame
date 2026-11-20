@@ -94,7 +94,8 @@ public final class SiphonVerb implements Verb {
         } else {
             GameMap.Tile tile = c.world.tile(pos);
             String layer = target instanceof Resolved.OnTile ot ? ot.layer() : null;
-            boolean explicitGas = "gas".equals(layer) || "steam".equals(layer) || "oil_mist".equals(layer) || "caustic".equals(layer);
+            boolean explicitGas = "gas".equals(layer) || "steam".equals(layer)
+                    || "superheated_steam".equals(layer) || "oil_mist".equals(layer);
             boolean explicitWater = "water".equals(layer);
             boolean explicitOil = "oil".equals(layer);
             boolean explicitAcid = "acid".equals(layer);
@@ -128,12 +129,11 @@ public final class SiphonVerb implements Verb {
                 }
                 ThermalState.clearGas(c.world, pos);
                 if (thermalFlag) {
-                    if (gas == Tag.STEAM) ThermalState.setWaterPuddle(c.world, pos);
+                    if (gas == Tag.STEAM || gas == Tag.SUPERHEATED_STEAM) ThermalState.setWaterPuddle(c.world, pos);
                     else if (gas == Tag.OIL_MIST) ThermalState.setOilSlick(c.world, pos);
-                    else if (gas == Tag.CAUSTIC_GAS) ThermalState.applyAcidToFloorOnly(c.world, pos);
                     emitted = Tag.FIRE;
                 } else {
-                    emitted = gas == Tag.STEAM ? Tag.WATER : gas == Tag.OIL_MIST ? Tag.OIL : Tag.ACID;
+                    emitted = gas == Tag.OIL_MIST ? Tag.OIL : Tag.WATER;
                 }
             } else if (explicitWater || (!explicitOil && !explicitAcid && tile.has(Tag.WATER))) {
                 if (tile.has(Tag.WATER)) {
@@ -230,8 +230,8 @@ public final class SiphonVerb implements Verb {
         return switch (layer) {
             case "gas" -> true;
             case "steam" -> tile.has(Tag.STEAM);
+            case "superheated_steam" -> tile.has(Tag.SUPERHEATED_STEAM);
             case "oil_mist" -> tile.has(Tag.OIL_MIST);
-            case "caustic" -> tile.has(Tag.CAUSTIC_GAS);
             default -> false;
         };
     }

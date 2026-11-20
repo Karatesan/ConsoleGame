@@ -3,8 +3,11 @@ package com.archon.exec;
 import com.archon.command.Ast;
 import com.archon.model.Actor;
 import com.archon.model.Balance;
+import com.archon.model.GameMap;
 import com.archon.model.Tag;
+import com.archon.model.Vec2;
 import com.archon.model.World;
+import com.archon.system.spatial.SpatialService;
 import com.archon.verb.*;
 
 import java.util.List;
@@ -33,19 +36,19 @@ public final class Validator {
 
     public int stageCost(Ast.Stage stage) {
         Actor thrall = world.thrall();
-        return stageCost(stage, thrall != null && thrall.has(Tag.PRONE));
+        return stageCost(stage, thrall != null && thrall.has(Tag.PRONE), thrall != null ? thrall.pos() : null);
     }
 
-    private int stageCost(Ast.Stage stage, boolean thrallProne) {
+    private int stageCost(Ast.Stage stage, boolean thrallProne, Vec2 thrallPos) {
         List<Ast.Invocation> pipeline = stage.pipeline();
         int total = 0;
         for (int i = 0; i < pipeline.size(); i++) {
-            total += invocationCost(pipeline.get(i), i > 0, thrallProne);
+            total += invocationCost(pipeline.get(i), i > 0, thrallProne, thrallPos);
         }
         return total;
     }
 
-    private int invocationCost(Ast.Invocation inv, boolean piped, boolean thrallProne) {
+    private int invocationCost(Ast.Invocation inv, boolean piped, boolean thrallProne, Vec2 thrallPos) {
         return switch (inv.verb()) {
             case "bolt" -> {
                 if (inv.hasFlag("blood")) yield Balance.AP_BOLT_BLOOD;
@@ -71,10 +74,32 @@ public final class Validator {
                     if (thrall.has(Tag.CHILLED)) cost += Balance.CHILLED_AP_STEP;
                     if (thrall.has(Tag.CRIPPLED)) cost += Balance.CRIPPLED_AP_STEP;
                 }
+                GameMap.Tile tile = thrallPos != null ? world.tile(thrallPos) : null;
+                if (tile != null && tile.has(Tag.TAR)) {
+                    cost += Balance.TAR_AP_STEP;
+                }
                 yield cost;
             }
             default -> catalog.get(inv.verb()).price().cost(inv);
         };
+    }
+
+    private Vec2 simulatedStepDest(Ast.Stage stage, Vec2 pos) {
+        if (pos == null) return null;
+        List<Ast.Invocation> pipeline = stage.pipeline();
+        for (int i = 0; i < pipeline.size(); i++) {
+            Ast.Invocation inv = pipeline.get(i);
+            if ("step".equals(inv.verb()) && inv.arg(0) != null) {
+                Vec2 dir = Vec2.dir(inv.arg(0));
+                if (dir != null) {
+                    Vec2 next = pos.plus(dir);
+                    if (SpatialService.passable(world, next)) {
+                        return next;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static boolean isAimed(Ast.Invocation inv) {
@@ -135,18 +160,27 @@ public final class Validator {
         Actor thrall = world.thrall();
         boolean canSurge = thrall != null && !thrall.bloodSurgedThisRound && thrall.hp() > Balance.HP_COST_CHANNEL_BLOOD;
         boolean prone = thrall != null && thrall.has(Tag.PRONE);
+        boolean prevProne = prone;
+        Vec2 pos = thrall != null ? thrall.pos() : null;
+        Vec2 prevPos = pos;
         List<Ast.Stage> stages = line.stages();
         for (int i = 0; i < stages.size(); i++) {
             Ast.Stage stage = stages.get(i);
             if (paidStage(stage)) {
                 free = false;
             }
-            allocation += stageCost(stage, prone);
+            Vec2 stagePos = stage.op() == Ast.Op.OR ? prevPos : pos;
+            boolean stageProne = stage.op() == Ast.Op.OR ? prevProne : prone;
+            allocation += stageCost(stage, stageProne, stagePos);
+            prevPos = stagePos;
+            prevProne = stageProne;
             if (stage.op() == Ast.Op.NONE || stage.op() == Ast.Op.SEQ || stage.op() == Ast.Op.AND) {
                 if (prone && containsStep(stage)) {
                     prone = false;
-                } else if (containsPassRoll(stage)) {
-                    prone = true;
+                } else {
+                    Vec2 moved = simulatedStepDest(stage, pos);
+                    if (moved != null) pos = moved;
+                    if (containsPassRoll(stage)) prone = true;
                 }
             }
             if (canSurge && surgeBonus == 0

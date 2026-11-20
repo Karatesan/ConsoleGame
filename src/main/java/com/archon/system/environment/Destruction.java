@@ -60,7 +60,7 @@ public final class Destruction {
         }
 
         // 2. Fire and thermal reactions (braziers, burning props, or torches)
-        if (entity.has(Tag.LIT) || entity.has(Tag.BURNING)) {
+        if (entity.kind() != Entity.Kind.CREATURE && (entity.has(Tag.LIT) || entity.has(Tag.BURNING))) {
             GameMap.Tile tile = world.map().tile(pos);
             if (tile != null) {
                 if (tile.has(Tag.WATER)) {

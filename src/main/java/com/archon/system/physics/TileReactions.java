@@ -15,10 +15,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Tab 6 gas/floor reactions (cols J-P, S6-S10), Fuel-Air BFS detonation, and LIT torch tile sparks. */
+/** Gas/floor reactions, Fuel-Air BFS detonation, and LIT torch tile sparks. */
 public final class TileReactions {
-
-    private static final int[][] CARDINALS = {{0, -1}, {0, 1}, {1, 0}, {-1, 0}};
 
     private TileReactions() {}
 
@@ -68,13 +66,16 @@ public final class TileReactions {
                     ThermalState.damageEntity(world, occ, Balance.SCALD_FLASH_DMG, false, log);
                 }
             } else if (payload == Tag.OIL) { ThermalState.setOilSlick(world, pos); ThermalState.addLog(log, pos + " Oil spreads over water."); }
-            else if (payload == Tag.ACID) { ThermalState.setAcidPool(world, pos); ThermalState.addLog(log, pos + " Water turns to acid."); }
+            else if (payload == Tag.ACID) { ThermalState.addLog(log, pos + " Acid is diluted in the water."); }
             return;
         }
         if (tile.has(Tag.BURNING)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) { ThermalState.igniteTile(world, pos); igniteGroundItems(tile, log); }
             else if (payload == Tag.WATER) {
-                if (tile.has(Tag.OIL)) {
+                if (tile.has(Tag.TAR)) {
+                    ThermalState.clearTar(world, pos);
+                    ThermalState.addLog(log, pos + " Water washes the burning tar clean.");
+                } else if (tile.has(Tag.OIL)) {
                     map.removeTag(pos, Tag.BURNING); map.removeTag(pos, Tag.OIL); map.removeTag(pos, Tag.FLAMMABLE); map.removeTag(pos, Tag.LIQUID);
                     tile.oilTurns = 0; tile.burnTurns = 0; tile.temp = Balance.AMBIENT_TEMP;
                     ThermalState.spawnGas(world, pos, Tag.STEAM);
@@ -88,31 +89,34 @@ public final class TileReactions {
                     ThermalState.setWaterPuddle(world, pos);
                     ThermalState.addLog(log, pos + " Flames are doused.");
                 }
-            } else if (payload == Tag.OIL) { ThermalState.setOilSlick(world, pos); ThermalState.igniteTile(world, pos); }
-            else if (payload == Tag.ACID) { ThermalState.spawnGas(world, pos, Tag.CAUSTIC_GAS); ThermalState.addLog(log, pos + " Acid boils into caustic gas!"); }
+            } else if (payload == Tag.OIL && !tile.has(Tag.TAR)) { ThermalState.setOilSlick(world, pos); ThermalState.igniteTile(world, pos); }
+            else if (payload == Tag.ACID) { ThermalState.addLog(log, pos + " Acid boils off the flames!"); }
             return;
         }
-        if (tile.has(Tag.ACID) && tile.has(Tag.OIL)) {
+        if (tile.has(Tag.TAR)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) {
-                map.removeTag(pos, Tag.ACID); ThermalState.spawnGas(world, pos, Tag.CAUSTIC_GAS); ThermalState.igniteTile(world, pos);
-                ThermalState.addLog(log, pos + " Toxic tar boils into caustic gas and ignites!");
-            } else if (payload == Tag.WATER) { ThermalState.setWaterPuddle(world, pos); ThermalState.addLog(log, pos + " Toxic tar is diluted into water."); }
-            else if (payload == Tag.OIL || payload == Tag.ACID) ThermalState.setToxicTar(world, pos);
+                ThermalState.igniteTile(world, pos);
+                ThermalState.addLog(log, pos + " Tar ignites in thick flames!");
+                igniteGroundItems(tile, log);
+            } else if (payload == Tag.WATER) {
+                ThermalState.clearTar(world, pos);
+                ThermalState.addLog(log, pos + " Water washes the tar clean.");
+            }
             return;
         }
         if (tile.has(Tag.OIL)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) { ThermalState.igniteTile(world, pos); ThermalState.addLog(log, pos + " Oil slick ignites!"); igniteGroundItems(tile, log); }
             else if (payload == Tag.WATER) { ThermalState.setWaterPuddle(world, pos); ThermalState.addLog(log, pos + " Oil is rinsed into water."); }
             else if (payload == Tag.OIL) ThermalState.setOilSlick(world, pos);
-            else if (payload == Tag.ACID) { ThermalState.setToxicTar(world, pos); ThermalState.addLog(log, pos + " Oil and acid form toxic tar."); }
+            else if (payload == Tag.ACID) { ThermalState.setTar(world, pos); ThermalState.addLog(log, pos + " Oil and acid form tar."); }
             return;
         }
         if (tile.has(Tag.ACID)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) {
-                map.removeTag(pos, Tag.ACID); map.removeTag(pos, Tag.LIQUID); ThermalState.spawnGas(world, pos, Tag.CAUSTIC_GAS);
-                ThermalState.addLog(log, pos + " Acid boils into caustic gas!");
+                map.removeTag(pos, Tag.ACID); map.removeTag(pos, Tag.LIQUID);
+                ThermalState.addLog(log, pos + " Acid evaporates in the heat!");
             } else if (payload == Tag.WATER) { ThermalState.setWaterPuddle(world, pos); ThermalState.addLog(log, pos + " Acid is diluted into water."); }
-            else if (payload == Tag.OIL) { ThermalState.setToxicTar(world, pos); ThermalState.addLog(log, pos + " Acid and oil form toxic tar."); }
+            else if (payload == Tag.OIL) { ThermalState.setTar(world, pos); ThermalState.addLog(log, pos + " Acid and oil form tar."); }
             else if (payload == Tag.ACID) ThermalState.setAcidPool(world, pos);
             return;
         }
@@ -128,36 +132,38 @@ public final class TileReactions {
             boolean isBlast, Set<Entity> burstHitEntities, Entity occ, List<String> log) {
         if (tile.has(Tag.STEAM)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) {
-                ThermalState.clearGas(world, pos);
-                ThermalState.addLog(log, pos + " Steam explodes!");
+                ThermalState.spawnSuperheatedSteam(world, pos, payload == Tag.INFERNO);
+                ThermalState.addLog(log, pos + " Steam superheats!");
                 if (occ != null && occ.alive() && (burstHitEntities == null || burstHitEntities.add(occ))) {
-                    ThermalState.addLog(log, occ.name() + " takes " + Balance.SCALD_FLASH_DMG + " steam flash dmg!");
-                    ThermalState.damageEntity(world, occ, Balance.SCALD_FLASH_DMG, false, log);
+                    heatEntityFromSuperheatedSteam(world, occ, log);
                 }
             } else if (payload == Tag.WATER) { ThermalState.clearGas(world, pos); ThermalState.setWaterPuddle(world, pos); ThermalState.addLog(log, pos + " Steam condenses into water."); }
             else if (payload == Tag.OIL) { ThermalState.spawnGas(world, pos, Tag.OIL_MIST); ThermalState.addLog(log, pos + " Steam turns into oil mist!"); }
             else if (payload == Tag.ACID) { ThermalState.clearGas(world, pos); ThermalState.applyAcidToFloorOnly(world, pos); ThermalState.addLog(log, pos + " Acid rain pools below!"); }
-        } else if (tile.has(Tag.CAUSTIC_GAS)) {
+        } else if (tile.has(Tag.SUPERHEATED_STEAM)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) {
-                ThermalState.clearGas(world, pos);
-                ThermalState.addLog(log, pos + " Caustic gas ruptures!");
-                if (occ != null && occ.alive() && (burstHitEntities == null || burstHitEntities.add(occ))) {
-                    ThermalState.shredArmor(occ, Balance.ACID_ARMOR_SHRED);
-                    occ.applyTag(Tag.CORRODED);
-                    int directFire = (payload == Tag.INFERNO ? Balance.DMG_INFERNO : Balance.DMG_HEAT) + ThermalState.magicBonus(caster);
-                    int firePart = isBlast ? Math.max(1, (int) Math.floor(directFire * Balance.BLAST_DMG_MULT)) : directFire;
-                    int total = firePart + Balance.RUPTURE_ACID_DMG;
-                    ThermalState.addLog(log, occ.name() + " takes " + total + " rupture dmg (-" + Balance.ACID_ARMOR_SHRED + " armor -> " + occ.armor() + ")!");
-                    ThermalState.damageEntity(world, occ, total, false, log);
-                }
-            } else if (payload == Tag.WATER) { ThermalState.clearGas(world, pos); ThermalState.setWaterPuddle(world, pos); ThermalState.addLog(log, pos + " Caustic gas dilutes into water."); }
-            else if (payload == Tag.OIL) { ThermalState.clearGas(world, pos); ThermalState.setToxicTar(world, pos); ThermalState.addLog(log, pos + " Caustic gas drops as toxic tar."); }
-            else if (payload == Tag.ACID) { tile.gasTemp = Balance.BOIL_TEMP; ThermalState.addLog(log, pos + " Caustic gas refreshes."); }
+                int targetTemp = payload == Tag.INFERNO ? Balance.SUPERHEATED_INFERNO_TEMP : Balance.SUPERHEATED_STEAM_TEMP;
+                tile.gasTemp = Math.max(tile.gasTemp, targetTemp);
+                ThermalState.addLog(log, pos + " Superheated steam surges!");
+            } else if (payload == Tag.WATER) { ThermalState.clearGas(world, pos); ThermalState.setWaterPuddle(world, pos); ThermalState.addLog(log, pos + " Superheated steam condenses into water."); }
+            else if (payload == Tag.OIL) { ThermalState.spawnGas(world, pos, Tag.OIL_MIST); ThermalState.addLog(log, pos + " Superheated steam turns into oil mist!"); }
+            else if (payload == Tag.ACID) { ThermalState.addLog(log, pos + " Acid evaporates in the superheated steam!"); }
         } else if (tile.has(Tag.OIL_MIST)) {
             if (payload == Tag.FIRE || payload == Tag.INFERNO) detonateOilMist(world, caster, pos, payload == Tag.INFERNO, burstHitEntities, log);
             else if (payload == Tag.WATER) { ThermalState.clearGas(world, pos); ThermalState.setOilSlick(world, pos); ThermalState.addLog(log, pos + " Oil mist precipitates into oil slick."); }
             else if (payload == Tag.OIL) { tile.gasTemp = Balance.BOIL_TEMP; ThermalState.setOilSlick(world, pos); ThermalState.addLog(log, pos + " Oil mist refreshes."); }
-            else if (payload == Tag.ACID) { ThermalState.clearGas(world, pos); ThermalState.setToxicTar(world, pos); ThermalState.addLog(log, pos + " Oil mist settles as toxic tar."); }
+            else if (payload == Tag.ACID) { ThermalState.clearGas(world, pos); ThermalState.setTar(world, pos); ThermalState.addLog(log, pos + " Oil mist settles as tar."); }
+        }
+    }
+
+    private static void heatEntityFromSuperheatedSteam(World world, Entity occ, List<String> log) {
+        if (occ.kind() == Entity.Kind.CREATURE) {
+            ThermalState.applyCreatureTempDelta(world, occ, Balance.SUPERHEATED_STEAM_TEMP_DELTA, false, log);
+            if (occ.alive()) {
+                ThermalState.addLog(log, occ.name() + " is scorched by superheated steam (" + occ.temp + "C).");
+            }
+        } else {
+            occ.temp += Balance.SUPERHEATED_STEAM_TEMP_DELTA;
         }
     }
 
@@ -165,39 +171,72 @@ public final class TileReactions {
             World world, Vec2 pos, GameMap map, GameMap.Tile tile, Tag payload, boolean fracturesIce, List<String> log) {
         if (payload == Tag.FORCE) {
             if (fracturesIce) {
-                ThermalState.setWaterPuddle(world, pos);
-                ThermalState.addLog(log, pos + " Ice fractures into water.");
+                map.removeTag(pos, Tag.ICE);
+                if (tile.has(Tag.OIL)) {
+                    ThermalState.setOilSlick(world, pos);
+                    ThermalState.addLog(log, pos + " Ice fractures under the oil.");
+                } else if (tile.has(Tag.TAR)) {
+                    ThermalState.addLog(log, pos + " Ice fractures under the tar.");
+                } else {
+                    boolean hadAcid = tile.has(Tag.ACID);
+                    ThermalState.setWaterPuddle(world, pos);
+                    ThermalState.addLog(log, pos + (hadAcid ? " Ice fractures and dilutes acid into water." : " Ice fractures into water."));
+                }
             }
             return;
         }
         if (payload == Tag.FIRE || payload == Tag.INFERNO) {
             boolean oiledIce = tile.has(Tag.OIL);
-            map.removeTag(pos, Tag.ICE); map.removeTag(pos, Tag.OIL); map.removeTag(pos, Tag.FLAMMABLE); map.removeTag(pos, Tag.LIQUID);
-            tile.oilTurns = 0; tile.temp = Balance.AMBIENT_TEMP;
-            if (payload == Tag.INFERNO || oiledIce) {
+            boolean tarIce = tile.has(Tag.TAR);
+            boolean acidIce = tile.has(Tag.ACID);
+            map.removeTag(pos, Tag.ICE);
+            if (oiledIce || tarIce) {
                 ThermalState.spawnGas(world, pos, Tag.STEAM);
-                ThermalState.addLog(log, pos + " Ice sublimates into steam!");
+                ThermalState.igniteTile(world, pos);
+                igniteGroundItems(tile, log);
+                ThermalState.addLog(log, pos + (tarIce ? " Ice sublimates and tar ignites!" : " Ice sublimates and oil ignites!"));
+            } else if (acidIce) {
+                map.removeTag(pos, Tag.ACID); map.removeTag(pos, Tag.LIQUID);
+                tile.temp = Balance.AMBIENT_TEMP;
+                if (payload == Tag.INFERNO) {
+                    ThermalState.spawnGas(world, pos, Tag.STEAM);
+                    ThermalState.addLog(log, pos + " Ice sublimates into steam and acid evaporates!");
+                } else {
+                    ThermalState.setWaterPuddle(world, pos);
+                    ThermalState.addLog(log, pos + " Ice melts and dilutes acid into water.");
+                }
             } else {
-                ThermalState.setWaterPuddle(world, pos);
-                ThermalState.addLog(log, pos + " Ice melts into water.");
+                tile.temp = Balance.AMBIENT_TEMP;
+                if (payload == Tag.INFERNO) {
+                    ThermalState.spawnGas(world, pos, Tag.STEAM);
+                    ThermalState.addLog(log, pos + " Ice sublimates into steam!");
+                } else {
+                    ThermalState.setWaterPuddle(world, pos);
+                    ThermalState.addLog(log, pos + " Ice melts into water.");
+                }
             }
         } else if (payload == Tag.WATER) {
             map.removeTag(pos, Tag.OIL); map.removeTag(pos, Tag.FLAMMABLE); tile.oilTurns = 0;
             map.removeTag(pos, Tag.ACID); map.removeTag(pos, Tag.LIQUID);
+            map.removeTag(pos, Tag.TAR);
         } else if (payload == Tag.OIL) {
-            map.addTag(pos, Tag.OIL); map.addTag(pos, Tag.FLAMMABLE); tile.oilTurns = Balance.OIL_TURNS;
-            ThermalState.addLog(log, pos + " Oil coats the ice.");
+            if (tile.has(Tag.ACID)) {
+                map.removeTag(pos, Tag.ACID); map.removeTag(pos, Tag.LIQUID);
+                map.addTag(pos, Tag.TAR);
+                ThermalState.addLog(log, pos + " Oil and acid form tar on the ice.");
+            } else if (!tile.has(Tag.TAR)) {
+                map.addTag(pos, Tag.OIL); map.addTag(pos, Tag.FLAMMABLE); tile.oilTurns = Balance.OIL_TURNS;
+                ThermalState.addLog(log, pos + " Oil coats the ice.");
+            }
         } else if (payload == Tag.ACID) {
-            map.addTag(pos, Tag.ACID); map.addTag(pos, Tag.LIQUID);
-            ThermalState.addLog(log, pos + " Acid pools over the ice.");
-        }
-    }
-
-    public static void expandCausticGasOutward(World world, Vec2 center) {
-        for (int i = 0; i < CARDINALS.length; i++) {
-            Vec2 adj = new Vec2(center.x() + CARDINALS[i][0], center.y() + CARDINALS[i][1]);
-            GameMap.Tile adjTile = world.tile(adj);
-            if (adjTile != null && !adjTile.isWall() && !SpatialService.hasGas(adjTile)) ThermalState.spawnGas(world, adj, Tag.CAUSTIC_GAS);
+            if (tile.has(Tag.OIL)) {
+                map.removeTag(pos, Tag.OIL); map.removeTag(pos, Tag.FLAMMABLE); tile.oilTurns = 0;
+                map.addTag(pos, Tag.TAR);
+                ThermalState.addLog(log, pos + " Acid and oil form tar on the ice.");
+            } else if (!tile.has(Tag.TAR)) {
+                map.addTag(pos, Tag.ACID); map.addTag(pos, Tag.LIQUID);
+                ThermalState.addLog(log, pos + " Acid pools over the ice.");
+            }
         }
     }
 
@@ -224,16 +263,22 @@ public final class TileReactions {
                     if (nbTile == null || nbTile.isWall()) continue;
                     if (nbTile.has(Tag.OIL_MIST) && visited.add(nb)) queue.add(nb);
 
-                    if (nbTile.has(Tag.OIL) && !nbTile.has(Tag.BURNING)) {
+                    if ((nbTile.has(Tag.OIL) || nbTile.has(Tag.TAR)) && !nbTile.has(Tag.BURNING)) {
                         if (nbTile.has(Tag.ICE)) {
-                            world.map().removeTag(nb, Tag.ICE); world.map().removeTag(nb, Tag.OIL); world.map().removeTag(nb, Tag.FLAMMABLE);
-                            nbTile.oilTurns = 0;
+                            world.map().removeTag(nb, Tag.ICE);
                             ThermalState.spawnGas(world, nb, Tag.STEAM);
-                        } else ThermalState.igniteTile(world, nb);
+                        }
+                        ThermalState.igniteTile(world, nb);
+                        igniteGroundItems(nbTile, log);
                     } else if (nbTile.has(Tag.WATER)) {
                         world.map().removeTag(nb, Tag.WATER); world.map().removeTag(nb, Tag.LIQUID); world.map().removeTag(nb, Tag.CONDUCTIVE);
                         ThermalState.spawnGas(world, nb, Tag.STEAM);
                     } else {
+                        if (nbTile.has(Tag.ICE)) {
+                            world.map().removeTag(nb, Tag.ICE);
+                            world.map().removeTag(nb, Tag.ACID); world.map().removeTag(nb, Tag.LIQUID);
+                            ThermalState.spawnGas(world, nb, Tag.STEAM);
+                        }
                         igniteGroundItems(nbTile, log);
                     }
 
@@ -264,13 +309,12 @@ public final class TileReactions {
         if (tile == null || tile.isWall()) return;
         if (tile.has(Tag.STEAM) || tile.has(Tag.WATER)) { if (torch != null) torch.tags().remove(Tag.LIT); return; }
         if (tile.has(Tag.OIL_MIST)) { detonateOilMist(world, caster, pos, false, burstHitEntities, log); return; }
-        if (tile.has(Tag.OIL)) {
+        if (tile.has(Tag.OIL) || tile.has(Tag.TAR)) {
             if (tile.has(Tag.ICE)) {
-                world.map().removeTag(pos, Tag.ICE); world.map().removeTag(pos, Tag.OIL); world.map().removeTag(pos, Tag.FLAMMABLE);
-                tile.oilTurns = 0; tile.temp = Balance.AMBIENT_TEMP;
+                world.map().removeTag(pos, Tag.ICE);
                 ThermalState.spawnGas(world, pos, Tag.STEAM);
-                return;
-            } else ThermalState.igniteTile(world, pos);
+            }
+            ThermalState.igniteTile(world, pos);
         }
         igniteGroundItems(tile, log);
     }

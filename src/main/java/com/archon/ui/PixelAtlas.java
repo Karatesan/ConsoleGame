@@ -7,7 +7,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 
 /**
  * Procedural 16x16 roguelike sprite atlas baked in memory at startup.
- * ATLAS_W x ATLAS_H = 256 x 64 (16x4 cells). Cell 35 is a solid white pixel block for Batch FX.
+ * ATLAS_W x ATLAS_H = 256 x 64 (16x4 cells). Cell 36 is a solid white pixel block for Batch FX.
  */
 public final class PixelAtlas {
     public static final int CELL = 16, COLS = 16, ROWS = 4;
@@ -21,7 +21,8 @@ public final class PixelAtlas {
             GOBLIN_0 = 18, GOBLIN_1 = 19, OGRE_0 = 20, OGRE_1 = 21, RAT_0 = 22, RAT_1 = 23,
             BRAZIER_0 = 24, BRAZIER_1 = 25, BARREL = 26, CRATE = 27, PILLAR = 28, DOOR = 29,
             LOOT_BLADE = 30, LOOT_OIL = 31, LOOT_WATER = 32, LOOT_ACID = 33, LOOT_STONE = 34,
-            COUNT = 35;
+            BRAZIER_OFF = 35,
+            COUNT = 36;
 
     private static final String[][] SPRITES = {
             // 0: FLOOR_0
@@ -688,6 +689,25 @@ public final class PixelAtlas {
                     "................",
                     "................",
                     "................"
+            },
+            // 35: BRAZIER_OFF
+            {
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "....kddddddk....",
+                    "...kkkkkkkkkk...",
+                    "..kssssssssssk..",
+                    "..ksSSSSSSSSsk..",
+                    "...kssssssssk...",
+                    "....ksskkssk....",
+                    "....ksk..ksk....",
+                    "...kssk..kssk...",
+                    "...ksk....ksk...",
+                    "..kkkk....kkkk..",
+                    "................"
             }
     };
 
@@ -721,7 +741,7 @@ public final class PixelAtlas {
         texture.dispose();
     }
 
-    /** Bakes all 35 16x16 sprites + cell 35 solid white block into RGBA8888 pixels. */
+    /** Bakes all 36 16x16 sprites + cell 36 solid white block into RGBA8888 pixels. */
     public static int[] bakeRgbaPixels() {
         int[] out = new int[ATLAS_W * ATLAS_H];
         for (int idx = 0; idx < COUNT; idx++) {
@@ -747,11 +767,12 @@ public final class PixelAtlas {
     }
 
     public static int spriteForEntity(Scene s, int i, int animFrame) {
-        if (i == 0) return THRALL_0 + animFrame;
+        int frame = s.frozenEntity[i] ? 0 : animFrame;
+        if (i == 0) return THRALL_0 + frame;
         if (s.kind[i] == Entity.Kind.DOOR) return DOOR;
         if (s.kind[i] == Entity.Kind.PROP) {
             return switch (s.glyph[i]) {
-                case 'i' -> BRAZIER_0 + animFrame;
+                case 'i' -> s.litEntity[i] ? BRAZIER_0 + frame : BRAZIER_OFF;
                 case 'B' -> BARREL;
                 case 'c' -> CRATE;
                 case 'S' -> PILLAR;
@@ -759,11 +780,11 @@ public final class PixelAtlas {
             };
         }
         return switch (s.glyph[i]) {
-            case 'O' -> ORC_0 + animFrame;
-            case 'G' -> s.maxHp[i] >= 35 ? OGRE_0 + animFrame : GOBLIN_0 + animFrame;
-            case 'g' -> GOBLIN_0 + animFrame;
-            case 'r' -> RAT_0 + animFrame;
-            default -> ORC_0 + animFrame;
+            case 'O' -> ORC_0 + frame;
+            case 'G' -> s.maxHp[i] >= 35 ? OGRE_0 + frame : GOBLIN_0 + frame;
+            case 'g' -> GOBLIN_0 + frame;
+            case 'r' -> RAT_0 + frame;
+            default -> ORC_0 + frame;
         };
     }
 

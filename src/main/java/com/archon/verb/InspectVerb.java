@@ -101,7 +101,7 @@ public final class InspectVerb implements Verb {
 
     private static String formatTile(World world, Resolved.OnTile target) {
         GameMap.Tile tile = world.tile(target.pos());
-        boolean hasGas = tile.has(Tag.STEAM) || tile.has(Tag.CAUSTIC_GAS) || tile.has(Tag.OIL_MIST)
+        boolean hasGas = com.archon.system.spatial.SpatialService.hasGas(tile)
                 || tile.gasTemp != Balance.AMBIENT_TEMP;
         return target.pos() + " " + (tile.isWall() ? "WALL" : "floor")
                 + (target.layer() != null ? " [" + target.layer() + "]" : "")

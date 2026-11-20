@@ -52,9 +52,9 @@ class SceneTest {
         World world = Scenario.magicArena(new Dice.Seeded(1L));
         world.map().addTag(new Vec2(6, 2), Tag.ICE);
         ThermalState.setAcidPool(world, new Vec2(7, 2));
-        ThermalState.setToxicTar(world, new Vec2(8, 2));
+        ThermalState.setTar(world, new Vec2(8, 2));
         ThermalState.spawnGas(world, new Vec2(6, 3), Tag.STEAM);
-        ThermalState.spawnGas(world, new Vec2(7, 3), Tag.CAUSTIC_GAS);
+        ThermalState.spawnSuperheatedSteam(world, new Vec2(7, 3), false);
         ThermalState.spawnGas(world, new Vec2(8, 3), Tag.OIL_MIST);
 
         world.thrall().channeledPayload = Tag.FIRE;
@@ -69,9 +69,9 @@ class SceneTest {
         assertTrue(s.water[2 * w + 3]);
         assertTrue(s.ice[2 * w + 6]);
         assertTrue(s.acid[2 * w + 7]);
-        assertTrue(s.toxicTar[2 * w + 8]);
+        assertTrue(s.tar[2 * w + 8]);
         assertTrue(s.steam[3 * w + 6]);
-        assertTrue(s.causticGas[3 * w + 7]);
+        assertTrue(s.superheatedSteam[3 * w + 7]);
         assertTrue(s.oilMist[3 * w + 8]);
 
         assertEquals(Balance.BASE_MAGIC, s.magic);

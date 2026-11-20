@@ -189,8 +189,8 @@ public sealed interface Resolved {
 
     private static String normalizeLayer(String key) {
         return switch (key) {
-            case "gas", "floor", "steam", "oil_mist", "water", "oil", "acid", "ice" -> key;
-            case "caustic", "caustic_gas" -> "caustic";
+            case "gas", "floor", "steam", "superheated_steam", "oil_mist", "water", "oil", "acid", "ice", "tar" -> key;
+            case "superheated" -> "superheated_steam";
             default -> null;
         };
     }

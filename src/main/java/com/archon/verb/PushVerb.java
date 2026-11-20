@@ -84,7 +84,8 @@ public final class PushVerb implements Verb {
 
         GameMap.Tile tile = c.world.tile(targetPos);
         String layer = target instanceof Resolved.OnTile ot ? ot.layer() : null;
-        boolean explicitGas = "gas".equals(layer) || "steam".equals(layer) || "oil_mist".equals(layer) || "caustic".equals(layer);
+        boolean explicitGas = "gas".equals(layer) || "steam".equals(layer)
+                || "superheated_steam".equals(layer) || "oil_mist".equals(layer);
         boolean explicitFloor = "floor".equals(layer) || "water".equals(layer) || "oil".equals(layer) || "acid".equals(layer);
         boolean isGasOrLiqSelector = explicitGas || explicitFloor;
         Entity occupant = SpatialService.entityAt(c.world, targetPos);
@@ -218,8 +219,8 @@ public final class PushVerb implements Verb {
         return switch (layer) {
             case "gas" -> true;
             case "steam" -> tile.has(Tag.STEAM);
+            case "superheated_steam" -> tile.has(Tag.SUPERHEATED_STEAM);
             case "oil_mist" -> tile.has(Tag.OIL_MIST);
-            case "caustic" -> tile.has(Tag.CAUSTIC_GAS);
             default -> false;
         };
     }

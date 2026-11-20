@@ -43,14 +43,11 @@ public final class SimulationSystem {
     }
 
     private static void runDotStep(World world, List<Entity> entities, Actor thrall, List<String> log) {
-        for (int i = 0; i < entities.size(); i++) {
-            Entity entity = entities.get(i);
-            if (entity.kind() == Entity.Kind.CREATURE && entity.alive()) {
-                applyCreatureDots(world, entity, log);
-            }
-        }
         if (thrall != null && thrall.alive()) {
-            int thrallDotDamage = applyCreatureDots(world, thrall, log);
+            int thrallDotDamage = applyCreatureStatusDots(world, thrall, log);
+            if (thrall.alive()) {
+                thrallDotDamage += applyTileHazardDots(world, thrall, log);
+            }
             if (thrall.alive() && thrallDotDamage > 0) {
                 ThermalState.onCreatureDamaged(world, thrall, thrallDotDamage, false, log);
             }
@@ -98,7 +95,7 @@ public final class SimulationSystem {
         }
     }
 
-    private static int applyCreatureDots(World world, Entity creature, List<String> log) {
+    public static int applyCreatureStatusDots(World world, Entity creature, List<String> log) {
         boolean wasBurning = creature.has(Tag.BURNING);
         int totalDmg = 0;
 
@@ -116,40 +113,44 @@ public final class SimulationSystem {
         }
 
         if (wasBurning) {
-            int burnDmg = Balance.BURN_TICK_DMG;
-            if (creature.temp >= Balance.INFERNO_MIN_TEMP) {
-                burnDmg += Balance.INFERNO_TICK_DMG;
-                creature.temp = Balance.BURN_CAP;
-            }
+            int burnDmg = Balance.BURN_TICK_BASE
+                    + Math.max(0, creature.temp - Balance.IGNITE_TEMP) / Balance.BURN_TEMP_STEP;
             totalDmg += applyRawDot(world, creature, burnDmg,
                     creature.name() + " burns for " + burnDmg + ".", log);
-            if (!creature.alive()) return totalDmg;
         }
+        return totalDmg;
+    }
 
+    public static int applyTileHazardDots(World world, Entity creature, List<String> log) {
         GameMap.Tile tile = world.tile(creature.pos());
-        if (tile == null) return totalDmg;
+        if (tile == null) return 0;
+        int totalDmg = 0;
 
-        if (!creature.has(Tag.FROZEN) && (tile.has(Tag.CAUSTIC_GAS) || tile.has(Tag.ACID))) {
+        if (!creature.has(Tag.FROZEN) && tile.has(Tag.ACID)) {
             ThermalState.shredArmor(creature, Balance.ACID_ARMOR_SHRED);
             creature.applyTag(Tag.CORRODED);
             totalDmg += applyRawDot(world, creature, Balance.CAUSTIC_DMG,
-                    creature.name() + " suffers " + Balance.CAUSTIC_DMG + " caustic damage.", log);
+                    creature.name() + " suffers " + Balance.CAUSTIC_DMG + " acid damage.", log);
             if (!creature.alive()) return totalDmg;
         }
 
-        if (!wasBurning && tile.has(Tag.BURNING)) {
+        if (!creature.has(Tag.FROZEN) && tile.has(Tag.TAR)) {
+            totalDmg += applyRawDot(world, creature, Balance.TAR_DMG,
+                    creature.name() + " suffers " + Balance.TAR_DMG + " tar damage.", log);
+            if (!creature.alive()) return totalDmg;
+        }
+
+        if (!creature.has(Tag.BURNING) && tile.has(Tag.BURNING)) {
             totalDmg += applyRawDot(world, creature, Balance.BURN_TICK_DMG,
                     creature.name() + " is seared by the burning floor for " + Balance.BURN_TICK_DMG + ".", log);
             if (!creature.alive()) return totalDmg;
-            if (creature.has(Tag.FROZEN)) {
-                ThermalState.exitFrozen(creature);
-                ThermalState.spawnGas(world, creature.pos(), Tag.STEAM);
-            } else if (creature.has(Tag.WET)) {
-                creature.removeTag(Tag.WET);
-                creature.wetTurns = 0;
-                ThermalState.spawnGas(world, creature.pos(), Tag.STEAM);
-            } else {
-                ThermalState.igniteEntity(creature);
+            ThermalState.applyBurningFloorContact(world, creature, creature.pos(), log);
+        }
+
+        if (tile.has(Tag.SUPERHEATED_STEAM) && creature.alive()) {
+            ThermalState.applyCreatureTempDelta(world, creature, Balance.SUPERHEATED_STEAM_TEMP_DELTA, false, log);
+            if (creature.alive()) {
+                log.add(creature.name() + " heats up in superheated steam (" + creature.temp + "C).");
             }
         }
         return totalDmg;
@@ -210,7 +211,7 @@ public final class SimulationSystem {
             entity.removeTag(Tag.STUNNED);
         }
 
-        boolean inGas = tile != null && SpatialService.hasGas(tile);
+        boolean inGas = tile != null && SpatialService.isOpaqueGas(tile);
         if (inGas) {
             entity.applyTag(Tag.BLIND);
             entity.blindLingerTurns = Balance.BLIND_LINGER_TURNS;
@@ -250,7 +251,7 @@ public final class SimulationSystem {
         } else if (creature.temp > Balance.BODY_TEMP) {
             if (creature.has(Tag.BURNING) && creature.oilTurns > 0) {
                 creature.oilTurns--;
-                creature.temp = Balance.BURN_CAP;
+                creature.temp = Math.max(creature.temp - Balance.CREATURE_HOT_COOL_STEP, Balance.BURN_CAP);
             } else {
                 creature.temp = Math.max(Balance.BODY_TEMP, creature.temp - Balance.CREATURE_HOT_COOL_STEP);
             }
@@ -313,13 +314,11 @@ public final class SimulationSystem {
         // Gas thermal layer
         if (SpatialService.hasGas(tile)) {
             tile.gasTemp = Math.max(Balance.AMBIENT_TEMP, tile.gasTemp - Balance.TILE_DECAY_STEP);
-            if (tile.has(Tag.STEAM) && tile.gasTemp < Balance.STEAM_CLEAR_TEMP) {
+            if ((tile.has(Tag.STEAM) || tile.has(Tag.SUPERHEATED_STEAM)) && tile.gasTemp < Balance.STEAM_CLEAR_TEMP) {
                 ThermalState.clearGas(world, pos);
             } else if (tile.has(Tag.OIL_MIST) && tile.gasTemp < Balance.STEAM_CLEAR_TEMP) {
                 ThermalState.clearGas(world, pos);
                 ThermalState.setOilSlick(world, pos);
-            } else if (tile.has(Tag.CAUSTIC_GAS) && tile.gasTemp < Balance.CAUSTIC_CLEAR_TEMP) {
-                ThermalState.clearGas(world, pos);
             }
         }
 
@@ -336,6 +335,7 @@ public final class SimulationSystem {
         if (tile.has(Tag.BURNING) && tile.temp < Balance.IGNITE_TEMP) {
             map.removeTag(pos, Tag.BURNING);
             map.removeTag(pos, Tag.OIL);
+            map.removeTag(pos, Tag.TAR);
             map.removeTag(pos, Tag.FLAMMABLE);
             if (!tile.has(Tag.ACID) && !tile.has(Tag.WATER)) {
                 map.removeTag(pos, Tag.LIQUID);

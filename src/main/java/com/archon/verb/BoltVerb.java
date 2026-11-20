@@ -293,8 +293,8 @@ public final class BoltVerb implements Verb {
     private static int rollBoltBase(Dice dice, Tag payload) {
         return switch (payload) {
             case FORCE -> dice.between(Balance.DMG_KIN_MIN, Balance.DMG_KIN_MAX);
-            case FIRE -> dice.between(Balance.DMG_HEAT - Balance.BOLT_DMG_VAR, Balance.DMG_HEAT + Balance.BOLT_DMG_VAR);
-            case INFERNO -> dice.between(Balance.DMG_INFERNO - Balance.BOLT_DMG_VAR, Balance.DMG_INFERNO + Balance.BOLT_DMG_VAR);
+            case FIRE -> dice.between(Math.max(1, Balance.DMG_HEAT - Balance.BOLT_DMG_VAR), Balance.DMG_HEAT + Balance.BOLT_DMG_VAR);
+            case INFERNO -> dice.between(Math.max(1, Balance.DMG_INFERNO - Balance.BOLT_DMG_VAR), Balance.DMG_INFERNO + Balance.BOLT_DMG_VAR);
             case ACID -> dice.between(Balance.DMG_ACID - Balance.BOLT_DMG_VAR, Balance.DMG_ACID + Balance.BOLT_DMG_VAR);
             case BLOOD -> dice.between(Balance.DMG_BLOOD - Balance.BLOOD_BOLT_VAR, Balance.DMG_BLOOD + Balance.BLOOD_BOLT_VAR);
             default -> 0;

@@ -92,9 +92,10 @@ class ExecutionAndGatesTest {
         ThermalState.setWaterPuddle(w, new Vec2(8, 5));
         ThermalState.spawnGas(w, new Vec2(4, 2), Tag.STEAM);
         ThermalState.spawnGas(w, new Vec2(6, 2), Tag.OIL_MIST);
-        ThermalState.spawnGas(w, new Vec2(7, 2), Tag.CAUSTIC_GAS);
+        ThermalState.spawnGas(w, new Vec2(7, 2), Tag.SUPERHEATED_STEAM);
         ThermalState.setAcidPool(w, new Vec2(2, 8));
         ThermalState.setOilSlick(w, new Vec2(9, 8));
+        ThermalState.setTar(w, new Vec2(3, 8));
         Item stone = new Item("stone", "throwing stone", Set.of(Tag.STONE), null, 1, 2);
         Item dagger = Item.weapon("iron_dagger", "iron dagger", 3, 4, 2, Tag.METAL);
         w.map().placeGroundItem(new Vec2(1, 5), stone);
@@ -103,7 +104,7 @@ class ExecutionAndGatesTest {
         brazier.with(Tag.METAL, Tag.LIT);
         w.add(brazier);
 
-        String[] rejected = {"@water", "@steam", "@oil_mist", "@caustic", "@caustic_gas",
+        String[] rejected = {"@water", "@steam", "@oil_mist", "@superheated_steam", "@tar",
                 "@acid", "@oil", "@item", "@stone", "@iron_dagger", "@nonexistent"};
         for (int i = 0; i < rejected.length; i++) {
             assertInstanceOf(Resolved.Failure.class, Resolved.resolve(rejected[i], w), rejected[i]);
@@ -115,7 +116,8 @@ class ExecutionAndGatesTest {
         assertEquals(new Resolved.OnTile(new Vec2(8, 5), "water"), Resolved.resolve("@8,5/water", w));
         assertEquals(new Resolved.OnTile(new Vec2(4, 2), "gas"), Resolved.resolve("@4,2/gas", w));
         assertEquals(new Resolved.OnTile(new Vec2(4, 2), "steam"), Resolved.resolve("@4,2/steam", w));
-        assertEquals(new Resolved.OnTile(new Vec2(7, 2), "caustic"), Resolved.resolve("@7,2/caustic_gas", w));
+        assertEquals(new Resolved.OnTile(new Vec2(7, 2), "superheated_steam"), Resolved.resolve("@7,2/superheated", w));
+        assertEquals(new Resolved.OnTile(new Vec2(3, 8), "tar"), Resolved.resolve("@3,8/tar", w));
 
         // Relative anchor from thrall at (2,5): @w1 = (1,5), @e2 = (4,5)
         assertEquals(new Resolved.OnItem(stone, new ItemLocation.Ground(new Vec2(1, 5))), Resolved.resolve("@1,5/stone", w));
@@ -435,5 +437,21 @@ class ExecutionAndGatesTest {
         w.add(card);
         exec.submit("strike");
         assertTrue(card.hp() < 20, "Bare strike should target sole cardinally adjacent enemy");
+    }
+
+    @Test
+    void tarAddsOneApToStepOutWhileProneStandUpRemainsOneAp() {
+        World w = newWorld(new Dice.Seeded(1L));
+        EventBus bus = new EventBus();
+        RoundState round = new RoundState(new EconomyRules(6, 1, 1, 1));
+        Executor exec = executor(w, bus, round, DefaultVerbs.create(round.rules()));
+
+        ThermalState.setTar(w, w.thrall().pos());
+        w.thrall().applyTag(Tag.PRONE);
+
+        // Stand up (1 AP, stays on TAR) + step off TAR (2 AP) + step on clear floor (1 AP) = 4 AP
+        exec.submit("step e ; step e ; step e");
+        assertEquals(new Vec2(4, 5), w.thrall().pos());
+        assertEquals(6 - 4, round.ap());
     }
 }

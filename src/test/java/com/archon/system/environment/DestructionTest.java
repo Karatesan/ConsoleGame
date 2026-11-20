@@ -142,6 +142,19 @@ class DestructionTest {
     }
 
     @Test
+    void deadBurningCreatureDoesNotIgniteTile() {
+        Vec2 pos = new Vec2(7, 7);
+        Actor orc = new Actor("o1", "Orc", 'O', pos, new CreatureStats(20, 2, 0));
+        orc.with(Tag.BURNING);
+        world.add(orc);
+
+        Destruction.Result result = Destruction.onKilled(world, orc);
+
+        assertFalse(result.ignitedTile());
+        assertFalse(world.tile(pos).has(Tag.BURNING));
+    }
+
+    @Test
     void strikeDestroyingBarrelAndOrcLogsDistinctMessages() {
         World testWorld = Scenario.testRoom(new Dice.Always(true)); // Always hit
         EventBus bus = new EventBus();

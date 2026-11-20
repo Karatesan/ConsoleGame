@@ -6,6 +6,7 @@ import com.archon.model.BodyPart;
 import com.archon.model.Entity;
 import com.archon.model.EquipmentSlot;
 import com.archon.model.GameMap;
+import com.archon.model.Inventory;
 import com.archon.model.Item;
 import com.archon.model.Tag;
 import com.archon.model.Thrall;
@@ -30,7 +31,7 @@ public final class Scene {
 
     public final int w, h;
     public final boolean[] wall, burning, oil, loot;
-    public final boolean[] water, ice, acid, toxicTar, steam, causticGas, oilMist;
+    public final boolean[] water, ice, acid, tar, steam, superheatedSteam, oilMist;
     public final byte[] lootKind;
     public final float[] light;
 
@@ -45,6 +46,9 @@ public final class Scene {
     public final int magic, concentration, temp;
     public final String channel, shortConds;
     public final boolean thrallStunned, thrallFrozen;
+    public final String rightHand, leftHand;
+    public final int packCount, packMax;
+    public final String[] packItems;
 
     public Scene(World world) {
         w = world.width();
@@ -57,9 +61,9 @@ public final class Scene {
         water = new boolean[size];
         ice = new boolean[size];
         acid = new boolean[size];
-        toxicTar = new boolean[size];
+        tar = new boolean[size];
         steam = new boolean[size];
-        causticGas = new boolean[size];
+        superheatedSteam = new boolean[size];
         oilMist = new boolean[size];
         lootKind = new byte[size];
         light = new float[size];
@@ -76,9 +80,9 @@ public final class Scene {
                 water[i] = t.has(Tag.WATER);
                 ice[i] = t.has(Tag.ICE);
                 acid[i] = t.has(Tag.ACID);
-                toxicTar[i] = t.has(Tag.ACID) && t.has(Tag.OIL);
+                tar[i] = t.has(Tag.TAR);
                 steam[i] = t.has(Tag.STEAM);
-                causticGas[i] = t.has(Tag.CAUSTIC_GAS);
+                superheatedSteam[i] = t.has(Tag.SUPERHEATED_STEAM);
                 oilMist[i] = t.has(Tag.OIL_MIST);
             }
         }
@@ -93,6 +97,13 @@ public final class Scene {
         thrallStunned = thrall.has(Tag.STUNNED);
         thrallFrozen = thrall.has(Tag.FROZEN);
         shortConds = formatShortConds(thrall);
+        rightHand = formatItem(thrall.inventory().equipped(EquipmentSlot.HAND_RIGHT));
+        leftHand = formatItem(thrall.inventory().equipped(EquipmentSlot.HAND_LEFT));
+        List<Item> pack = thrall.inventory().pack();
+        packCount = pack.size();
+        packMax = Inventory.PACK_MAX;
+        packItems = new String[packCount];
+        for (int i = 0; i < packCount; i++) packItems[i] = formatItem(pack.get(i));
 
         List<Entity> entities = world.entities();
         n = 1 + entities.size();
@@ -118,6 +129,13 @@ public final class Scene {
         for (int e = 0; e < entities.size(); e++) put(e + 1, entities.get(e));
 
         computeLighting();
+    }
+
+    private static String formatItem(Item item) {
+        if (item == null) return "empty";
+        if (item.has(Tag.LIT)) return item.name() + " [LIT]";
+        if (item.has(Tag.BURNING)) return item.name() + " [BURN]";
+        return item.name();
     }
 
     private static byte classifyLoot(List<Item> ground) {

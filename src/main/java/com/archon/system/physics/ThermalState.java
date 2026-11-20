@@ -17,12 +17,13 @@ import java.util.Locale;
 /** Tab 5 thermal/state transitions, two-layer tile helpers, damage, and Tab 4B concentration. */
 public final class ThermalState {
 
-    private static final Tag[] GASES = {Tag.STEAM, Tag.CAUSTIC_GAS, Tag.OIL_MIST};
-    private static final Tag[] WATER_CLEAR = {Tag.ICE, Tag.OIL, Tag.ACID, Tag.FLAMMABLE, Tag.BURNING};
+    private static final Tag[] GASES = {Tag.STEAM, Tag.SUPERHEATED_STEAM, Tag.OIL_MIST};
+    private static final Tag[] WATER_CLEAR = {Tag.ICE, Tag.OIL, Tag.ACID, Tag.TAR, Tag.FLAMMABLE, Tag.BURNING};
     private static final Tag[] WATER_ADD = {Tag.WATER, Tag.LIQUID, Tag.CONDUCTIVE};
-    private static final Tag[] WATER_LIQ_CLEAR = {Tag.WATER, Tag.CONDUCTIVE};
+    private static final Tag[] WATER_LIQ_CLEAR = {Tag.WATER, Tag.CONDUCTIVE, Tag.TAR};
     private static final Tag[] OIL_ADD = {Tag.OIL, Tag.LIQUID, Tag.FLAMMABLE};
     private static final Tag[] ACID_ADD = {Tag.ACID, Tag.LIQUID};
+    private static final Tag[] TAR_CLEAR = {Tag.WATER, Tag.CONDUCTIVE, Tag.OIL, Tag.ACID, Tag.FLAMMABLE, Tag.LIQUID, Tag.BURNING};
 
     private ThermalState() {}
 
@@ -31,7 +32,7 @@ public final class ThermalState {
         if (entity.kind() != Entity.Kind.CREATURE || !entity.alive()) return;
         int scaled = ignoreThermalMass ? delta : (int) Math.floor(delta / entity.thermalMass);
         if (scaled < 0 && entity.has(Tag.FROZEN)) scaled = (int) Math.floor(scaled * Balance.FROZEN_DELTA_MULT);
-        entity.temp = Math.max(Balance.ABS_ZERO, entity.temp + scaled);
+        entity.temp = Math.clamp(entity.temp + scaled, Balance.ABS_ZERO, Balance.MAX_CREATURE_TEMP);
         syncThermalState(world, entity, log);
     }
 
@@ -94,6 +95,25 @@ public final class ThermalState {
         else if (entity.kind() != Entity.Kind.CREATURE) entity.propBurnTurns = Balance.PROP_BURN_TURNS;
     }
 
+    public static void applyBurningFloorContact(World world, Entity entity, Vec2 pos, List<String> log) {
+        if (entity.has(Tag.FROZEN)) {
+            exitFrozen(entity);
+            spawnGas(world, pos, Tag.STEAM);
+            addLog(log, entity.name() + " is thawed by the flames in a hiss of steam!");
+        } else if (entity.has(Tag.WET)) {
+            entity.removeTag(Tag.WET);
+            entity.wetTurns = 0;
+            spawnGas(world, pos, Tag.STEAM);
+            addLog(log, "Flames flash the water on " + entity.name() + " into steam!");
+        } else {
+            boolean wasBurning = entity.has(Tag.BURNING);
+            igniteEntity(entity);
+            if (!wasBurning) {
+                addLog(log, entity.name() + " catches fire from the burning floor!");
+            }
+        }
+    }
+
     public static void clearBleeding(Entity entity) {
         entity.removeTag(Tag.BLEEDING);
         entity.removeTag(Tag.BLOOD);
@@ -111,6 +131,21 @@ public final class ThermalState {
 
     public static void shredArmor(Entity entity, int amount) { entity.setArmor(Math.max(0, entity.armor() - amount)); }
 
+    public static void applyAcidHazard(World world, Entity victim, int dmg, List<String> log) {
+        if (victim == null || !victim.alive() || victim.has(Tag.FROZEN)) return;
+        shredArmor(victim, Balance.ACID_ARMOR_SHRED);
+        victim.applyTag(Tag.CORRODED);
+        addLog(log, victim.name() + " is corroded (-" + Balance.ACID_ARMOR_SHRED
+                + " armor -> " + victim.armor() + ") and takes " + dmg + " acid dmg!");
+        damageEntity(world, victim, dmg, false, log);
+    }
+
+    public static void applyTarHazard(World world, Entity victim, List<String> log) {
+        if (victim == null || !victim.alive() || victim.has(Tag.FROZEN)) return;
+        addLog(log, victim.name() + " takes " + Balance.TAR_DMG + " tar acid dmg!");
+        damageEntity(world, victim, Balance.TAR_DMG, false, log);
+    }
+
     public static boolean isLightOrMedium(Entity entity) {
         if (entity instanceof Actor a) return (a.strength() / 2) <= Balance.RES_MEDIUM;
         return entity.kind() == Entity.Kind.PROP && !entity.has(Tag.STONE) && !entity.has(Tag.METAL);
@@ -127,6 +162,10 @@ public final class ThermalState {
         if (tile == null || tile.isWall()) return;
         swapTags(map, pos, GASES, null);
         map.addTag(pos, gasTag);
+        if (gasTag == Tag.SUPERHEATED_STEAM) {
+            tile.gasTemp = Math.max(tile.gasTemp, Balance.SUPERHEATED_STEAM_TEMP);
+            return;
+        }
         tile.gasTemp = Balance.BOIL_TEMP;
         Entity occ = SpatialService.entityAt(world, pos);
         if (occ != null && occ.kind() == Entity.Kind.CREATURE && occ.alive()) {
@@ -134,6 +173,14 @@ public final class ThermalState {
             occ.blindLingerTurns = Balance.BLIND_LINGER_TURNS;
             if (occ instanceof Actor a) a.clearReadied();
         }
+    }
+
+    public static void spawnSuperheatedSteam(World world, Vec2 pos, boolean inferno) {
+        GameMap.Tile tile = world.tile(pos);
+        if (tile == null || tile.isWall()) return;
+        swapTags(world.map(), pos, GASES, null);
+        world.map().addTag(pos, Tag.SUPERHEATED_STEAM);
+        tile.gasTemp = inferno ? Balance.SUPERHEATED_INFERNO_TEMP : Balance.SUPERHEATED_STEAM_TEMP;
     }
 
     public static void clearGas(World world, Vec2 pos) {
@@ -160,13 +207,37 @@ public final class ThermalState {
     }
 
     public static void setAcidPool(World world, Vec2 pos) { swapTags(world.map(), pos, WATER_LIQ_CLEAR, ACID_ADD); }
-    public static void setToxicTar(World world, Vec2 pos) { setAcidPool(world, pos); setOilSlick(world, pos); }
+
+    public static void setTar(World world, Vec2 pos) {
+        GameMap.Tile tile = world.tile(pos);
+        swapTags(world.map(), pos, TAR_CLEAR, null);
+        world.map().addTag(pos, Tag.TAR);
+        tile.oilTurns = 0;
+        tile.burnTurns = 0;
+    }
+
+    public static void clearTar(World world, Vec2 pos) {
+        GameMap.Tile tile = world.tile(pos);
+        world.map().removeTag(pos, Tag.TAR);
+        world.map().removeTag(pos, Tag.BURNING);
+        tile.burnTurns = 0;
+        tile.temp = Balance.AMBIENT_TEMP;
+    }
 
     public static void applyAcidToFloorOnly(World world, Vec2 pos) {
         GameMap.Tile tile = world.tile(pos);
-        if (tile.has(Tag.ICE)) swapTags(world.map(), pos, null, ACID_ADD);
-        else if (tile.has(Tag.OIL)) setToxicTar(world, pos);
-        else setAcidPool(world, pos);
+        if (tile.has(Tag.ICE)) {
+            if (tile.has(Tag.OIL)) {
+                world.map().removeTag(pos, Tag.OIL);
+                world.map().removeTag(pos, Tag.FLAMMABLE);
+                tile.oilTurns = 0;
+                world.map().addTag(pos, Tag.TAR);
+            } else if (!tile.has(Tag.TAR)) {
+                swapTags(world.map(), pos, null, ACID_ADD);
+            }
+        } else if (tile.has(Tag.OIL)) setTar(world, pos);
+        else if (tile.has(Tag.WATER)) setWaterPuddle(world, pos);
+        else if (!tile.has(Tag.TAR)) setAcidPool(world, pos);
     }
 
     public static void igniteTile(World world, Vec2 pos) {
@@ -174,6 +245,7 @@ public final class ThermalState {
         world.map().addTag(pos, Tag.BURNING);
         tile.temp = Math.max(tile.temp, Balance.BURN_CAP);
         if (tile.has(Tag.OIL)) tile.oilTurns = Balance.OIL_TURNS;
+        else if (tile.has(Tag.TAR)) tile.burnTurns = Balance.TAR_BURN_TURNS;
         else tile.burnTurns = Balance.PROP_BURN_TURNS;
     }
 

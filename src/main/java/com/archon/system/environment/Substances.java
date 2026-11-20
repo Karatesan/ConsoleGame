@@ -41,7 +41,7 @@ public final class Substances {
                     : tile.has(Tag.WATER) ? Tag.WATER
                     : ThermalState.gasTag(tile);
             if (substance != null) {
-                if (substance == Tag.STEAM || substance == Tag.CAUSTIC_GAS || substance == Tag.OIL_MIST) {
+                if (substance == Tag.STEAM || substance == Tag.SUPERHEATED_STEAM || substance == Tag.OIL_MIST) {
                     ThermalState.clearGas(world, source.pos());
                 } else {
                     if (!world.map().removeTag(source.pos(), substance)) {

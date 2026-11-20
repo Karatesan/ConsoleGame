@@ -68,8 +68,12 @@ public final class Ignition {
             return true;
         }
         boolean litItems = TileReactions.igniteGroundItems(tile, log);
-        if (!tile.has(Tag.OIL) && !tile.has(Tag.FLAMMABLE)) {
+        if (!tile.has(Tag.OIL) && !tile.has(Tag.TAR) && !tile.has(Tag.FLAMMABLE)) {
             return litItems;
+        }
+        if (tile.has(Tag.ICE)) {
+            world.map().removeTag(at, Tag.ICE);
+            ThermalState.spawnGas(world, at, Tag.STEAM);
         }
 
         ThermalState.igniteTile(world, at);

@@ -104,8 +104,8 @@ public final class Balance {
     public static final int AI_STEP_OIL_PENALTY      = 3;
 
     // --- Economy & Inventory Defaults ---
-    public static final int DEFAULT_ROUND_AP         = 6;
-    public static final int DEFAULT_UNTAXED_LINES    = 1;
+    public static final int DEFAULT_ROUND_AP         = 60   ;
+    public static final int DEFAULT_UNTAXED_LINES    = 100;
     public static final int DEFAULT_LINE_TAX         = 1;
     public static final int DEFAULT_BREAK_PENALTY    = 1;
     public static final int PACK_MAX                 = 8;
@@ -119,12 +119,14 @@ public final class Balance {
     public static final int AMBIENT_TEMP       = 20;
     public static final int BODY_TEMP          = 36;
     public static final int WARM_MELT_TEMP     = 36;
-    public static final int BOIL_TEMP          = 100;
-    public static final int CAUSTIC_CLEAR_TEMP = 66;
-    public static final int STEAM_CLEAR_TEMP   = 80;
-    public static final int IGNITE_TEMP        = 200;
-    public static final int BURN_CAP           = 250;
-    public static final int INFERNO_MIN_TEMP   = 300;
+    public static final int BOIL_TEMP                  = 100;
+    public static final int STEAM_CLEAR_TEMP           = 80;
+    public static final int SUPERHEATED_STEAM_TEMP     = 140;
+    public static final int SUPERHEATED_INFERNO_TEMP   = 180;
+    public static final int IGNITE_TEMP                = 200;
+    public static final int BURN_CAP                   = 250;
+    public static final int INFERNO_MIN_TEMP           = 300;
+    public static final int MAX_CREATURE_TEMP          = 500;
 
     // --- 1B. Temperature Change Per Round ---
     public static final int CHILL_WARM_STEP       = 10;
@@ -158,29 +160,31 @@ public final class Balance {
     public static final int DMG_KIN              = 3;
     public static final int DMG_KIN_MIN          = 2;
     public static final int DMG_KIN_MAX          = 5;
-    public static final int DMG_HEAT             = 3;
-    public static final int DMG_INFERNO          = 6;
-    public static final int DMG_ACID             = 4;
-    public static final int DMG_BLOOD            = 10;
-    public static final int DMG_BLOOD_BLAST      = 9;
-    public static final int BOLT_DMG_VAR         = 1;
-    public static final int BLOOD_BOLT_VAR       = 2;
-    public static final double BLAST_DMG_MULT    = 0.5;
-    public static final int BLAST_ARM_PRONE_CHANCE = 20;
-    public static final int TD_HEAT              = 100;
-    public static final int TD_INFERNO           = 200;
-    public static final int TD_WATER             = -10;
-    public static final int SIPHON_COOL_DELTA    = -30;
-    public static final int FUEL_AIR_DMG_HEAT    = 8;
-    public static final int FUEL_AIR_DMG_INFERNO = 10;
-    public static final int RUPTURE_ACID_DMG     = 3;
-    public static final int STONE_STRESS_DMG     = 1;
+    public static final int DMG_HEAT                   = 1;
+    public static final int DMG_INFERNO                = 3;
+    public static final int DMG_ACID                   = 4;
+    public static final int DMG_BLOOD                  = 10;
+    public static final int DMG_BLOOD_BLAST            = 9;
+    public static final int BOLT_DMG_VAR               = 1;
+    public static final int BLOOD_BOLT_VAR             = 2;
+    public static final double BLAST_DMG_MULT          = 0.5;
+    public static final int BLAST_ARM_PRONE_CHANCE     = 20;
+    public static final int TD_HEAT                    = 100;
+    public static final int TD_INFERNO                 = 200;
+    public static final int TD_WATER                   = -10;
+    public static final int SIPHON_COOL_DELTA          = -30;
+    public static final int SUPERHEATED_STEAM_TEMP_DELTA = 60;
+    public static final int FUEL_AIR_DMG_HEAT          = 8;
+    public static final int FUEL_AIR_DMG_INFERNO       = 10;
+    public static final int TAR_DMG                    = 1;
+    public static final int STONE_STRESS_DMG           = 1;
 
     // --- 1E. Status Damage and Durations ---
     public static final int SCALD_FLASH_DMG           = 5;
     public static final int SCALD_DOT_DMG             = 3;
     public static final int BURN_TICK_DMG             = 5;
-    public static final int INFERNO_TICK_DMG          = 15;
+    public static final int BURN_TICK_BASE            = 3;
+    public static final int BURN_TEMP_STEP            = 20;
     public static final int FROSTBITE_DMG             = 3;
     public static final int CRYO_DMG                  = 6;
     public static final int CRYO_ARMOR_SHRED          = 1;
@@ -196,12 +200,14 @@ public final class Balance {
     public static final int CAUTERIZE_SCALD_DMG       = 3;
     public static final int OIL_TURNS                 = 3;
     public static final int PROP_BURN_TURNS           = 3;
+    public static final int TAR_BURN_TURNS            = 6;
     public static final int WET_TURNS                 = 3;
     public static final int SLIP_CHANCE               = 40;
     public static final int EVA_CHILLED               = -15;
     public static final int EVA_FROZEN                = -20;
     public static final int CHILLED_AP_STEP           = 1;
     public static final int CRIPPLED_AP_STEP          = 1;
+    public static final int TAR_AP_STEP               = 1;
     public static final int BLIND_LINGER_TURNS        = 1;
     public static final int WEAPON_CLATTER_WEAR       = 1;
 

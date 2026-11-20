@@ -167,14 +167,10 @@ public final class BlastVerb implements Verb {
 
         String blastSource = blastSource(payload);
         c.say(blastSource + " saturates " + epicenter + "!");
-        boolean[] hadGas = new boolean[cross.size()];
-        List<Vec2> initialCaustic = new ArrayList<>();
+        boolean[] hadFuelAirGas = new boolean[cross.size()];
+        boolean firePayload = payload == Tag.FIRE || payload == Tag.INFERNO;
         for (int i = 0; i < cross.size(); i++) {
-            Vec2 pos = cross.get(i);
-            hadGas[i] = SpatialService.hasGas(c.world.tile(pos));
-            if (payload == Tag.ACID && c.world.tile(pos).has(Tag.CAUSTIC_GAS)) {
-                initialCaustic.add(pos);
-            }
+            hadFuelAirGas[i] = firePayload && c.world.tile(cross.get(i)).has(Tag.OIL_MIST);
         }
 
         boolean anyEffect = false;
@@ -186,21 +182,13 @@ public final class BlastVerb implements Verb {
                 anyEffect = true;
             }
             Entity occ = SpatialService.entityAt(c.world, pos);
-            if (!hadGas[i] && occ != null && occ.alive()) {
+            if (!hadFuelAirGas[i] && occ != null && occ.alive()) {
                 anyEffect = true;
                 EntityReactions.Hit hit = EntityReactions.applyPayloadToEntity(c.world, c.thrall, occ, payload, true, false,
                         1.0, false, burstHitEntities, c.log);
                 if (hit.damage() > 0 || !c.log.isEmpty() || !occ.alive()) {
                     CombatNarrative.narrateAutoHit(c, blastSource, occ, hit);
                 }
-            }
-        }
-
-        if (payload == Tag.ACID) {
-            for (int i = 0; i < initialCaustic.size(); i++) {
-                TileReactions.expandCausticGasOutward(c.world, initialCaustic.get(i));
-                c.say("Caustic gas expands outward from " + initialCaustic.get(i) + "!");
-                anyEffect = true;
             }
         }
         if (!anyEffect) c.say("No targets affected.");

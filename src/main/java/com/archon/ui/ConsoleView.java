@@ -152,10 +152,10 @@ public final class ConsoleView implements View {
         int t = y * s.w + x;
         return s.wall[t] ? "####"
                 : s.burning[t] ? "*"
-                : s.causticGas[t] ? "!"
+                : s.superheatedSteam[t] ? "!"
                 : s.oilMist[t] ? "?"
                 : s.steam[t] ? "^"
-                : s.toxicTar[t] ? "&"
+                : s.tar[t] ? "&"
                 : s.acid[t] ? "a"
                 : s.ice[t] ? "="
                 : s.water[t] ? "w"

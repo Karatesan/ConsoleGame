@@ -255,8 +255,8 @@ public final class CommandManual {
                   @<entityId>          The tile occupied by an entity, for example @o1.
                   @<dir><distance>     Relative tile, for example @e2 or @sw1.
                   @<tile>/<item>       Specific ground item on a tile, for example @3,4/iron_dagger or @e2/stone.
-                  @<tile>/gas          Gas cloud layer on a tile (or /steam, /oil_mist, /caustic).
-                  @<tile>/floor        Floor liquid/ice layer on a tile (or /water, /oil, /acid, /ice).
+                  @<tile>/gas          Gas cloud layer on a tile (or /steam, /superheated_steam, /oil_mist).
+                  @<tile>/floor        Floor liquid/ice layer on a tile (or /water, /oil, /acid, /tar, /ice).
                 
                 THRALL INVENTORY:
                   /pack                The pack location, not a selected item.

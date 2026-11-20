@@ -135,23 +135,24 @@ class SiphonAndChannelTest {
         assertTrue(w.tile(steamPos).has(Tag.WATER));
         assertEquals(30 - (Balance.DMG_INFERNO + Balance.BOLT_DMG_VAR + 1), target.hp());
 
-        // @2,3/oil_mist -t condenses to OIL slick; @3,5/caustic -t condenses to ACID pool
+        // @2,3/oil_mist -t condenses to OIL slick; @3,5/superheated_steam -t condenses to WATER puddle
         Vec2 mistPos = new Vec2(2, 3);
         ThermalState.spawnGas(w, mistPos, Tag.OIL_MIST);
         ex.submit("siphon @2,3/oil_mist -t");
         assertFalse(w.tile(mistPos).has(Tag.OIL_MIST));
         assertTrue(w.tile(mistPos).has(Tag.OIL));
 
-        Vec2 causticPos = new Vec2(3, 5);
-        ThermalState.spawnGas(w, causticPos, Tag.CAUSTIC_GAS);
+        Vec2 superPos = new Vec2(3, 5);
+        ThermalState.spawnSuperheatedSteam(w, superPos, false);
         ex.submit("pass");
-        ex.submit("siphon @3,5/caustic -t");
-        assertFalse(w.tile(causticPos).has(Tag.CAUSTIC_GAS));
-        assertTrue(w.tile(causticPos).has(Tag.ACID));
+        ex.submit("siphon @3,5/superheated_steam -t");
+        assertFalse(w.tile(superPos).has(Tag.SUPERHEATED_STEAM));
+        assertTrue(w.tile(superPos).has(Tag.WATER));
 
         // -t rejected on /acid and /oil pools (pool remains intact)
+        ThermalState.setAcidPool(w, superPos);
         ex.submit("siphon @3,5/acid -t");
-        assertTrue(w.tile(causticPos).has(Tag.ACID));
+        assertTrue(w.tile(superPos).has(Tag.ACID));
         ex.submit("siphon @2,3/oil -t");
         assertTrue(w.tile(mistPos).has(Tag.OIL));
     }

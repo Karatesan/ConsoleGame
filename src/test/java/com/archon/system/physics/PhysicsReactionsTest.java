@@ -207,22 +207,43 @@ class PhysicsReactionsTest {
         assertTrue(w.tile(p3).has(Tag.ICE) && w.tile(p3).has(Tag.OIL));
         TileReactions.applyPayloadToTile(w, w.thrall(), p3, Tag.FIRE, false, null, null);
         assertFalse(w.tile(p3).has(Tag.ICE));
-        assertFalse(w.tile(p3).has(Tag.OIL));
+        assertTrue(w.tile(p3).has(Tag.OIL));
+        assertTrue(w.tile(p3).has(Tag.BURNING), "Oiled ice hit with fire ignites oil AND produces steam");
         assertTrue(w.tile(p3).has(Tag.STEAM));
+
+        Vec2 p4 = new Vec2(6, 3);
+        w.map().addTag(p4, Tag.ICE);
+        TileReactions.applyPayloadToTile(w, w.thrall(), p4, Tag.ACID, false, null, null);
+        assertTrue(w.tile(p4).has(Tag.ICE) && w.tile(p4).has(Tag.ACID));
+        TileReactions.applyPayloadToTile(w, w.thrall(), p4, Tag.FIRE, false, null, null);
+        assertFalse(w.tile(p4).has(Tag.ICE));
+        assertFalse(w.tile(p4).has(Tag.ACID), "Acid + melting ice water dilutes to water");
+        assertTrue(w.tile(p4).has(Tag.WATER));
+
+        Vec2 p5 = new Vec2(7, 3);
+        w.map().addTag(p5, Tag.ICE);
+        TileReactions.applyPayloadToTile(w, w.thrall(), p5, Tag.ACID, false, null, null);
+        TileReactions.applyPayloadToTile(w, w.thrall(), p5, Tag.INFERNO, false, null, null);
+        assertFalse(w.tile(p5).has(Tag.ICE));
+        assertFalse(w.tile(p5).has(Tag.ACID));
+        assertTrue(w.tile(p5).has(Tag.STEAM));
     }
 
     @Test
-    void causticRuptureAndChainedFuelAirDetonationCapAtOneHitPerCreature() {
+    void superheatedSteamAndChainedFuelAirDetonationCapAtOneHitPerCreature() {
         World w = newWorld(new Dice.Seeded(1L));
         Actor occ = new Actor("o1", "Orc", 'O', new Vec2(4, 4), new CreatureStats(40, 2, 0));
         w.add(occ);
-        ThermalState.spawnGas(w, new Vec2(4, 4), Tag.CAUSTIC_GAS);
+        ThermalState.spawnGas(w, new Vec2(4, 4), Tag.STEAM);
+        occ.removeTag(Tag.BLIND);
+        occ.blindLingerTurns = 0;
         TileReactions.applyPayloadToTile(w, w.thrall(), new Vec2(4, 4), Tag.FIRE, false, null, null);
-        assertFalse(w.tile(new Vec2(4, 4)).has(Tag.CAUSTIC_GAS));
-        assertTrue(occ.has(Tag.CORRODED));
-        assertEquals(1, occ.armor());
-        int expectedRupture = Balance.DMG_HEAT + (Balance.BASE_MAGIC / 2) + Balance.RUPTURE_ACID_DMG;
-        assertEquals(40 - expectedRupture, occ.hp());
+        assertFalse(w.tile(new Vec2(4, 4)).has(Tag.STEAM));
+        assertTrue(w.tile(new Vec2(4, 4)).has(Tag.SUPERHEATED_STEAM));
+        assertEquals(Balance.SUPERHEATED_STEAM_TEMP, w.tile(new Vec2(4, 4)).gasTemp);
+        assertEquals(40, occ.hp(), "Steam -> Superheated steam heats without instant explosion damage");
+        assertEquals(Balance.BODY_TEMP + Balance.SUPERHEATED_STEAM_TEMP_DELTA, occ.temp);
+        assertFalse(occ.has(Tag.BLIND));
 
         Actor victim = new Actor("o2", "Victim", 'O', new Vec2(6, 5), new CreatureStats(50, 5, 0));
         Actor wetBuddy = new Actor("o3", "Wet", 'O', new Vec2(7, 5), new CreatureStats(50, 0, 0));
@@ -255,14 +276,14 @@ class PhysicsReactionsTest {
         w.add(orc);
 
         Vec2 tarPos = new Vec2(3, 5);
-        ThermalState.setToxicTar(w, tarPos);
+        ThermalState.setTar(w, tarPos);
         boolean slipped = TileDisplacement.onEnterTile(w, orc, tarPos, true, null);
-        assertTrue(slipped);
-        assertTrue(orc.has(Tag.PRONE));
-        assertTrue(orc.has(Tag.CORRODED));
-        assertEquals(1, orc.armor());
-        assertEquals(30 - Balance.CAUSTIC_DMG, orc.hp());
-        assertTrue(orc.has(Tag.OIL));
+        assertFalse(slipped, "Tar must not cause slip");
+        assertFalse(orc.has(Tag.PRONE));
+        assertFalse(orc.has(Tag.CORRODED), "Tar must not corrode");
+        assertEquals(2, orc.armor());
+        assertEquals(30 - Balance.TAR_DMG, orc.hp());
+        assertFalse(orc.has(Tag.OIL));
 
         orc.ready(Actor.Trigger.ON_ADJACENCY, "strike", 5);
         Vec2 gasPos = new Vec2(4, 5);
@@ -271,6 +292,24 @@ class PhysicsReactionsTest {
         assertTrue(orc.has(Tag.BLIND));
         assertEquals(Balance.BLIND_LINGER_TURNS, orc.blindLingerTurns);
         assertNull(orc.readied());
+
+        // Superheated steam heats on step without refreshing BLIND, and burning floor logs ignition
+        orc.removeTag(Tag.BLIND);
+        orc.blindLingerTurns = 0;
+        Vec2 superPos = new Vec2(4, 6);
+        ThermalState.spawnSuperheatedSteam(w, superPos, false);
+        List<String> moveLogs = new ArrayList<>();
+        TileDisplacement.onEnterTile(w, orc, superPos, true, moveLogs);
+        assertFalse(orc.has(Tag.BLIND));
+        assertFalse(orc.has(Tag.BURNING));
+        assertEquals(Balance.BODY_TEMP + Balance.SUPERHEATED_STEAM_TEMP_DELTA, orc.temp);
+        assertTrue(moveLogs.stream().anyMatch(s -> s.contains("heats up in superheated steam")));
+
+        Vec2 burnFloor = new Vec2(4, 7);
+        ThermalState.igniteTile(w, burnFloor);
+        TileDisplacement.onEnterTile(w, orc, burnFloor, true, moveLogs);
+        assertTrue(orc.has(Tag.BURNING));
+        assertTrue(moveLogs.stream().anyMatch(s -> s.contains("catches fire from the burning floor!")));
 
         w.map().setWall(new Vec2(5, 0), true);
         ThermalState.spawnGas(w, new Vec2(5, 3), Tag.STEAM);
@@ -324,29 +363,31 @@ class PhysicsReactionsTest {
         assertEquals(Balance.BURN_CAP, orc.temp);
         assertEquals(Balance.OIL_TURNS, w.tile(orc.pos()).oilTurns);
 
-        // N8: Water on Oiled ice and Acid on ice rinses surface OIL/ACID while keeping ICE
+        // N8: Oil + Acid on ice forms Tar on ice, and Water rinses Tar keeping ICE
         Vec2 icePos = new Vec2(5, 5);
         w.map().addTag(icePos, Tag.ICE);
         TileReactions.applyPayloadToTile(w, w.thrall(), icePos, Tag.OIL, false, null, null);
         TileReactions.applyPayloadToTile(w, w.thrall(), icePos, Tag.ACID, false, null, null);
-        assertTrue(w.tile(icePos).has(Tag.ICE) && w.tile(icePos).has(Tag.OIL) && w.tile(icePos).has(Tag.ACID));
+        assertTrue(w.tile(icePos).has(Tag.ICE) && w.tile(icePos).has(Tag.TAR));
+        assertFalse(w.tile(icePos).has(Tag.OIL));
+        assertFalse(w.tile(icePos).has(Tag.ACID));
 
         TileReactions.applyPayloadToTile(w, w.thrall(), icePos, Tag.WATER, false, null, null);
         assertTrue(w.tile(icePos).has(Tag.ICE));
-        assertFalse(w.tile(icePos).has(Tag.OIL));
-        assertFalse(w.tile(icePos).has(Tag.ACID));
+        assertFalse(w.tile(icePos).has(Tag.TAR));
         assertFalse(w.tile(icePos).has(Tag.WATER));
 
-        // J7: Steam explosion burst respects burstHitEntities deduplication
+        // J7: Superheated steam creation burst respects burstHitEntities deduplication
         Actor victim = new Actor("o2", "Victim", 'O', new Vec2(7, 7), new CreatureStats(30, 0, 0));
         w.add(victim);
         ThermalState.spawnGas(w, victim.pos(), Tag.STEAM);
         Set<Entity> burstHit = new HashSet<>();
         TileReactions.applyPayloadToTile(w, w.thrall(), victim.pos(), Tag.FIRE, true, burstHit, null);
-        assertEquals(30 - Balance.SCALD_FLASH_DMG, victim.hp());
+        int heatedOnce = Balance.BODY_TEMP + Balance.SUPERHEATED_STEAM_TEMP_DELTA;
+        assertEquals(heatedOnce, victim.temp);
         ThermalState.spawnGas(w, victim.pos(), Tag.STEAM);
         TileReactions.applyPayloadToTile(w, w.thrall(), victim.pos(), Tag.FIRE, true, burstHit, null);
-        assertEquals(30 - Balance.SCALD_FLASH_DMG, victim.hp());
+        assertEquals(heatedOnce, victim.temp);
     }
 
     @Test
@@ -465,5 +506,67 @@ class PhysicsReactionsTest {
         stepLogs.clear();
         TileDisplacement.onEnterTile(w, orc, new Vec2(6, 5), false, stepLogs);
         assertFalse(stepLogs.stream().anyMatch(s -> s.contains("is coated in oil")), "Repeat oil entry must skip OIL log: " + stepLogs);
+    }
+
+    @Test
+    void pushedSuperheatedSteamHeatsAndLiquidReactionsFormTarDiluteAcidAndCleanseTar() {
+        // 1. Pushing SUPERHEATED_STEAM heats target without blinding
+        World w = newWorld(new Dice.Always(true));
+        Actor orc1 = new Actor("o1", "OrcOne", 'O', new Vec2(4, 3), new CreatureStats(30, 3, 0));
+        w.add(orc1);
+        ThermalState.spawnSuperheatedSteam(w, new Vec2(2, 3), false);
+        TileDisplacement.relocateGasOrLiquid(w, new Vec2(2, 3), new Vec2(1, 0), 2, null, null);
+        assertFalse(w.tile(new Vec2(2, 3)).has(Tag.SUPERHEATED_STEAM));
+        assertTrue(w.tile(new Vec2(4, 3)).has(Tag.SUPERHEATED_STEAM));
+        assertFalse(orc1.has(Tag.BLIND));
+        assertEquals(Balance.BODY_TEMP + Balance.SUPERHEATED_STEAM_TEMP_DELTA, orc1.temp);
+
+        // 2. Pushing STEAM onto BURNING tile turns it into SUPERHEATED_STEAM
+        Vec2 burnPos = new Vec2(6, 5);
+        w.map().addTag(burnPos, Tag.BURNING);
+        ThermalState.spawnGas(w, new Vec2(4, 5), Tag.STEAM);
+        TileDisplacement.relocateGasOrLiquid(w, new Vec2(4, 5), new Vec2(1, 0), 2, null, null);
+        assertFalse(w.tile(burnPos).has(Tag.STEAM));
+        assertTrue(w.tile(burnPos).has(Tag.SUPERHEATED_STEAM));
+
+        // 3. Pushing Acid onto existing Oil forms Tar (not OIL+ACID)
+        ThermalState.setAcidPool(w, new Vec2(2, 6));
+        ThermalState.setOilSlick(w, new Vec2(3, 6));
+        List<String> mixLogs = new ArrayList<>();
+        TileDisplacement.relocateGasOrLiquid(w, new Vec2(2, 6), new Vec2(1, 0), 1, null, mixLogs);
+        assertTrue(w.tile(new Vec2(3, 6)).has(Tag.TAR));
+        assertFalse(w.tile(new Vec2(3, 6)).has(Tag.OIL));
+        assertFalse(w.tile(new Vec2(3, 6)).has(Tag.ACID));
+        assertTrue(mixLogs.stream().anyMatch(s -> s.contains("form tar")));
+
+        // 4. Water + Tar clears tile completely; Acid + Water always ends in Water
+        TileReactions.applyPayloadToTile(w, w.thrall(), new Vec2(3, 6), Tag.WATER, false, null, null);
+        assertFalse(w.tile(new Vec2(3, 6)).has(Tag.TAR));
+        assertFalse(w.tile(new Vec2(3, 6)).has(Tag.WATER));
+
+        Vec2 pond = new Vec2(4, 6);
+        ThermalState.setWaterPuddle(w, pond);
+        TileReactions.applyPayloadToTile(w, w.thrall(), pond, Tag.ACID, false, null, null);
+        assertTrue(w.tile(pond).has(Tag.WATER));
+        assertFalse(w.tile(pond).has(Tag.ACID));
+
+        // 5. Tar ignites for TAR_BURN_TURNS (6t) while retaining Tag.TAR slow, and linear Fire DoT scales with temp
+        Vec2 tarFire = new Vec2(5, 6);
+        ThermalState.setTar(w, tarFire);
+        TileReactions.applyPayloadToTile(w, w.thrall(), tarFire, Tag.FIRE, false, null, null);
+        assertTrue(w.tile(tarFire).has(Tag.TAR) && w.tile(tarFire).has(Tag.BURNING));
+        assertEquals(Balance.TAR_BURN_TURNS, w.tile(tarFire).burnTurns);
+
+        Actor burning = new Actor("b2", "BurnTarget", 'O', new Vec2(7, 7), new CreatureStats(100, 3, 0));
+        burning.applyTag(Tag.BURNING);
+        burning.temp = 200;
+        w.add(burning);
+        int dot200 = SimulationSystem.applyCreatureStatusDots(w, burning, new ArrayList<>());
+        assertEquals(Balance.BURN_TICK_BASE, dot200);
+
+        EntityReactions.applyPayloadToEntity(w, w.thrall(), burning, Tag.FIRE, null);
+        assertEquals(200 + Balance.TD_HEAT, burning.temp, "Reapplying Fire stacks heat on already-burning target");
+        int dot300 = SimulationSystem.applyCreatureStatusDots(w, burning, new ArrayList<>());
+        assertEquals(Balance.BURN_TICK_BASE + (300 - Balance.IGNITE_TEMP) / Balance.BURN_TEMP_STEP, dot300);
     }
 }

@@ -1,9 +1,12 @@
 package com.archon.ui;
 
 import com.archon.app.Scenario;
+import com.archon.event.GameEvent;
+import com.archon.model.Balance;
 import com.archon.model.Dice;
 import com.archon.model.Tag;
 import com.archon.model.World;
+import com.archon.verb.ExitCode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -99,6 +102,18 @@ class PresentationUpgradeTest {
         assertEquals(PixelAtlas.RAT_0, PixelAtlas.spriteForEntity(s, s.indexOf("r1"), 0));
         assertEquals(PixelAtlas.BRAZIER_1, PixelAtlas.spriteForEntity(s, s.indexOf("br1"), 1));
         assertEquals(PixelAtlas.BARREL, PixelAtlas.spriteForEntity(s, s.indexOf("b1"), 0));
+
+        assertEquals("rusted cleaver", s.rightHand);
+        assertEquals("torch [LIT]", s.leftHand);
+        assertEquals(5, s.packCount);
+        assertEquals(Balance.PACK_MAX, s.packMax);
+        assertEquals(5, s.packItems.length);
+
+        arena.get("br1").removeTag(Tag.LIT);
+        arena.actor("o1").applyTag(Tag.FROZEN);
+        Scene offAndFrozen = new Scene(arena);
+        assertEquals(PixelAtlas.BRAZIER_OFF, PixelAtlas.spriteForEntity(offAndFrozen, offAndFrozen.indexOf("br1"), 1));
+        assertEquals(PixelAtlas.ORC_0, PixelAtlas.spriteForEntity(offAndFrozen, offAndFrozen.indexOf("o1"), 1));
     }
 
     @Test
@@ -121,5 +136,51 @@ class PresentationUpgradeTest {
         assertEquals(4, ys[0]);
         assertEquals(s.x[0], xs[1]);
         assertEquals(s.y[0], ys[1]);
+    }
+
+    @Test
+    void pipedElementalBoltsBlastsBloodAndPsionicSpawnsDistinctVfx() {
+        World arena = Scenario.magicArena(new Dice.Seeded(1L));
+        GdxView view = new GdxView(1L, true);
+        view.scene(new Scene(arena), null);
+
+        // Psionic / Kinetic bolt -> FX_PSIONIC_SPIKE (2)
+        view.handle(new GameEvent.StageResult(1, 1, "bolt o1", ExitCode.SUCCESS, 1, 3));
+        assertEquals(2, view.recentFxKind(0));
+
+        // Bloodlance -> FX_BLOOD_BOLT (1)
+        view.handle(new GameEvent.StageResult(1, 1, "bolt o1 --blood", ExitCode.SUCCESS, 1, 3));
+        assertEquals(1, view.recentFxKind(0));
+
+        // Piped Inferno bolt -> FX_DRAIN (8) then FX_FIREBALL (4)
+        view.handle(new GameEvent.StageResult(1, 1, "siphon br1 | bolt o1", ExitCode.SUCCESS, 1, 3));
+        assertEquals(4, view.recentFxKind(0));
+        assertEquals(8, view.recentFxKind(1));
+
+        // Piped Acid bolt -> FX_DRAIN (8) then FX_ELEM_BOLT (5) with ELEM_ACID (3)
+        view.handle(new GameEvent.StageResult(1, 1, "siphon @1,3/acid | bolt o1", ExitCode.SUCCESS, 1, 3));
+        assertEquals(5, view.recentFxKind(0));
+        assertEquals(3, view.recentFxParam(0));
+        assertEquals(8, view.recentFxKind(1));
+
+        // Piped Water bolt -> FX_ELEM_BOLT (5) with ELEM_WATER (2)
+        view.handle(new GameEvent.StageResult(1, 1, "siphon @3,2 | bolt o1", ExitCode.SUCCESS, 1, 3));
+        assertEquals(5, view.recentFxKind(0));
+        assertEquals(2, view.recentFxParam(0));
+
+        // Piped Oil blast -> FX_CROSS (7) with ELEM_OIL (4) + FX_RING (6)
+        view.handle(new GameEvent.StageResult(1, 1, "siphon @3,5/oil | blast @7,4", ExitCode.SUCCESS, 2, 2));
+        assertEquals(6, view.recentFxKind(0));
+        assertEquals(7, view.recentFxKind(1));
+        assertEquals(4, view.recentFxParam(1));
+
+        // Channeled Inferno blast -> FX_RING (channel) then FX_CROSS (7) with ELEM_FIRE (1) + FX_RING (6)
+        arena.thrall().channeledPayload = Tag.INFERNO;
+        arena.thrall().channelTurns = 2;
+        view.scene(new Scene(arena), null);
+        view.handle(new GameEvent.StageResult(1, 1, "channel | blast @7,4", ExitCode.SUCCESS, 1, 2));
+        assertEquals(6, view.recentFxKind(0));
+        assertEquals(7, view.recentFxKind(1));
+        assertEquals(1, view.recentFxParam(1));
     }
 }
