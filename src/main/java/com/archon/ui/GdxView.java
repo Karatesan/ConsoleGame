@@ -13,11 +13,8 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.MathUtils;
@@ -25,38 +22,34 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Windowed front end. Renders in WIN_W x WIN_H virtual space with 2x supersampled fonts,
  * 16x16 pixel-art sprites, dynamic tile lighting, fixed-array particles/VFX, live command
- * targeting telegraphs, and procedural synth audio (F1 sprites/classic, F2 audio mute).
+ * targeting telegraphs, and procedural synth audio (F2 mute, F3 music toggle).
  */
 public final class GdxView extends ApplicationAdapter implements View {
     public static final int WIN_W = 1140, WIN_H = 820;
     private static final int TILE = 64, MAP_X = 32, MAP_Y = 26, LINE_H = 22, MAX_FLOATERS = 16;
     private static final int INPUT_TOP = WIN_H - 48, INPUT_H = 34, SCROLLBAR_W = 8, JUMP_PILL_H = 22;
     private static final float SLIDE = 0.4f, GHOST_LIFE = 0.8f, FLOAT_LIFE = 1.6f, SCROLL_LINES = 1.0f;
-    private static final int MAX_PARTICLES = 192, MAX_FX = 16, MAX_ENT = 32;
+    private static final int MAX_PARTICLES = 192, MAX_FX = 16, MAX_ENT = 32, MAX_CRIT_QUEUE = 8;
     private static final int FX_BLOOD_BOLT = 1, FX_PSIONIC_SPIKE = 2, FX_PROJ = 3,
-            FX_FIREBALL = 4, FX_ELEM_BOLT = 5, FX_RING = 6, FX_CROSS = 7, FX_DRAIN = 8;
+            FX_FIREBALL = 4, FX_ELEM_BOLT = 5, FX_RING = 6, FX_CROSS = 7, FX_DRAIN = 8, FX_CRIT = 9;
     private static final int ELEM_FORCE = 0, ELEM_FIRE = 1, ELEM_WATER = 2,
             ELEM_ACID = 3, ELEM_OIL = 4, ELEM_BLOOD = 5, ELEM_ITEM = 6;
     private static final int[] CROSS_DX = {0, 0, 0, 1, -1}, CROSS_DY = {0, -1, 1, 0, 0};
+    private static final String[] NUMS = {
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+            "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"
+    };
 
     private static final Color BG = Color.valueOf("090B0E"), PANEL = Color.valueOf("11151C"),
-            BORDER = Color.valueOf("232B38"), FLOOR = Color.valueOf("131820"), FLOOR_ALT = Color.valueOf("151A23"),
-            WALL = Color.valueOf("1E2530"), WALL_BEVEL = Color.valueOf("2A3342"),
-            TOKEN_BG = Color.valueOf("10141B"), BAR_BG = Color.valueOf("0A0C10"),
-            OIL = Color.valueOf("1F1A12"), OIL_RIM = Color.valueOf("3D311E"), FIRE = Color.valueOf("F07148"),
-            EMBER = Color.valueOf("FACC15"), WATER_COL = Color.valueOf("1E4E79"), ICE_COL = Color.valueOf("7EC8E3"),
-            ACID_COL = Color.valueOf("5FA832"), TAR_COL = Color.valueOf("3B2F2F"),
+            BORDER = Color.valueOf("232B38"), BAR_BG = Color.valueOf("0A0C10"),
+            FIRE = Color.valueOf("F07148"), EMBER = Color.valueOf("FACC15"),
+            WATER_COL = Color.valueOf("1E4E79"), ICE_COL = Color.valueOf("7EC8E3"),
             STEAM_COL = Color.valueOf("C8D6E5"), SUPERHEATED_COL = Color.valueOf("F0B88A"),
             ACID_GLOW = Color.valueOf("A3E635"),
             MIST_COL = Color.valueOf("D97706"), STUN_COL = Color.valueOf("FACC15"),
@@ -98,7 +91,6 @@ public final class GdxView extends ApplicationAdapter implements View {
     private final SynthAudio audio = new SynthAudio();
     private float charW = 8f, fontH = 14f;
     private final FitViewport viewport = new FitViewport(WIN_W, WIN_H);
-    private boolean pixelMode = true;
 
     private Scene cur, prev;
     private int[] prevIdx = new int[0];
@@ -136,9 +128,14 @@ public final class GdxView extends ApplicationAdapter implements View {
 
     private final float[] hitFlash = new float[MAX_ENT],
             lungeX = new float[MAX_ENT], lungeY = new float[MAX_ENT], lungeAge = new float[MAX_ENT];
-    private float shakeTime, shakeMag, shakeX, shakeY;
+    private float shakeTime, shakeMaxTime = 0.28f, shakeMag, shakeX, shakeY, hitStop, critFlashTime;
     private final int[] targetX = new int[8], targetY = new int[8];
     private int vfxRng = 0x13572468, pipeElem = ELEM_FORCE;
+    private int thrallPose = PixelAtlas.POSE_IDLE, thrallFacing = 1, thrallCastElem = ELEM_FORCE;
+    private float thrallPoseAge, thrallPoseMax;
+    private final String[] critMsg = new String[MAX_CRIT_QUEUE];
+    private final int[] critTierQ = new int[MAX_CRIT_QUEUE], critElemQ = new int[MAX_CRIT_QUEUE];
+    private int critCount;
 
     private final StringBuilder input = new StringBuilder();
     private int cursor;
@@ -173,8 +170,11 @@ public final class GdxView extends ApplicationAdapter implements View {
         shapes = new ShapeRenderer();
         batch = new SpriteBatch();
         atlas = new PixelAtlas();
-        font = buildMonoFont(14, true);
-        badgeFont = buildMonoFont(10, false);
+        MonoFont primary = MonoFont.build(14);
+        font = primary.font;
+        charW = primary.charW;
+        fontH = primary.fontH;
+        badgeFont = MonoFont.build(10).font;
         audio.init();
 
         game = new Game(seed, magicArena);
@@ -189,24 +189,27 @@ public final class GdxView extends ApplicationAdapter implements View {
                 if (c == '\r' || c == '\n') submit();
                 else if (c == '\b' || (c >= 32 && c != 127)) {
                     editInputChar(c);
-                    audio.play(SynthAudio.KEY, 0.16f);
+                    playSfx(SynthAudio.KEY, 0.22f, 0.16f);
                 }
                 return true;
             }
 
             @Override
             public boolean keyDown(int key) {
-                if (key == Input.Keys.F1) pixelMode = !pixelMode;
-                if (key == Input.Keys.F2) audio.muted = !audio.muted;
-                if (key == Input.Keys.LEFT) moveCursor(-1);
-                if (key == Input.Keys.RIGHT) moveCursor(1);
-                if (key == Input.Keys.FORWARD_DEL) deleteForward();
-                if (key == Input.Keys.UP && historyPos > 0) recall(--historyPos);
-                if (key == Input.Keys.DOWN && historyPos < history.size()) recall(++historyPos);
-                if (key == Input.Keys.PAGE_UP) setLogScroll(logScroll + Math.max(1, logLines() - 1));
-                if (key == Input.Keys.PAGE_DOWN) setLogScroll(logScroll - Math.max(1, logLines() - 1));
-                if (key == Input.Keys.HOME) setLogScroll(maxScroll());
-                if (key == Input.Keys.END) setLogScroll(0f);
+                switch (key) {
+                    case Input.Keys.F2 -> audio.toggleMute();
+                    case Input.Keys.F3 -> audio.toggleMusic();
+                    case Input.Keys.LEFT -> moveCursor(-1);
+                    case Input.Keys.RIGHT -> moveCursor(1);
+                    case Input.Keys.FORWARD_DEL -> deleteForward();
+                    case Input.Keys.UP -> { if (historyPos > 0) recall(--historyPos); }
+                    case Input.Keys.DOWN -> { if (historyPos < history.size()) recall(++historyPos); }
+                    case Input.Keys.PAGE_UP -> setLogScroll(logScroll + Math.max(1, logLines() - 1));
+                    case Input.Keys.PAGE_DOWN -> setLogScroll(logScroll - Math.max(1, logLines() - 1));
+                    case Input.Keys.HOME -> setLogScroll(maxScroll());
+                    case Input.Keys.END -> setLogScroll(0f);
+                    default -> { return false; }
+                }
                 return true;
             }
 
@@ -262,84 +265,6 @@ public final class GdxView extends ApplicationAdapter implements View {
         });
     }
 
-    /** Rasterizes a 2x supersampled mipmapped monospace font (sharp on macOS Retina and 1x displays). */
-    private BitmapFont buildMonoFont(int sizePx, boolean primary) {
-        System.setProperty("java.awt.headless", "true");
-        int scale = 2;
-        int hiPx = sizePx * scale;
-        Font awtFont = new Font(Font.MONOSPACED, Font.PLAIN, hiPx);
-        for (String name : new String[]{"JetBrains Mono", "SF Mono", "Menlo", "Monaco", "Consolas"}) {
-            Font candidate = new Font(name, Font.PLAIN, hiPx);
-            if (!Font.DIALOG.equals(candidate.getFamily())) { awtFont = candidate; break; }
-        }
-        BufferedImage scratch = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g0 = scratch.createGraphics();
-        g0.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-        g0.setFont(awtFont);
-        FontMetrics fm = g0.getFontMetrics();
-        int hiCharW = Math.max(12, fm.charWidth('M'));
-        int ascent = fm.getAscent(), descent = fm.getDescent(), glyphH = ascent + descent;
-        int cellW = hiCharW + 6, cellH = glyphH + 6;
-        g0.dispose();
-        if (primary) {
-            charW = hiCharW / (float) scale;
-            fontH = glyphH / (float) scale;
-        }
-
-        int texW = 512, texH = 512, cols = texW / cellW;
-        BufferedImage img = new BufferedImage(texW, texH, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = img.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-        g.setFont(awtFont);
-        g.setColor(java.awt.Color.WHITE);
-
-        BitmapFont bf = new BitmapFont();
-        bf.setUseIntegerPositions(false);
-        TextureRegion reg = bf.getRegion();
-        for (int c = 32; c < 127; c++) {
-            int idx = c - 32, gx = (idx % cols) * cellW, gy = (idx / cols) * cellH;
-            g.drawString(String.valueOf((char) c), gx + 2, gy + 2 + ascent);
-            BitmapFont.Glyph glyph = bf.getData().getGlyph((char) c);
-            if (glyph != null) {
-                glyph.srcX = gx + 2;
-                glyph.srcY = gy + 2;
-                glyph.width = hiCharW;
-                glyph.height = glyphH;
-                glyph.xoffset = 0;
-                glyph.yoffset = -glyphH;
-                glyph.xadvance = hiCharW;
-            }
-        }
-        g.dispose();
-
-        Pixmap pm = new Pixmap(texW, texH, Pixmap.Format.RGBA8888);
-        int[] argb = img.getRGB(0, 0, texW, texH, null, 0, texW);
-        for (int y = 0; y < texH; y++) {
-            for (int x = 0; x < texW; x++) {
-                int p = argb[y * texW + x];
-                pm.drawPixel(x, y, (p << 8) | ((p >>> 24) & 0xFF));
-            }
-        }
-        Texture tex = new Texture(pm, true);
-        tex.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
-        pm.dispose();
-        reg.setTexture(tex);
-        for (int c = 32; c < 127; c++) {
-            BitmapFont.Glyph glyph = bf.getData().getGlyph((char) c);
-            if (glyph != null) {
-                bf.getData().setGlyphRegion(glyph, reg);
-                glyph.yoffset = -glyphH;
-            }
-        }
-        bf.getData().lineHeight = cellH;
-        bf.getData().capHeight = glyphH;
-        bf.getData().ascent = 0;
-        bf.getData().descent = -descent;
-        bf.getData().setScale(1f / scale);
-        return bf;
-    }
-
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
@@ -383,6 +308,38 @@ public final class GdxView extends ApplicationAdapter implements View {
         return fxParam[idx];
     }
 
+    int thrallFacing() { return thrallFacing; }
+
+    float shakeMag() { return shakeMag; }
+
+    float hitStopLeft() { return hitStop; }
+
+    float critFlashLeft() { return critFlashTime; }
+
+    String recentFloaterText(int back) {
+        int idx = ((nextFloater - 1 - back) % MAX_FLOATERS + MAX_FLOATERS) % MAX_FLOATERS;
+        return floatText[idx];
+    }
+
+    void stepAnim(float dt) {
+        anim += updateEffects(dt);
+    }
+
+    int thrallDrawSprite(int entFrame) {
+        if (cur.frozenEntity[0]) return PixelAtlas.THRALL_0;
+        if (cur.proneEntity[0]) return PixelAtlas.THRALL_0 + entFrame;
+        if (thrallPose != PixelAtlas.POSE_IDLE && thrallPoseAge < thrallPoseMax) {
+            int f = Math.min(3, (int) ((thrallPoseAge / thrallPoseMax) * 4f));
+            return PixelAtlas.thrallSprite(thrallPose, f);
+        }
+        if (prevIdx[0] >= 0 && cur.moved(0, prev) && anim < SLIDE) {
+            int f = Math.min(3, (int) ((anim / SLIDE) * 4f));
+            return PixelAtlas.thrallSprite(PixelAtlas.POSE_MOVE, f);
+        }
+        if (hitFlash[0] > 0) return PixelAtlas.THRALL_HURT;
+        return PixelAtlas.THRALL_0 + entFrame;
+    }
+
     void recall(int i) {
         input.setLength(0);
         if (i < history.size()) input.append(history.get(i));
@@ -400,7 +357,6 @@ public final class GdxView extends ApplicationAdapter implements View {
             Gdx.app.exit();
             return;
         }
-        audio.play(SynthAudio.SUBMIT, 0.35f);
         history.add(raw);
         historyPos = history.size();
         logScroll = 0f;
@@ -457,10 +413,13 @@ public final class GdxView extends ApplicationAdapter implements View {
             case GameEvent.Narrative e -> {
                 String text = e.text();
                 pipeElem = detectNarrativeElem(text, pipeElem);
-                if (text.contains("EXPLOD") || text.contains("detonat") || text.contains("shatter")) {
-                    shakeTime = Math.max(shakeTime, 0.28f);
-                    shakeMag = Math.max(shakeMag, 5f);
-                    audio.play(SynthAudio.BOOM, 0.70f);
+                latchCrit(text, pipeElem);
+                if (text.contains("shatter")) {
+                    triggerShake(0.22f, 4f);
+                    playSfx(SynthAudio.SHATTER, 0.68f, 0.14f);
+                } else if (text.contains("EXPLOD") || text.contains("detonat")) {
+                    triggerShake(0.28f, 5f);
+                    playSfx(SynthAudio.BOOM, 0.72f, 0.12f);
                 }
                 Color c = text.startsWith("CRITICAL") || (curGroup == G_PLAYER && (text.endsWith("!") || text.contains("crippled") || text.contains("blind")))
                         ? PROP : (text.contains(" misses ") ? MUTED : TEXT);
@@ -482,7 +441,7 @@ public final class GdxView extends ApplicationAdapter implements View {
             }
             case GameEvent.Rejected e -> {
                 openStage = null;
-                audio.play(SynthAudio.REJECT, 0.45f);
+                playSfx(SynthAudio.REJECT, 0.42f, 0.08f);
                 if (curBlock == 0) curBlock = nextBlock++;
                 String msg = e.reason() + (e.hint() == null ? "" : " (" + e.hint() + ")");
                 addRow(K_ALERT, G_PLAYER, "  " + msg, CREATURE, "REJECT | " + e.code().name(), CREATURE);
@@ -495,7 +454,7 @@ public final class GdxView extends ApplicationAdapter implements View {
             case GameEvent.StageResult e -> {
                 ap = e.apLeft();
                 if (e.code() == ExitCode.INVALID || e.code() == ExitCode.BLOCKED) {
-                    audio.play(SynthAudio.REJECT, 0.45f);
+                    playSfx(SynthAudio.REJECT, 0.42f, 0.08f);
                 } else {
                     triggerStageVfx(e.render());
                 }
@@ -533,16 +492,15 @@ public final class GdxView extends ApplicationAdapter implements View {
             case GameEvent.LineBroke e -> {
                 ap = e.apLeft();
                 openStage = null;
-                audio.play(SynthAudio.REJECT, 0.45f);
+                playSfx(SynthAudio.REJECT, 0.42f, 0.08f);
                 addRow(K_ALERT, G_PLAYER, "  " + e.reason(), CREATURE, "BREAK | -" + e.forfeited() + " AP", CREATURE);
             }
             case GameEvent.InterruptFired e -> {
                 openStage = null;
-                audio.play(SynthAudio.SHOOT, 0.65f);
+                playSfxAt(SynthAudio.SHOOT, 0.62f, 0.12f, cur != null ? cur.x[0] + 0.5f : 0f);
                 if (cur != null) {
                     spawnFx(FX_RING, cur.x[0] + 0.5f, cur.y[0] + 0.5f, 1.1f, 0f, 0.3f, CREATURE);
-                    shakeTime = Math.max(shakeTime, 0.18f);
-                    shakeMag = Math.max(shakeMag, 3f);
+                    triggerShake(0.18f, 3f);
                 }
                 addRow(K_ALERT, G_ENV, "  " + e.source() + ": " + e.description(), PROP, "REACT | -" + e.damage() + " HP", PROP);
             }
@@ -557,6 +515,10 @@ public final class GdxView extends ApplicationAdapter implements View {
                 curGroup = G_HOSTILE;
                 curBlock = nextBlock++;
                 triggerActorBeatVfx(e);
+                for (int i = 0; i < e.lines().size(); i++) {
+                    String l = e.lines().get(i);
+                    latchCrit(l, detectNarrativeElem(l, ELEM_FORCE));
+                }
                 String move = e.from().equals(e.to()) ? "holds @" + e.to() : e.from() + " -> " + e.to();
                 if (e.lines().isEmpty()) {
                     addRow(K_ACTOR, G_HOSTILE, "  " + e.name(), TEXT, move, MUTED);
@@ -577,18 +539,21 @@ public final class GdxView extends ApplicationAdapter implements View {
                     spawnFx(FX_RING, p.x() + 0.5f, p.y() + 0.5f, 1.0f, 0f, 0.35f, FIRE);
                     spawnBurst(p.x() + 0.5f, p.y() + 0.5f, 12, FIRE, -1.0f);
                 }
-                boolean exploded = false;
+                boolean exploded = false, shattered = false;
                 for (int i = 0; i < e.lines().size(); i++) {
                     String l = e.lines().get(i);
-                    if (l.contains("detonate") || l.contains("explode") || l.contains("shatter")) exploded = true;
+                    if (l.contains("shatter")) shattered = true;
+                    else if (l.contains("detonate") || l.contains("explode")) exploded = true;
                     addRow(K_ALERT, G_ENV, "  " + l, FIRE, "HAZARD", FIRE);
                 }
-                if (exploded) {
-                    shakeTime = Math.max(shakeTime, 0.28f);
-                    shakeMag = Math.max(shakeMag, 5f);
-                    audio.play(SynthAudio.BOOM, 0.70f);
+                if (shattered) {
+                    triggerShake(0.22f, 4f);
+                    playSfx(SynthAudio.SHATTER, 0.68f, 0.14f);
+                } else if (exploded) {
+                    triggerShake(0.28f, 5f);
+                    playSfx(SynthAudio.BOOM, 0.72f, 0.12f);
                 } else if (!ignited.isEmpty()) {
-                    audio.play(SynthAudio.BOOM, 0.40f);
+                    playSfxAt(SynthAudio.FIRE, 0.54f, 0.14f, ignited.get(0).x() + 0.5f);
                 }
             }
             case GameEvent.Thinking e -> thinking = e.dots();
@@ -597,14 +562,16 @@ public final class GdxView extends ApplicationAdapter implements View {
                 actingId = "";
                 curGroup = G_NONE;
                 curBlock = 0;
+                critCount = 0;
                 openStage = null;
                 round = e.round();
                 ap = e.ap();
+                if (e.round() > 1) playSfx(SynthAudio.SUBMIT, 0.22f, 0.02f);
                 addRow(K_ROUND, G_NONE, "ROUND " + e.round(), THRALL, e.ap() + " AP READY", THRALL);
             }
             case GameEvent.ThrallDied e -> {
                 curBlock = 0;
-                audio.play(SynthAudio.BOOM, 0.80f);
+                playSfx(SynthAudio.BOOM, 0.78f, 0.06f);
                 addRow(K_ALERT, G_NONE, "THE THRALL COLLAPSES. THE LINK GOES DARK.", CREATURE, "FATAL", CREATURE);
             }
             default -> { }
@@ -711,6 +678,76 @@ public final class GdxView extends ApplicationAdapter implements View {
         pipeElem = ELEM_FORCE;
     }
 
+    private void latchCrit(String text, int elem) {
+        if (text == null || !text.startsWith("CRITICAL") || critCount >= MAX_CRIT_QUEUE) return;
+        int tier = text.startsWith("CRITICAL T3!") ? 3 : text.startsWith("CRITICAL T2!") ? 2 : 1;
+        critMsg[critCount] = text;
+        critTierQ[critCount] = tier;
+        critElemQ[critCount] = elem;
+        critCount++;
+    }
+
+    private int consumeCritFor(String name) {
+        for (int k = 0; k < critCount; k++) {
+            if (critMsg[k] != null && name != null && critMsg[k].contains(name)) {
+                critMsg[k] = null;
+                return k;
+            }
+        }
+        return -1;
+    }
+
+    private void triggerShake(float dur, float mag) {
+        if (dur > shakeTime) {
+            shakeTime = dur;
+            shakeMaxTime = dur;
+        }
+        shakeMag = Math.max(shakeMag, mag);
+    }
+
+    private void triggerCritImpact(int entIdx, int tier, int elem, int delta, int floaterSlot) {
+        float dur = tier >= 3 ? 0.42f : tier == 2 ? 0.36f : 0.30f;
+        float mag = tier >= 3 ? 10f : tier == 2 ? 8f : 6.5f;
+        triggerShake(dur, mag);
+        hitStop = Math.max(hitStop, 0.05f + 0.015f * tier);
+        critFlashTime = Math.max(critFlashTime, 0.14f);
+
+        float cx = cur.x[entIdx] + 0.5f, cy = cur.y[entIdx] + 0.5f;
+        Color cc = elem == ELEM_FORCE ? EMBER : elemColor(elem);
+        spawnFx(FX_CRIT, cx, cy, cx, cy, 0.42f + 0.05f * tier, cc, (tier << 4) | elem);
+        spawnFx(FX_RING, cx, cy, 1.5f + 0.3f * tier, 0f, 0.36f, EMBER, elem);
+        spawnFx(FX_RING, cx, cy, 0.9f + 0.2f * tier, 0f, 0.24f, Color.WHITE, elem);
+        spawnBurst(cx, cy, 16 + tier * 6, EMBER, -0.7f);
+        if (elem != ELEM_FORCE) spawnBurst(cx, cy, 10 + tier * 4, cc, -0.5f);
+        if (floaterSlot >= 0) {
+            floatText[floaterSlot] = (tier > 1 ? "CRIT T" + tier + "! " : "CRIT! ") + delta;
+        }
+        playSfxAt(SynthAudio.CRIT, 0.75f, 0.08f, cx);
+        if (elem == ELEM_FIRE) playSfxAt(SynthAudio.FIRE, 0.55f, 0.12f, cx);
+        else if (elem == ELEM_ACID) playSfxAt(SynthAudio.SIZZLE, 0.50f, 0.12f, cx);
+        else if (tier >= 2 && elem != ELEM_FORCE) playSfxAt(SynthAudio.BOOM, 0.50f, 0.10f, cx);
+    }
+
+    private void playSfx(int kind, float vol, float jitter) {
+        audio.play(kind, vol, 1f + (nextRand01() - 0.5f) * jitter, 0f);
+    }
+
+    private void playSfxAt(int kind, float vol, float jitter, float tx) {
+        float pan = cur == null ? 0f : MathUtils.clamp((tx / Math.max(1f, cur.w) - 0.5f) * 1.15f, -0.6f, 0.6f);
+        audio.play(kind, vol, 1f + (nextRand01() - 0.5f) * jitter, pan);
+    }
+
+    private void setThrallPose(int pose, float dur, int targetTileX, boolean hasTarget, int elem) {
+        thrallPose = pose;
+        thrallPoseAge = 0f;
+        thrallPoseMax = dur;
+        thrallCastElem = elem;
+        if (hasTarget && cur != null) {
+            int dx = targetTileX - cur.x[0];
+            if (dx != 0) thrallFacing = dx > 0 ? 1 : -1;
+        }
+    }
+
     private void triggerInvocationVfx(String cmd) {
         int nTargets = findTargets(cmd, cur, targetX, targetY, targetX.length);
         float sx = cur.x[0] + 0.5f, sy = cur.y[0] + 0.5f;
@@ -723,28 +760,31 @@ public final class GdxView extends ApplicationAdapter implements View {
         pipeElem = elem;
         switch (verb) {
             case "bolt" -> {
+                setThrallPose(PixelAtlas.POSE_CAST, 0.66f, ex, nTargets > 0, elem);
                 if (elem == ELEM_FIRE) {
                     if (nTargets > 0) spawnFx(FX_FIREBALL, sx, sy, tx, ty, 0.34f, FIRE, ELEM_FIRE);
                     spawnBurst(tx, ty, 20, EMBER, -0.9f);
-                    audio.play(SynthAudio.BOOM, 0.40f);
-                    audio.play(SynthAudio.ZAP, 0.45f);
+                    playSfxAt(SynthAudio.FIRE, 0.68f, 0.14f, tx);
                 } else if (elem == ELEM_BLOOD) {
                     if (nTargets > 0) spawnFx(FX_BLOOD_BOLT, sx, sy, tx, ty, 0.36f, BLOOD_BRIGHT, ELEM_BLOOD);
                     spawnBurst(tx, ty, 18, BLOOD_BRIGHT, -0.4f);
                     spawnBurst(sx, sy, 8, BLOOD_DEEP, -0.6f);
-                    audio.play(SynthAudio.ZAP, 0.60f);
+                    playSfxAt(SynthAudio.ZAP, 0.58f, 0.12f, tx);
                 } else if (elem == ELEM_ACID || elem == ELEM_WATER || elem == ELEM_OIL || elem == ELEM_ITEM) {
                     Color ec = elemColor(elem);
                     if (nTargets > 0) spawnFx(FX_ELEM_BOLT, sx, sy, tx, ty, 0.32f, ec, elem);
                     spawnBurst(tx, ty, 14, ec, -0.5f);
-                    audio.play(elem == ELEM_ITEM ? SynthAudio.SHOOT : SynthAudio.SPLASH, 0.60f);
+                    int sfx = elem == ELEM_ITEM ? SynthAudio.SHOOT
+                            : elem == ELEM_ACID ? SynthAudio.SIZZLE : SynthAudio.SPLASH;
+                    playSfxAt(sfx, 0.58f, 0.14f, tx);
                 } else {
                     if (nTargets > 0) spawnFx(FX_PSIONIC_SPIKE, sx, sy, tx, ty, 0.36f, BOLT_COL, ELEM_FORCE);
                     spawnBurst(tx, ty, 14, Color.WHITE, -0.5f);
-                    audio.play(SynthAudio.ZAP, 0.60f);
+                    playSfxAt(SynthAudio.ZAP, 0.58f, 0.12f, tx);
                 }
             }
             case "blast" -> {
+                setThrallPose(PixelAtlas.POSE_CAST, 0.68f, ex, nTargets > 0, elem);
                 Color ec = elemColor(elem);
                 spawnFx(FX_CROSS, tx, ty, tx, ty, 0.48f, ec, elem);
                 spawnFx(FX_RING, tx, ty, 2.2f, 0f, 0.45f, ec, elem);
@@ -753,28 +793,33 @@ public final class GdxView extends ApplicationAdapter implements View {
                     spawnCrossBurst(ex, ey, 6, BLOOD_BRIGHT, -0.4f);
                 } else if (elem == ELEM_FIRE) {
                     spawnCrossBurst(ex, ey, 6, EMBER, -0.9f);
+                    playSfxAt(SynthAudio.FIRE, 0.60f, 0.12f, tx);
                 } else {
                     spawnCrossBurst(ex, ey, 5, ec, -0.6f);
+                    if (elem == ELEM_ACID) playSfxAt(SynthAudio.SIZZLE, 0.54f, 0.12f, tx);
+                    else if (elem == ELEM_WATER || elem == ELEM_OIL) playSfxAt(SynthAudio.SPLASH, 0.54f, 0.12f, tx);
                 }
-                shakeTime = Math.max(shakeTime, 0.24f);
-                shakeMag = Math.max(shakeMag, 4f);
-                audio.play(SynthAudio.BOOM, 0.65f);
+                triggerShake(0.24f, 4f);
+                playSfxAt(SynthAudio.BOOM, 0.68f, 0.12f, tx);
             }
             case "push", "pull" -> {
+                setThrallPose(PixelAtlas.POSE_CAST, 0.56f, ex, nTargets > 0, elem);
                 if (nTargets > 0) {
                     spawnFx(FX_RING, tx, ty, 1.4f, 0f, 0.35f, THRALL, elem);
                     spawnFx(FX_PROJ, verb.equals("push") ? sx : tx, verb.equals("push") ? sy : ty,
                             verb.equals("push") ? tx : sx, verb.equals("push") ? ty : sy, 0.22f, THRALL, elem);
                 }
-                audio.play(SynthAudio.ZAP, 0.42f);
+                playSfxAt(SynthAudio.PSIONIC, 0.52f, 0.14f, tx);
             }
             case "throw", "shoot" -> {
+                setThrallPose(PixelAtlas.POSE_ATTACK, 0.36f, ex, nTargets > 0, elem);
                 Color pc = cmd.contains("acid") ? ACID_GLOW : cmd.contains("water") ? ICE_COL
                         : cmd.contains("oil") ? MIST_COL : PROP;
                 if (nTargets > 0) spawnFx(FX_PROJ, sx, sy, tx, ty, 0.28f, pc, elem);
-                audio.play(SynthAudio.SHOOT, 0.55f);
+                playSfxAt(SynthAudio.SHOOT, 0.56f, 0.14f, tx);
             }
             case "siphon" -> {
+                setThrallPose(PixelAtlas.POSE_CAST, 0.64f, ex, nTargets > 0, elem);
                 Color sc = elem == ELEM_FORCE ? THRALL : elemColor(elem);
                 if (elem == ELEM_BLOOD) {
                     if (nTargets > 0) spawnFx(FX_DRAIN, tx, ty, sx, sy, 0.42f, BLOOD_BRIGHT, elem);
@@ -784,37 +829,49 @@ public final class GdxView extends ApplicationAdapter implements View {
                     spawnFx(FX_DRAIN, tx, ty, sx, sy, 0.34f, sc, elem);
                     spawnBurst(tx, ty, 10, sc, -0.5f);
                 }
-                audio.play(SynthAudio.SPLASH, 0.55f);
+                int sfx = elem == ELEM_FIRE ? SynthAudio.FIRE
+                        : elem == ELEM_ACID ? SynthAudio.SIZZLE
+                        : (elem == ELEM_WATER || elem == ELEM_OIL) ? SynthAudio.SPLASH : SynthAudio.PSIONIC;
+                playSfxAt(sfx, 0.52f, 0.14f, tx);
             }
             case "pour" -> {
+                setThrallPose(PixelAtlas.POSE_ATTACK, 0.32f, ex, nTargets > 0, elem);
                 Color pc = elem == ELEM_FORCE ? WATER_COL : elemColor(elem);
                 if (nTargets > 0) spawnFx(FX_PROJ, sx, sy, tx, ty, 0.25f, pc, elem);
-                audio.play(SynthAudio.SPLASH, 0.55f);
+                playSfxAt(elem == ELEM_ACID ? SynthAudio.SIZZLE : SynthAudio.SPLASH, 0.56f, 0.14f, tx);
             }
             case "ignite" -> {
+                setThrallPose(PixelAtlas.POSE_CAST, 0.60f, ex, nTargets > 0, ELEM_FIRE);
                 spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, FIRE, ELEM_FIRE);
                 spawnBurst(tx, ty, 16, FIRE, -1.0f);
-                audio.play(SynthAudio.BOOM, 0.42f);
+                playSfxAt(SynthAudio.FIRE, 0.62f, 0.16f, tx);
             }
             case "strike" -> {
+                setThrallPose(PixelAtlas.POSE_ATTACK, 0.36f, ex, nTargets > 0, elem);
                 if (nTargets > 0) {
                     lungeX[0] = (tx - sx) * 0.45f;
                     lungeY[0] = (ty - sy) * 0.45f;
                     lungeAge[0] = 0.22f;
                     spawnBurst(tx, ty, 8, TEXT, -0.3f);
                 }
+                playSfxAt(SynthAudio.SWING, 0.45f, 0.16f, tx);
             }
             case "channel" -> {
+                setThrallPose(PixelAtlas.POSE_CAST, 0.64f, ex, false, elem);
                 if (elem == ELEM_BLOOD) {
                     spawnFx(FX_RING, sx, sy, 1.4f, 0f, 0.40f, BLOOD_BRIGHT, elem);
                     spawnBurst(sx, sy, 18, BLOOD_BRIGHT, -0.9f);
-                    audio.play(SynthAudio.ZAP, 0.45f);
                 } else {
                     Color cc = elem == ELEM_FORCE ? BOLT_COL : elemColor(elem);
                     spawnFx(FX_RING, sx, sy, 1.1f, 0f, 0.35f, cc, elem);
-                    audio.play(SynthAudio.ZAP, 0.35f);
                 }
+                playSfxAt(elem == ELEM_FIRE ? SynthAudio.FIRE : SynthAudio.PSIONIC, 0.48f, 0.12f, sx);
             }
+            case "guard" -> {
+                setThrallPose(PixelAtlas.POSE_GUARD, 0.45f, ex, false, elem);
+                playSfxAt(SynthAudio.STEP, 0.30f, 0.14f, sx);
+            }
+            case "nock", "take", "drop", "wield" -> playSfxAt(SynthAudio.STEP, 0.28f, 0.16f, sx);
             default -> { }
         }
     }
@@ -835,11 +892,12 @@ public final class GdxView extends ApplicationAdapter implements View {
         float tx = cur.x[0] + 0.5f, ty = cur.y[0] + 0.5f;
         if (ranged) {
             spawnFx(FX_PROJ, ax, ay, tx, ty, 0.28f, PROP);
-            audio.play(SynthAudio.SHOOT, 0.55f);
+            playSfxAt(SynthAudio.SHOOT, 0.52f, 0.14f, ax);
         } else if (Math.abs(e.to().x() - cur.x[0]) <= 1 && Math.abs(e.to().y() - cur.y[0]) <= 1) {
             lungeX[ai] = (tx - ax) * 0.45f;
             lungeY[ai] = (ty - ay) * 0.45f;
             lungeAge[ai] = 0.22f;
+            playSfxAt(SynthAudio.SWING, 0.40f, 0.16f, ax);
         }
     }
 
@@ -860,43 +918,103 @@ public final class GdxView extends ApplicationAdapter implements View {
         cur = s;
         hp = s.hp[0];
         maxHp = s.maxHp[0];
+        audio.setCombat(hasVisibleEnemy(s));
         anim = 0;
         prevIdx = new int[s.n];
+        int firstDamagedIdx = -1, firstDamagedDelta = 0, firstDamagedSlot = -1;
         for (int i = 0; i < s.n; i++) {
             prevIdx[i] = p == null ? -1 : p.indexOf(s.id[i]);
+            if (i == 0 && prevIdx[0] >= 0 && s.moved(0, p)) {
+                int dx = s.x[0] - p.x[prevIdx[0]];
+                if (dx != 0) thrallFacing = dx > 0 ? 1 : -1;
+                playSfxAt(SynthAudio.STEP, 0.36f, 0.18f, s.x[0] + 0.5f);
+            }
             int delta = p == null ? 0 : s.hpDelta(i, p);
             if (delta != 0) {
-                floatX[nextFloater] = s.x[i];
-                floatY[nextFloater] = s.y[i];
-                floatText[nextFloater] = (delta > 0 ? "+" : "") + delta;
-                floatAge[nextFloater] = 0;
-                nextFloater = (nextFloater + 1) % MAX_FLOATERS;
+                int slot = nextFloater;
+                floatX[slot] = s.x[i];
+                floatY[slot] = s.y[i];
+                floatText[slot] = (delta > 0 ? "+" : "") + delta;
+                floatAge[slot] = 0;
+                nextFloater = (slot + 1) % MAX_FLOATERS;
                 if (delta < 0 && p != null) {
+                    if (firstDamagedIdx < 0) {
+                        firstDamagedIdx = i;
+                        firstDamagedDelta = delta;
+                        firstDamagedSlot = slot;
+                    }
                     if (i < MAX_ENT) hitFlash[i] = 0.28f;
                     Color bloodOrSpark = s.kind[i] == Entity.Kind.CREATURE ? BLEED_COL : PROP;
                     spawnBurst(s.x[i] + 0.5f, s.y[i] + 0.5f, 14, bloodOrSpark, -0.4f);
-                    shakeTime = Math.max(shakeTime, 0.16f);
-                    shakeMag = Math.max(shakeMag, -delta >= 10 ? 5f : 2.5f);
-                    audio.play(SynthAudio.HIT, 0.65f);
+                    int critSlot = consumeCritFor(s.name[i]);
+                    if (critSlot >= 0) {
+                        triggerCritImpact(i, critTierQ[critSlot], critElemQ[critSlot], delta, slot);
+                    } else {
+                        triggerShake(0.16f, -delta >= 10 ? 5f : 2.5f);
+                        playSfxAt(SynthAudio.HIT, 0.64f, 0.16f, s.x[i] + 0.5f);
+                    }
                 } else if (delta > 0 && p != null) {
                     spawnBurst(s.x[i] + 0.5f, s.y[i] + 0.5f, 10, SAGE, -0.7f);
+                    playSfxAt(SynthAudio.HEAL, 0.45f, 0.08f, s.x[i] + 0.5f);
                 }
             }
         }
         if (p != null) {
+            if (firstDamagedIdx >= 0) {
+                for (int k = 0; k < critCount; k++) {
+                    if (critMsg[k] != null) {
+                        triggerCritImpact(firstDamagedIdx, critTierQ[k], critElemQ[k], firstDamagedDelta, firstDamagedSlot);
+                        break;
+                    }
+                }
+            }
+            critCount = 0;
+            boolean newSteam = false, newFire = false;
+            float steamX = 0f, fireX = 0f;
             for (int ty = 0; ty < s.h; ty++) {
                 for (int tx = 0; tx < s.w; tx++) {
                     int t = ty * s.w + tx;
                     if (s.newlyBurning(tx, ty, p)) {
                         spawnBurst(tx + 0.5f, ty + 0.5f, 16, FIRE, -1.1f);
+                        if (!newFire) { newFire = true; fireX = tx + 0.5f; }
                     }
                     if ((s.steam[t] && !p.steam[t]) || (s.superheatedSteam[t] && !p.superheatedSteam[t]) || (s.oilMist[t] && !p.oilMist[t])) {
                         Color gc = s.superheatedSteam[t] ? SUPERHEATED_COL : s.oilMist[t] ? MIST_COL : STEAM_COL;
                         spawnBurst(tx + 0.5f, ty + 0.5f, 8, gc, -0.4f);
+                        if (!newSteam) { newSteam = true; steamX = tx + 0.5f; }
                     }
                 }
             }
+            if (newSteam) playSfxAt(SynthAudio.SIZZLE, 0.40f, 0.14f, steamX);
+            else if (newFire) playSfxAt(SynthAudio.FIRE, 0.38f, 0.16f, fireX);
         }
+    }
+
+    static boolean hasVisibleEnemy(Scene s) {
+        if (s == null || s.hp[0] <= 0) return false;
+        int ox = s.x[0], oy = s.y[0];
+        for (int i = 1; i < s.n; i++) {
+            if (s.kind[i] == Entity.Kind.CREATURE && s.hp[i] > 0 && hasLineOfSight(s, ox, oy, s.x[i], s.y[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasLineOfSight(Scene s, int ax, int ay, int bx, int by) {
+        int dx = Math.abs(bx - ax), dy = Math.abs(by - ay);
+        int sx = ax < bx ? 1 : -1, sy = ay < by ? 1 : -1;
+        int err = dx - dy, x = ax, y = ay;
+        while (x != bx || y != by) {
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x += sx; }
+            if (e2 < dx) { err += dx; y += sy; }
+            if (x == bx && y == by) break;
+            if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
+            int t = y * s.w + x;
+            if (s.wall[t] || s.steam[t] || s.oilMist[t]) return false;
+        }
+        return true;
     }
 
     // ---- VFX & particle helpers ----
@@ -947,25 +1065,11 @@ public final class GdxView extends ApplicationAdapter implements View {
         nextFx = (nextFx + 1) % MAX_FX;
     }
 
-    private void updateEffects(float dt) {
-        for (int i = 0; i < MAX_FLOATERS; i++) floatAge[i] += dt;
-        for (int i = 0; i < MAX_ENT; i++) {
-            if (hitFlash[i] > 0) hitFlash[i] = Math.max(0f, hitFlash[i] - dt);
-            if (lungeAge[i] > 0) lungeAge[i] = Math.max(0f, lungeAge[i] - dt);
-        }
-        for (int i = 0; i < MAX_PARTICLES; i++) {
-            if (partAge[i] < partMaxAge[i]) {
-                partAge[i] += dt;
-                partX[i] += partVX[i] * dt;
-                partY[i] += partVY[i] * dt;
-            }
-        }
-        for (int i = 0; i < MAX_FX; i++) {
-            if (fxAge[i] < fxMaxAge[i]) fxAge[i] += dt;
-        }
+    private float updateEffects(float dt) {
+        if (critFlashTime > 0) critFlashTime = Math.max(0f, critFlashTime - dt);
         if (shakeTime > 0) {
             shakeTime = Math.max(0f, shakeTime - dt);
-            float mag = shakeMag * (shakeTime / 0.28f);
+            float mag = shakeMag * (shakeTime / Math.max(0.01f, shakeMaxTime));
             shakeX = MathUtils.sin(time * 95f) * mag;
             shakeY = MathUtils.cos(time * 113f) * mag;
         } else {
@@ -974,11 +1078,40 @@ public final class GdxView extends ApplicationAdapter implements View {
             shakeMag = 0f;
         }
 
-        ambientTimer += dt;
+        float simDt = dt;
+        if (hitStop > 0) {
+            float used = Math.min(hitStop, dt);
+            hitStop -= used;
+            simDt = dt - used;
+        }
+        if (simDt <= 0f) return 0f;
+
+        for (int i = 0; i < MAX_FLOATERS; i++) floatAge[i] += simDt;
+        for (int i = 0; i < MAX_ENT; i++) {
+            if (hitFlash[i] > 0) hitFlash[i] = Math.max(0f, hitFlash[i] - simDt);
+            if (lungeAge[i] > 0) lungeAge[i] = Math.max(0f, lungeAge[i] - simDt);
+        }
+        if (thrallPose != PixelAtlas.POSE_IDLE) {
+            thrallPoseAge += simDt;
+            if (thrallPoseAge >= thrallPoseMax) thrallPose = PixelAtlas.POSE_IDLE;
+        }
+        for (int i = 0; i < MAX_PARTICLES; i++) {
+            if (partAge[i] < partMaxAge[i]) {
+                partAge[i] += simDt;
+                partX[i] += partVX[i] * simDt;
+                partY[i] += partVY[i] * simDt;
+            }
+        }
+        for (int i = 0; i < MAX_FX; i++) {
+            if (fxAge[i] < fxMaxAge[i]) fxAge[i] += simDt;
+        }
+
+        ambientTimer += simDt;
         if (ambientTimer >= 0.09f && cur != null) {
             ambientTimer = 0f;
             emitAmbientParticles();
         }
+        return simDt;
     }
 
     private void emitAmbientParticles() {
@@ -1020,9 +1153,9 @@ public final class GdxView extends ApplicationAdapter implements View {
     public void render() {
         float dt = Gdx.graphics.getDeltaTime();
         time += dt;
-        anim += dt;
         blinkTime += dt;
-        updateEffects(dt);
+        anim += updateEffects(dt);
+        audio.updateMusic(dt);
 
         presenter.update(dt);
         if (dirty && !presenter.busy()) {
@@ -1040,12 +1173,9 @@ public final class GdxView extends ApplicationAdapter implements View {
         viewport.apply();
         shapes.setProjectionMatrix(viewport.getCamera().combined);
         batch.setProjectionMatrix(viewport.getCamera().combined);
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
         drawPanelShapes();
-        if (pixelMode) drawSpriteScene();
-        else drawClassicMapShapes();
+        drawSpriteScene();
         drawLineOverlays();
         drawText();
     }
@@ -1137,8 +1267,8 @@ public final class GdxView extends ApplicationAdapter implements View {
         return frac * maxScroll;
     }
 
-    /** Zero-allocation parser extracting live target tile coordinates from a partial/full command string. */
-    static int findTargets(String cmd, Scene s, int[] outX, int[] outY, int max) {
+    /** Zero-allocation parser extracting live target tile coordinates from a partial/full command. */
+    static int findTargets(CharSequence cmd, Scene s, int[] outX, int[] outY, int max) {
         if (cmd == null || s == null || max <= 0) return 0;
         int len = cmd.length(), found = 0, i = 0;
         while (i < len && found < max) {
@@ -1192,7 +1322,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         return c <= ' ' || c == '|' || c == ';' || c == '&';
     }
 
-    private static int parseNonNegInt(String s, int from, int to) {
+    private static int parseNonNegInt(CharSequence s, int from, int to) {
         int v = 0;
         for (int i = from; i < to; i++) {
             char c = s.charAt(i);
@@ -1203,15 +1333,27 @@ public final class GdxView extends ApplicationAdapter implements View {
         return v;
     }
 
-    private static int matchEntityId(String cmd, int from, int to, Scene s) {
+    private static int matchEntityId(CharSequence cmd, int from, int to, Scene s) {
         int len = to - from;
         if (len <= 0) return -1;
         for (int i = 0; i < s.n; i++) {
             if (s.hp[i] <= 0) continue;
             String eid = s.id[i];
-            if (eid.length() == len && cmd.regionMatches(true, from, eid, 0, len)) return i;
+            if (eid.length() == len && equalsIgnoreCaseRange(cmd, from, eid)) return i;
         }
         return -1;
+    }
+
+    private static boolean equalsIgnoreCaseRange(CharSequence a, int from, String b) {
+        for (int i = 0; i < b.length(); i++) {
+            char ca = a.charAt(from + i), cb = b.charAt(i);
+            if (ca != cb && Character.toLowerCase(ca) != Character.toLowerCase(cb)) return false;
+        }
+        return true;
+    }
+
+    private static String numStr(int v) {
+        return v >= 0 && v < NUMS.length ? NUMS[v] : Integer.toString(v);
     }
 
     private static String firstWord(String cmd) {
@@ -1257,12 +1399,6 @@ public final class GdxView extends ApplicationAdapter implements View {
             base += lungeY[i] * MathUtils.sin((lungeAge[i] / 0.22f) * MathUtils.PI);
         }
         return base;
-    }
-
-    private static void drawToken(ShapeRenderer sr, Entity.Kind kind, float px, float py) {
-        if (kind == Entity.Kind.DOOR) sr.rect(px + 4, py + 14, TILE - 8, TILE - 28);
-        else if (kind == Entity.Kind.PROP) sr.rect(px + 9, py + 11, TILE - 18, TILE - 20);
-        else sr.rect(px + 6, py + 10, TILE - 12, TILE - 16);
     }
 
     private float rowMidY(int j) {
@@ -1377,13 +1513,14 @@ public final class GdxView extends ApplicationAdapter implements View {
     }
 
     private void drawSpriteScene() {
-        int animFrame = ((int) (time * 2.5f)) % 2;
+        int animFrame = ((int) (time * 5.0f)) & 3;
         batch.begin();
 
         // 1. Dungeon tiles, liquids, loot, gas, fire, dynamic lighting
         for (int y = 0; y < cur.h; y++) {
             for (int x = 0; x < cur.w; x++) {
                 int t = y * cur.w + x;
+                int tileFrame = (animFrame + x * 3 + y * 5) & 3;
                 float sx = mapScreenX(x), sy = mapScreenY(y);
                 float lum = cur.light[t];
                 if (lum > 0.42f) lum *= 0.95f + 0.05f * MathUtils.sin(time * 9f + x * 1.7f + y * 2.3f);
@@ -1395,82 +1532,89 @@ public final class GdxView extends ApplicationAdapter implements View {
                     batch.draw(atlas.regions[front ? PixelAtlas.WALL_FRONT : PixelAtlas.WALL_TOP], sx, sy, TILE, TILE);
                 } else {
                     batch.draw(atlas.regions[(x + y) % 2 == 0 ? PixelAtlas.FLOOR_0 : PixelAtlas.FLOOR_1], sx, sy, TILE, TILE);
+                    if (y > 0 && cur.wall[(y - 1) * cur.w + x]) {
+                        batch.setColor(0f, 0f, 0f, 0.28f);
+                        batch.draw(atlas.white, sx, sy + TILE - 12, TILE, 12);
+                        batch.setColor(0f, 0f, 0f, 0.12f);
+                        batch.draw(atlas.white, sx, sy + TILE - 20, TILE, 8);
+                        batch.setColor(r, g, b, 1f);
+                    }
                     if (cur.ice[t]) {
                         batch.draw(atlas.regions[PixelAtlas.ICE_TILE], sx, sy, TILE, TILE);
-                        if (cur.tar[t]) batch.draw(atlas.regions[PixelAtlas.TAR_TILE], sx + 9, sy + 9, TILE - 18, TILE - 18);
-                        else if (cur.acid[t]) batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], sx + 9, sy + 9, TILE - 18, TILE - 18);
-                        else if (cur.oil[t]) batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], sx + 9, sy + 9, TILE - 18, TILE - 18);
+                        if (cur.tar[t]) batch.draw(atlas.regions[PixelAtlas.TAR_TILE], sx + 8, sy + 8, 48, 48);
+                        else if (cur.acid[t]) batch.draw(atlas.regions[PixelAtlas.ACID_0 + tileFrame], sx + 8, sy + 8, 48, 48);
+                        else if (cur.oil[t]) batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], sx + 8, sy + 8, 48, 48);
                     } else if (cur.tar[t]) {
                         batch.draw(atlas.regions[PixelAtlas.TAR_TILE], sx, sy, TILE, TILE);
                     } else if (cur.acid[t]) {
-                        batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], sx, sy, TILE, TILE);
+                        batch.draw(atlas.regions[PixelAtlas.ACID_0 + tileFrame], sx, sy, TILE, TILE);
                     } else if (cur.water[t]) {
-                        batch.draw(atlas.regions[PixelAtlas.WATER_0 + animFrame], sx, sy, TILE, TILE);
+                        batch.draw(atlas.regions[PixelAtlas.WATER_0 + tileFrame], sx, sy, TILE, TILE);
                     } else if (cur.oil[t]) {
                         batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], sx, sy, TILE, TILE);
                     }
                 }
 
                 if (cur.lootKind[t] != Scene.LOOT_NONE) {
-                    float bob = 2f * MathUtils.sin(time * 3.5f + x + y);
+                    float bob = Math.round(2f * MathUtils.sin(time * 3.5f + x + y));
                     batch.setColor(r, g, b, 1f);
-                    batch.draw(atlas.regions[PixelAtlas.spriteForLoot(cur.lootKind[t])], sx + 10, sy + 8 + bob, TILE - 20, TILE - 20);
+                    batch.draw(atlas.regions[PixelAtlas.spriteForLoot(cur.lootKind[t])], sx + 8, sy + 6 + bob, 48, 48);
                 }
 
                 if (cur.steam[t] || cur.superheatedSteam[t] || cur.oilMist[t]) {
                     Color gc = cur.superheatedSteam[t] ? SUPERHEATED_COL : cur.oilMist[t] ? MIST_COL : STEAM_COL;
-                    float drift = MathUtils.sin(time * 2.2f + x * 1.1f + y) * 3f;
+                    float drift = Math.round(MathUtils.sin(time * 2.2f + x * 1.1f + y) * 3f);
                     batch.setColor(gc.r, gc.g, gc.b, 0.48f);
                     batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], sx + drift, sy + 2, TILE, TILE);
                 }
 
                 if (cur.burning[t]) {
                     batch.setColor(1f, 1f, 1f, 0.88f);
-                    batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], sx, sy, TILE, TILE);
-                    batch.setColor(1f, 0.55f, 0.2f, 0.16f);
-                    batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], sx - 14, sy - 14, TILE + 28, TILE + 28);
+                    batch.draw(atlas.regions[PixelAtlas.FIRE_0 + tileFrame], sx, sy, TILE, TILE);
                 }
             }
         }
 
-        // 2. Entities: light halos, movement ghosts, sprites, burning overlay, HP bar
+        // 2. Entities: contact shadows, movement ghosts, sprites, frozen/burning overlays, HP bar
         for (int i = 0; i < cur.n; i++) {
             if (cur.hp[i] <= 0) continue;
             float px = mapScreenX(drawX(i)), py = mapScreenY(drawY(i));
-            if (cur.litEntity[i]) {
-                batch.setColor(1f, 0.6f, 0.22f, 0.16f);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], px - 18, py - 18, TILE + 36, TILE + 36);
-            } else if (i == 0 && cur.concentration > 0) {
-                batch.setColor(0.3f, 0.9f, 0.85f, 0.20f);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], px - 14, py - 14, TILE + 28, TILE + 28);
-            }
+            batch.setColor(0f, 0f, 0f, 0.44f);
+            batch.draw(atlas.glow, px + 8, py - 2, TILE - 16, 16);
 
-            int spr = PixelAtlas.spriteForEntity(cur, i, animFrame);
+            int entFrame = (animFrame + cur.id[i].hashCode()) & 3;
+            int spr = i == 0 ? thrallDrawSprite(entFrame) : PixelAtlas.spriteForEntity(cur, i, entFrame);
+            float scaleX = (i == 0 && !cur.proneEntity[0]) ? thrallFacing : 1f;
             int p = prevIdx[i];
             if (p >= 0 && cur.moved(i, prev) && anim < GHOST_LIFE) {
                 float ga = 0.35f * (1f - anim / GHOST_LIFE);
                 batch.setColor(1f, 1f, 1f, ga);
-                batch.draw(atlas.regions[spr], mapScreenX(prev.x[p]), mapScreenY(prev.y[p]), TILE, TILE);
+                batch.draw(atlas.regions[spr], mapScreenX(prev.x[p]), mapScreenY(prev.y[p]),
+                        TILE * 0.5f, TILE * 0.5f, TILE, TILE, scaleX, 1f, 0f);
             }
+
+            boolean casting = i == 0 && thrallPose == PixelAtlas.POSE_CAST && thrallPoseAge < thrallPoseMax
+                    && !cur.frozenEntity[0] && !cur.proneEntity[0];
+            float castPulse = casting ? MathUtils.sin((thrallPoseAge / thrallPoseMax) * MathUtils.PI) : 0f;
 
             if (i < MAX_ENT && hitFlash[i] > 0) {
                 batch.setColor(1f, 0.95f, 0.95f, 1f);
             } else if (cur.frozenEntity[i]) {
                 batch.setColor(0.28f, 0.68f, 1f, 1f);
             } else {
-                float eLum = MathUtils.clamp(cur.light[cur.y[i] * cur.w + cur.x[i]] + 0.22f, 0.62f, 1f);
+                float eLum = MathUtils.clamp(cur.light[cur.y[i] * cur.w + cur.x[i]] + 0.22f + 0.26f * castPulse, 0.62f, 1f);
                 batch.setColor(eLum, eLum, eLum, 1f);
             }
             float rot = cur.proneEntity[i] ? 90f : 0f;
-            batch.draw(atlas.regions[spr], px, py, TILE * 0.5f, TILE * 0.5f, TILE, TILE, 1f, 1f, rot);
+            batch.draw(atlas.regions[spr], px, py, TILE * 0.5f, TILE * 0.5f, TILE, TILE, scaleX, 1f, rot);
 
             if (cur.frozenEntity[i]) {
-                batch.setColor(0.55f, 0.90f, 1f, 0.38f);
-                batch.draw(atlas.regions[PixelAtlas.ICE_TILE], px + 4, py + 4, TILE - 8, TILE - 8);
+                batch.setColor(0.55f, 0.90f, 1f, 0.36f);
+                batch.draw(atlas.regions[PixelAtlas.ICE_TILE], px, py, TILE, TILE);
             }
             if (cur.burningEntity[i]) {
                 batch.setColor(1f, 1f, 1f, 0.80f);
-                batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], px, py + 4, TILE, TILE);
+                batch.draw(atlas.regions[PixelAtlas.FIRE_0 + ((entFrame + 1) & 3)], px, py + 4, TILE, TILE);
             }
 
             if (cur.kind[i] == Entity.Kind.CREATURE || cur.hp[i] < cur.maxHp[i]) {
@@ -1488,7 +1632,95 @@ public final class GdxView extends ApplicationAdapter implements View {
             }
         }
 
-        // 3. Sprite-based spell VFX (bolts, fireballs, psionic blur, elemental/blood cross bursts)
+        // 3. Crisp 3x/4x projectile & cross sprites + particles
+        for (int i = 0; i < MAX_FX; i++) {
+            if (fxAge[i] >= fxMaxAge[i]) continue;
+            float u = fxAge[i] / fxMaxAge[i];
+            float a = 1f - u;
+            Color fc = fxCol[i];
+            if (fxKind[i] == FX_FIREBALL) {
+                float fx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], u));
+                float fy = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], u));
+                batch.setColor(1f, 1f, 1f, 0.95f);
+                batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], fx - 24, fy - 24, 48, 48);
+            } else if (fxKind[i] == FX_ELEM_BOLT) {
+                float fx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], u));
+                float fy = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], u));
+                int spr = switch (fxParam[i]) {
+                    case ELEM_ACID -> PixelAtlas.ACID_0 + animFrame;
+                    case ELEM_WATER -> PixelAtlas.WATER_0 + animFrame;
+                    case ELEM_OIL -> PixelAtlas.OIL_SLICK;
+                    default -> PixelAtlas.LOOT_STONE;
+                };
+                batch.setColor(1f, 1f, 1f, 0.96f);
+                batch.draw(atlas.regions[spr], fx - 24, fy - 24, 48, 48);
+            } else if (fxKind[i] == FX_CROSS) {
+                int ex = MathUtils.floor(fxX0[i]), ey = MathUtils.floor(fxY0[i]);
+                int elem = fxParam[i];
+                for (int c = 0; c < CROSS_DX.length; c++) {
+                    int cx = ex + CROSS_DX[c], cy = ey + CROSS_DY[c];
+                    if (cx < 0 || cx >= cur.w || cy < 0 || cy >= cur.h || cur.wall[cy * cur.w + cx]) continue;
+                    float tx = mapScreenX(cx), ty = mapScreenY(cy);
+                    batch.setColor(fc.r, fc.g, fc.b, (elem == ELEM_BLOOD ? 0.42f : 0.32f) * a);
+                    batch.draw(atlas.white, tx + 2, ty + 2, TILE - 4, TILE - 4);
+                    int cFrame = (animFrame + c) & 3;
+                    if (elem == ELEM_FIRE) {
+                        batch.setColor(1f, 1f, 1f, 0.88f * a);
+                        batch.draw(atlas.regions[PixelAtlas.FIRE_0 + cFrame], tx + 8, ty + 8, 48, 48);
+                    } else if (elem == ELEM_ACID) {
+                        batch.setColor(1f, 1f, 1f, 0.85f * a);
+                        batch.draw(atlas.regions[PixelAtlas.ACID_0 + cFrame], tx + 8, ty + 8, 48, 48);
+                    } else if (elem == ELEM_WATER) {
+                        batch.setColor(1f, 1f, 1f, 0.85f * a);
+                        batch.draw(atlas.regions[PixelAtlas.WATER_0 + cFrame], tx + 8, ty + 8, 48, 48);
+                    } else if (elem == ELEM_OIL) {
+                        batch.setColor(1f, 1f, 1f, 0.85f * a);
+                        batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], tx + 8, ty + 8, 48, 48);
+                    } else {
+                        batch.setColor(fc.r, fc.g, fc.b, 0.55f * a);
+                        batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], tx, ty, TILE, TILE);
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < MAX_PARTICLES; i++) {
+            if (partAge[i] >= partMaxAge[i]) continue;
+            float a = 1f - partAge[i] / partMaxAge[i];
+            Color pc = partCol[i];
+            batch.setColor(pc.r, pc.g, pc.b, a);
+            batch.draw(atlas.white, mapScreenX(partX[i]), centerScreenY(partY[i]), partSize[i], partSize[i]);
+        }
+
+        // 4. Additive Linear radial glow pass (torches, fires, cast auras, spell blooms, crit flares)
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+        for (int y = 0; y < cur.h; y++) {
+            for (int x = 0; x < cur.w; x++) {
+                int t = y * cur.w + x;
+                if (!cur.burning[t]) continue;
+                float sx = mapScreenX(x), sy = mapScreenY(y);
+                batch.setColor(1f, 0.55f, 0.18f, 0.34f);
+                batch.draw(atlas.glow, sx - 20, sy - 20, TILE + 40, TILE + 40);
+            }
+        }
+        for (int i = 0; i < cur.n; i++) {
+            if (cur.hp[i] <= 0) continue;
+            float px = mapScreenX(drawX(i)), py = mapScreenY(drawY(i));
+            if (cur.litEntity[i]) {
+                batch.setColor(1f, 0.60f, 0.20f, 0.34f);
+                batch.draw(atlas.glow, px - 28, py - 28, TILE + 56, TILE + 56);
+            } else if (i == 0 && cur.concentration > 0) {
+                batch.setColor(0.30f, 0.90f, 0.85f, 0.30f);
+                batch.draw(atlas.glow, px - 22, py - 22, TILE + 44, TILE + 44);
+            }
+            if (i == 0 && thrallPose == PixelAtlas.POSE_CAST && thrallPoseAge < thrallPoseMax
+                    && !cur.frozenEntity[0] && !cur.proneEntity[0]) {
+                float castPulse = MathUtils.sin((thrallPoseAge / thrallPoseMax) * MathUtils.PI);
+                Color cc = thrallCastElem == ELEM_FORCE ? BOLT_COL : elemColor(thrallCastElem);
+                float pad = 18f + 22f * castPulse;
+                batch.setColor(cc.r, cc.g, cc.b, 0.65f * castPulse);
+                batch.draw(atlas.glow, px - pad, py - pad, TILE + pad * 2f, TILE + pad * 2f);
+            }
+        }
         for (int i = 0; i < MAX_FX; i++) {
             if (fxAge[i] >= fxMaxAge[i]) continue;
             float u = fxAge[i] / fxMaxAge[i];
@@ -1503,16 +1735,16 @@ public final class GdxView extends ApplicationAdapter implements View {
                 float len = Math.max(8f, (float) Math.hypot(dx, dy));
                 float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
                 float mx = (x0 + px) * 0.5f, my = (y0 + py) * 0.5f;
-                float corrW = len + 28f, corrH = 38f;
-                batch.setColor(0.55f, 0.85f, 1f, 0.28f * a);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], mx - corrW * 0.5f, my - corrH * 0.5f,
+                float corrW = len + 34f, corrH = 44f;
+                batch.setColor(0.55f, 0.88f, 1f, 0.42f * a);
+                batch.draw(atlas.glow, mx - corrW * 0.5f, my - corrH * 0.5f,
                         corrW * 0.5f, corrH * 0.5f, corrW, corrH, 1f, 1f, angle);
                 for (int rIdx = 1; rIdx <= 4; rIdx++) {
                     float rt = rIdx * 0.25f;
                     float rx = MathUtils.lerp(x0, px, rt), ry = MathUtils.lerp(y0, py, rt);
-                    float rw = 10f + u * 14f, rh = 26f + u * 34f;
-                    batch.setColor(0.85f, 0.96f, 1f, 0.34f * a);
-                    batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], rx - rw * 0.5f, ry - rh * 0.5f,
+                    float rw = 16f + u * 18f, rh = 34f + u * 40f;
+                    batch.setColor(0.85f, 0.96f, 1f, 0.44f * a);
+                    batch.draw(atlas.glow, rx - rw * 0.5f, ry - rh * 0.5f,
                             rw * 0.5f, rh * 0.5f, rw, rh, 1f, 1f, angle);
                 }
             } else if (fxKind[i] == FX_BLOOD_BOLT) {
@@ -1522,137 +1754,45 @@ public final class GdxView extends ApplicationAdapter implements View {
                 float len = Math.max(8f, (float) Math.hypot(dx, dy));
                 float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
                 float mx = (x0 + x1) * 0.5f, my = (y0 + y1) * 0.5f;
-                float corrW = len + 20f, corrH = 32f;
-                batch.setColor(0.75f, 0.08f, 0.14f, 0.28f * a);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], mx - corrW * 0.5f, my - corrH * 0.5f,
+                float corrW = len + 26f, corrH = 38f;
+                batch.setColor(0.85f, 0.10f, 0.16f, 0.42f * a);
+                batch.draw(atlas.glow, mx - corrW * 0.5f, my - corrH * 0.5f,
                         corrW * 0.5f, corrH * 0.5f, corrW, corrH, 1f, 1f, angle);
             } else if (fxKind[i] == FX_FIREBALL) {
                 float fx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], u));
                 float fy = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], u));
-                batch.setColor(1f, 0.55f, 0.15f, 0.45f * a + 0.2f);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], fx - TILE * 0.45f, fy - TILE * 0.45f, TILE * 0.9f, TILE * 0.9f);
-                batch.setColor(1f, 1f, 1f, 0.95f);
-                batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], fx - TILE * 0.38f, fy - TILE * 0.38f, TILE * 0.76f, TILE * 0.76f);
+                batch.setColor(1f, 0.55f, 0.15f, 0.72f * a + 0.18f);
+                batch.draw(atlas.glow, fx - TILE * 0.6f, fy - TILE * 0.6f, TILE * 1.2f, TILE * 1.2f);
             } else if (fxKind[i] == FX_ELEM_BOLT) {
                 float fx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], u));
                 float fy = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], u));
                 float pu = Math.max(0f, u - 0.16f);
                 float tx = mapScreenX(MathUtils.lerp(fxX0[i], fxX1[i], pu));
                 float ty = centerScreenY(MathUtils.lerp(fxY0[i], fxY1[i], pu));
-                batch.setColor(fc.r, fc.g, fc.b, 0.42f * a);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], tx - TILE * 0.3f, ty - TILE * 0.3f, TILE * 0.6f, TILE * 0.6f);
-                batch.setColor(fc.r, fc.g, fc.b, 0.62f * a + 0.15f);
-                batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], fx - TILE * 0.44f, fy - TILE * 0.44f, TILE * 0.88f, TILE * 0.88f);
-                int spr = switch (fxParam[i]) {
-                    case ELEM_ACID -> PixelAtlas.ACID_0 + animFrame;
-                    case ELEM_WATER -> PixelAtlas.WATER_0 + animFrame;
-                    case ELEM_OIL -> PixelAtlas.OIL_SLICK;
-                    default -> PixelAtlas.LOOT_STONE;
-                };
-                batch.setColor(1f, 1f, 1f, 0.96f);
-                batch.draw(atlas.regions[spr], fx - TILE * 0.34f, fy - TILE * 0.34f, TILE * 0.68f, TILE * 0.68f);
-            } else if (fxKind[i] == FX_CROSS) {
-                int ex = MathUtils.floor(fxX0[i]), ey = MathUtils.floor(fxY0[i]);
-                int elem = fxParam[i];
-                for (int c = 0; c < CROSS_DX.length; c++) {
-                    int cx = ex + CROSS_DX[c], cy = ey + CROSS_DY[c];
-                    if (cx < 0 || cx >= cur.w || cy < 0 || cy >= cur.h || cur.wall[cy * cur.w + cx]) continue;
-                    float tx = mapScreenX(cx), ty = mapScreenY(cy);
-                    batch.setColor(fc.r, fc.g, fc.b, (elem == ELEM_BLOOD ? 0.46f : 0.36f) * a);
-                    batch.draw(atlas.white, tx + 2, ty + 2, TILE - 4, TILE - 4);
-                    if (elem == ELEM_FIRE) {
-                        batch.setColor(1f, 1f, 1f, 0.88f * a);
-                        batch.draw(atlas.regions[PixelAtlas.FIRE_0 + animFrame], tx + 4, ty + 4, TILE - 8, TILE - 8);
-                    } else if (elem == ELEM_ACID) {
-                        batch.setColor(1f, 1f, 1f, 0.85f * a);
-                        batch.draw(atlas.regions[PixelAtlas.ACID_0 + animFrame], tx + 4, ty + 4, TILE - 8, TILE - 8);
-                    } else if (elem == ELEM_WATER) {
-                        batch.setColor(1f, 1f, 1f, 0.85f * a);
-                        batch.draw(atlas.regions[PixelAtlas.WATER_0 + animFrame], tx + 4, ty + 4, TILE - 8, TILE - 8);
-                    } else if (elem == ELEM_OIL) {
-                        batch.setColor(1f, 1f, 1f, 0.85f * a);
-                        batch.draw(atlas.regions[PixelAtlas.OIL_SLICK], tx + 4, ty + 4, TILE - 8, TILE - 8);
-                    } else {
-                        batch.setColor(fc.r, fc.g, fc.b, 0.55f * a);
-                        batch.draw(atlas.regions[PixelAtlas.GAS_PUFF], tx + 2, ty + 2, TILE - 4, TILE - 4);
-                    }
-                }
+                batch.setColor(fc.r, fc.g, fc.b, 0.52f * a);
+                batch.draw(atlas.glow, tx - TILE * 0.4f, ty - TILE * 0.4f, TILE * 0.8f, TILE * 0.8f);
+                batch.setColor(fc.r, fc.g, fc.b, 0.72f * a + 0.16f);
+                batch.draw(atlas.glow, fx - TILE * 0.55f, fy - TILE * 0.55f, TILE * 1.1f, TILE * 1.1f);
+            } else if (fxKind[i] == FX_CRIT) {
+                int tier = Math.max(1, fxParam[i] >>> 4);
+                float cx = mapScreenX(fxX0[i]), cy = centerScreenY(fxY0[i]);
+                float glow = TILE * (1.2f + 0.7f * u + 0.25f * tier);
+                batch.setColor(fc.r, fc.g, fc.b, 0.80f * a);
+                batch.draw(atlas.glow, cx - glow * 0.5f, cy - glow * 0.5f, glow, glow);
+                float core = TILE * (0.85f - 0.30f * u);
+                batch.setColor(1f, 0.96f, 0.72f, 0.95f * a);
+                batch.draw(atlas.glow, cx - core * 0.5f, cy - core * 0.5f, core, core);
             }
         }
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // 4. Particles
-        for (int i = 0; i < MAX_PARTICLES; i++) {
-            if (partAge[i] >= partMaxAge[i]) continue;
-            float a = 1f - partAge[i] / partMaxAge[i];
-            Color pc = partCol[i];
-            batch.setColor(pc.r, pc.g, pc.b, a);
-            batch.draw(atlas.white, mapScreenX(partX[i]), centerScreenY(partY[i]), partSize[i], partSize[i]);
+        if (critFlashTime > 0) {
+            batch.setColor(1f, 0.90f, 0.45f, 0.20f * (critFlashTime / 0.14f));
+            batch.draw(atlas.white, mapScreenX(0), mapScreenY(cur.h - 1), mapW(), mapH());
         }
 
         batch.setColor(Color.WHITE);
         batch.end();
-    }
-
-    private void drawClassicMapShapes() {
-        float pulse = 0.55f + 0.35f * (float) Math.sin(time * 7);
-        shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for (int y = 0; y < cur.h; y++) {
-            for (int x = 0; x < cur.w; x++) {
-                int t = y * cur.w + x;
-                float sx = mapScreenX(x), sy = mapScreenY(y);
-                if (cur.wall[t]) {
-                    shapes.setColor(WALL_BEVEL);
-                    shapes.rect(sx + 1, sy + 1, TILE - 2, TILE - 2);
-                    shapes.setColor(WALL);
-                    shapes.rect(sx + 2, sy + 1, TILE - 3, TILE - 4);
-                } else {
-                    shapes.setColor((x + y) % 2 == 0 ? FLOOR : FLOOR_ALT);
-                    shapes.rect(sx + 1, sy + 1, TILE - 2, TILE - 2);
-                    if (cur.ice[t]) {
-                        shapes.setColor(ICE_COL);
-                        shapes.rect(sx + 4, sy + 4, TILE - 8, TILE - 8);
-                        if (cur.tar[t]) { shapes.setColor(TAR_COL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
-                        else if (cur.acid[t]) { shapes.setColor(ACID_COL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
-                        else if (cur.oil[t]) { shapes.setColor(OIL); shapes.rect(sx + 10, sy + 10, TILE - 20, TILE - 20); }
-                    } else if (cur.tar[t]) {
-                        shapes.setColor(TAR_COL);
-                        shapes.rect(sx + 4, sy + 4, TILE - 8, TILE - 8);
-                    } else if (cur.acid[t]) {
-                        shapes.setColor(ACID_COL);
-                        shapes.rect(sx + 5, sy + 5, TILE - 10, TILE - 10);
-                    } else if (cur.water[t]) {
-                        shapes.setColor(WATER_COL);
-                        shapes.rect(sx + 5, sy + 5, TILE - 10, TILE - 10);
-                    } else if (cur.oil[t]) {
-                        shapes.setColor(OIL_RIM);
-                        shapes.rect(sx + 4, sy + 4, TILE - 8, TILE - 8);
-                        shapes.setColor(OIL);
-                        shapes.rect(sx + 6, sy + 6, TILE - 12, TILE - 12);
-                    }
-                }
-                if (cur.steam[t]) { shapes.setColor(STEAM_COL.r, STEAM_COL.g, STEAM_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
-                else if (cur.superheatedSteam[t]) { shapes.setColor(SUPERHEATED_COL.r, SUPERHEATED_COL.g, SUPERHEATED_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
-                else if (cur.oilMist[t]) { shapes.setColor(MIST_COL.r, MIST_COL.g, MIST_COL.b, 0.38f); shapes.rect(sx + 2, sy + 2, TILE - 4, TILE - 4); }
-                if (cur.burning[t]) { shapes.setColor(FIRE.r, FIRE.g, FIRE.b, pulse * 0.45f); shapes.rect(sx + 3, sy + 3, TILE - 6, TILE - 6); }
-                if (cur.loot[t]) { shapes.setColor(PROP); shapes.rect(sx + TILE - 12, sy + 4, 6, 6); }
-            }
-        }
-        for (int i = 0; i < cur.n; i++) {
-            if (cur.hp[i] <= 0) continue;
-            float px = mapScreenX(drawX(i)), py = mapScreenY(drawY(i));
-            Color c = colorOf(cur, i);
-            shapes.setColor(TOKEN_BG);
-            drawToken(shapes, cur.kind[i], px, py);
-            shapes.setColor(c.r, c.g, c.b, 0.22f);
-            drawToken(shapes, cur.kind[i], px, py);
-            if (cur.kind[i] == Entity.Kind.CREATURE || cur.hp[i] < cur.maxHp[i]) {
-                shapes.setColor(BAR_BG);
-                shapes.rect(px + 6, py + 4, TILE - 12, 3);
-                shapes.setColor(c);
-                shapes.rect(px + 6, py + 4, (TILE - 12) * cur.hp[i] / (float) cur.maxHp[i], 3);
-            }
-        }
-        shapes.end();
     }
 
     private void drawLineOverlays() {
@@ -1701,20 +1841,9 @@ public final class GdxView extends ApplicationAdapter implements View {
         for (int i = 0; i < cur.n; i++) {
             if (cur.hp[i] <= 0) continue;
             float px = mapScreenX(drawX(i)), py = mapScreenY(drawY(i));
-            if (!pixelMode) {
-                Color c = colorOf(cur, i);
-                int p = prevIdx[i];
-                if (p >= 0 && cur.moved(i, prev) && anim < GHOST_LIFE) {
-                    shapes.setColor(c.r, c.g, c.b, 0.38f * (1f - anim / GHOST_LIFE));
-                    drawToken(shapes, cur.kind[i], mapScreenX(prev.x[p]), mapScreenY(prev.y[p]));
-                }
-                shapes.setColor(c.r, c.g, c.b, 0.9f);
-                drawToken(shapes, cur.kind[i], px, py);
-            }
             if (cur.frozenEntity[i]) { shapes.setColor(ICE_COL.r, ICE_COL.g, ICE_COL.b, 0.95f); shapes.rect(px + 3, py + 3, TILE - 6, TILE - 6); }
             if (cur.stunnedEntity[i] && !cur.frozenEntity[i]) { shapes.setColor(STUN_COL.r, STUN_COL.g, STUN_COL.b, pulse); shapes.rect(px + 3, py + 3, TILE - 6, TILE - 6); }
             if (cur.bleedingEntity[i]) { shapes.setColor(BLEED_COL.r, BLEED_COL.g, BLEED_COL.b, 0.9f); shapes.rect(px + 5, py + 5, TILE - 10, TILE - 10); }
-            if (!pixelMode && cur.burningEntity[i]) { shapes.setColor(FIRE.r, FIRE.g, FIRE.b, pulse); shapes.rect(px + 3, py + 3, TILE - 6, TILE - 6); }
             if (cur.overwatchEntity[i]) {
                 shapes.setColor(CREATURE.r, CREATURE.g, CREATURE.b, 0.30f * pulse);
                 shapes.line(px + TILE * 0.5f, py + TILE * 0.5f, mapScreenX(cur.x[0] + 0.5f), centerScreenY(cur.y[0] + 0.5f));
@@ -1727,7 +1856,7 @@ public final class GdxView extends ApplicationAdapter implements View {
 
         // Live command targeting reticles
         if (!presenter.busy() && input.length() > 0) {
-            int nT = findTargets(input.toString(), cur, targetX, targetY, targetX.length);
+            int nT = findTargets(input, cur, targetX, targetY, targetX.length);
             float ox = mapScreenX(cur.x[0] + 0.5f), oy = centerScreenY(cur.y[0] + 0.5f);
             for (int k = 0; k < nT; k++) {
                 float rx = mapScreenX(targetX[k]), ry = mapScreenY(targetY[k]);
@@ -1873,6 +2002,22 @@ public final class GdxView extends ApplicationAdapter implements View {
                     float wave = MathUtils.sin(ou * MathUtils.PI * 2f + time * 18f) * 7f;
                     shapes.circle(MathUtils.lerp(x0, x1, ou) + nx * wave, MathUtils.lerp(y0, y1, ou) + ny * wave, 4.5f, 10);
                 }
+            } else if (fxKind[i] == FX_CRIT) {
+                int tier = Math.max(1, fxParam[i] >>> 4);
+                float cx = mapScreenX(fxX0[i]), cy = centerScreenY(fxY0[i]);
+                float ease = Interpolation.pow2Out.apply(u);
+                float diag = MathUtils.lerp(10f, 36f + tier * 10f, ease);
+                float card = MathUtils.lerp(6f, 26f + tier * 8f, ease);
+                shapes.setColor(fc.r, fc.g, fc.b, a);
+                shapes.line(cx - diag, cy - diag, cx + diag, cy + diag);
+                shapes.line(cx - diag, cy + diag, cx + diag, cy - diag);
+                shapes.line(cx - card, cy, cx + card, cy);
+                shapes.line(cx, cy - card, cx, cy + card);
+                shapes.setColor(1f, 1f, 1f, a);
+                float inner = diag * 0.65f;
+                shapes.line(cx - inner, cy - inner, cx + inner, cy + inner);
+                shapes.line(cx - inner, cy + inner, cx + inner, cy - inner);
+                shapes.circle(cx, cy, MathUtils.lerp(8f, (0.85f + 0.25f * tier) * TILE, ease), 24);
             }
         }
         shapes.end();
@@ -1888,33 +2033,33 @@ public final class GdxView extends ApplicationAdapter implements View {
 
         // Map coordinate rulers
         font.setColor(MUTED);
-        for (int x = 0; x < cur.w; x++) text(String.valueOf(x), mapScreenX(x) + (TILE - String.valueOf(x).length() * charW) / 2f, MAP_Y - fontH - 4 - shakeY);
-        for (int y = 0; y < cur.h; y++) text(String.valueOf(y), MAP_X - 18 + shakeX, MAP_Y + y * TILE + (TILE - fontH) / 2f - shakeY);
+        for (int x = 0; x < cur.w; x++) {
+            String xs = numStr(x);
+            text(xs, mapScreenX(x) + (TILE - xs.length() * charW) / 2f, MAP_Y - fontH - 4 - shakeY);
+        }
+        for (int y = 0; y < cur.h; y++) text(numStr(y), MAP_X - 18 + shakeX, MAP_Y + y * TILE + (TILE - fontH) / 2f - shakeY);
 
         // Entity labels & floating damage numbers
         for (int i = 0; i < cur.n; i++) {
             if (cur.hp[i] <= 0) continue;
             String label = i == 0 ? "@" : cur.id[i];
             float px = mapScreenX(drawX(i)), py = mapScreenY(drawY(i));
-            if (pixelMode) {
-                badgeFont.setColor(i == 0 ? THRALL : TEXT);
-                badgeFont.draw(batch, label, px + 5, py + TILE - 3.5f);
-                if (cur.overwatchEntity[i]) {
-                    badgeFont.setColor(CREATURE);
-                    badgeFont.draw(batch, "!", px + TILE - 11, py + TILE - 3.5f);
-                }
-            } else {
-                font.setColor(i == 0 ? THRALL : TEXT);
-                float tokenCenterFromTop = WIN_H - (py + 26f);
-                text(label, px + (TILE - label.length() * charW) / 2f, tokenCenterFromTop - fontH / 2f);
+            badgeFont.setColor(i == 0 ? THRALL : TEXT);
+            badgeFont.draw(batch, label, px + 5, py + TILE - 3.5f);
+            if (cur.overwatchEntity[i]) {
+                badgeFont.setColor(CREATURE);
+                badgeFont.draw(batch, "!", px + TILE - 11, py + TILE - 3.5f);
             }
         }
         for (int i = 0; i < MAX_FLOATERS; i++) {
             if (floatAge[i] >= FLOAT_LIFE) continue;
             float alpha = 1f - floatAge[i] / FLOAT_LIFE;
-            Color fc = floatText[i].startsWith("-") ? CREATURE : SAGE;
+            boolean crit = floatText[i].startsWith("CRIT");
+            Color fc = crit ? EMBER : floatText[i].startsWith("-") ? CREATURE : SAGE;
             font.setColor(fc.r, fc.g, fc.b, alpha);
-            text(floatText[i], mapScreenX(floatX[i]) + 14, WIN_H - mapScreenY(floatY[i]) - TILE + 6 - floatAge[i] * 24);
+            float xOff = crit ? 4f : 14f;
+            font.draw(batch, floatText[i], mapScreenX(floatX[i]) + xOff,
+                    mapScreenY(floatY[i]) + TILE - 6 + floatAge[i] * (crit ? 30f : 24f));
         }
 
         // Right panel: Compact Thrall HUD + Equipment / Pack
@@ -1929,8 +2074,8 @@ public final class GdxView extends ApplicationAdapter implements View {
             text("HOSTILES" + ".".repeat(thinking), px + 96, py);
         } else {
             badgeFont.setColor(MUTED);
-            badgeFont.draw(batch, (pixelMode ? "F1:SPR" : "F1:CLS") + (audio.muted ? "  F2:MUTE" : "  F2:SFX"),
-                    sideX() + sideW() - 120, WIN_H - py - 2);
+            String audioLabel = audio.muted ? "F2:MUTE" : (audio.musicMuted ? "F2:SFX F3:OFF" : "F2:SFX F3:BGM");
+            badgeFont.draw(batch, audioLabel, sideX() + sideW() - 118, WIN_H - py - 2);
         }
 
         font.setColor(MUTED);
@@ -1946,7 +2091,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         text("CHANNEL", px, MAP_Y + 110);
         text("CONDS", px, MAP_Y + 130);
         font.setColor(TEXT);
-        text(String.valueOf(cur.magic), px + 56, MAP_Y + 90);
+        text(numStr(cur.magic), px + 56, MAP_Y + 90);
         text(cur.temp + "C", px + 164, MAP_Y + 90);
         String chanText = cur.concentration > 0
                 ? cur.channel + "  CONC " + cur.concentration + "%"
@@ -2000,7 +2145,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         float promptTop = INPUT_TOP + (INPUT_H - fontH) / 2f;
         text("ARCHON>", MAP_X + 12, promptTop);
         font.setColor(presenter.busy() ? MUTED : TEXT);
-        text(input.toString(), MAP_X + 12 + 8 * charW, promptTop);
+        font.draw(batch, input, MAP_X + 12 + 8 * charW, WIN_H - promptTop);
 
         batch.end();
     }

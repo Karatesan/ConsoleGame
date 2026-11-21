@@ -19,6 +19,7 @@ public final class GdxMain {
         config.setBackBufferConfig(8, 8, 8, 8, 16, 0, 4);
         config.useVsync(true);
         config.setForegroundFPS(60);
+        config.setAudioConfig(24, 512, 9);
         long seed = System.currentTimeMillis();
         boolean magicArena = true;
         for (String arg : args) {

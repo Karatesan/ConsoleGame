@@ -7,22 +7,35 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 
 /**
  * Procedural 16x16 roguelike sprite atlas baked in memory at startup.
- * ATLAS_W x ATLAS_H = 256 x 64 (16x4 cells). Cell 36 is a solid white pixel block for Batch FX.
+ * ATLAS_W x ATLAS_H = 256 x 80 (16x5 cells). Cell 68 is a solid white pixel block for Batch FX.
  */
 public final class PixelAtlas {
-    public static final int CELL = 16, COLS = 16, ROWS = 4;
+    public static final int CELL = 16, COLS = 16, ROWS = 5;
     public static final int ATLAS_W = COLS * CELL, ATLAS_H = ROWS * CELL;
+
+    public static final int POSE_IDLE = 0, POSE_MOVE = 1, POSE_ATTACK = 2,
+            POSE_CAST = 3, POSE_GUARD = 4, POSE_HURT = 5;
 
     public static final int
             FLOOR_0 = 0, FLOOR_1 = 1, WALL_TOP = 2, WALL_FRONT = 3,
-            WATER_0 = 4, WATER_1 = 5, ACID_0 = 6, ACID_1 = 7,
-            OIL_SLICK = 8, ICE_TILE = 9, TAR_TILE = 10, FIRE_0 = 11, FIRE_1 = 12, GAS_PUFF = 13,
-            THRALL_0 = 14, THRALL_1 = 15, ORC_0 = 16, ORC_1 = 17,
-            GOBLIN_0 = 18, GOBLIN_1 = 19, OGRE_0 = 20, OGRE_1 = 21, RAT_0 = 22, RAT_1 = 23,
-            BRAZIER_0 = 24, BRAZIER_1 = 25, BARREL = 26, CRATE = 27, PILLAR = 28, DOOR = 29,
-            LOOT_BLADE = 30, LOOT_OIL = 31, LOOT_WATER = 32, LOOT_ACID = 33, LOOT_STONE = 34,
-            BRAZIER_OFF = 35,
-            COUNT = 36;
+            WATER_0 = 4, WATER_1 = 5, WATER_2 = 6, WATER_3 = 7,
+            ACID_0 = 8, ACID_1 = 9, ACID_2 = 10, ACID_3 = 11,
+            OIL_SLICK = 12, ICE_TILE = 13, TAR_TILE = 14,
+            FIRE_0 = 15, FIRE_1 = 16, FIRE_2 = 17, FIRE_3 = 18, GAS_PUFF = 19,
+            THRALL_0 = 20, THRALL_1 = 21, THRALL_2 = 22, THRALL_3 = 23,
+            ORC_0 = 24, ORC_1 = 25, ORC_2 = 26, ORC_3 = 27,
+            GOBLIN_0 = 28, GOBLIN_1 = 29, GOBLIN_2 = 30, GOBLIN_3 = 31,
+            OGRE_0 = 32, OGRE_1 = 33, OGRE_2 = 34, OGRE_3 = 35,
+            RAT_0 = 36, RAT_1 = 37, RAT_2 = 38, RAT_3 = 39,
+            BRAZIER_0 = 40, BRAZIER_1 = 41, BRAZIER_2 = 42, BRAZIER_3 = 43,
+            BARREL = 44, CRATE = 45, PILLAR = 46, DOOR = 47,
+            LOOT_BLADE = 48, LOOT_OIL = 49, LOOT_WATER = 50, LOOT_ACID = 51, LOOT_STONE = 52,
+            BRAZIER_OFF = 53,
+            THRALL_MOVE_0 = 54, THRALL_MOVE_1 = 55, THRALL_MOVE_2 = 56, THRALL_MOVE_3 = 57,
+            THRALL_ATTACK_0 = 58, THRALL_ATTACK_1 = 59, THRALL_ATTACK_2 = 60, THRALL_ATTACK_3 = 61,
+            THRALL_CAST_0 = 62, THRALL_CAST_1 = 63, THRALL_CAST_2 = 64, THRALL_CAST_3 = 65,
+            THRALL_GUARD = 66, THRALL_HURT = 67,
+            COUNT = 68;
 
     private static final String[][] SPRITES = {
             // 0: FLOOR_0
@@ -124,22 +137,60 @@ public final class PixelAtlas {
             {
                     "................",
                     "..bbbbbbbbbbbb..",
-                    ".bbbbbbbbwbbbbb.",
-                    ".bbBbbbbwwwbbbb.",
+                    ".bbbBBbbbbbbbbb.",
+                    ".bbbbbbwwbbbbBb.",
+                    ".bbbbbwwwwbbbBb.",
                     ".bbbbbbbbbbbbbb.",
-                    ".bbbwwbbbbbbbbb.",
-                    ".bbwwwwbbbbBbbb.",
+                    ".bBbbbbbbbbbwwb.",
+                    ".bbbbbbbbbbwwwb.",
+                    ".bbbbbbwbbbbbbb.",
+                    ".bbbbbwwwbbbbbb.",
+                    ".bBBbbbbbbbbBbb.",
                     ".bbbbbbbbbbbbbb.",
-                    ".bbbbbbbbbwwbbb.",
-                    ".bbbbBbbbwwwwbb.",
-                    ".bbbbBbbbbbbbbb.",
-                    ".bbwbbbbbbbbbbb.",
-                    ".bwwwbbbbbbbbbb.",
+                    ".bbBbbbbbbbbbbb.",
                     ".bbbbbbbbbbbbbb.",
                     "..bbbbbbbbbbbb..",
                     "................"
             },
-            // 6: ACID_0
+            // 6: WATER_2
+            {
+                    "................",
+                    "..bbbbbbbbbbbb..",
+                    ".bbbbbBBbbbbbbb.",
+                    ".bbbbbbbbwwbbbb.",
+                    ".bbbbbbbwwwwbbb.",
+                    ".bBbbbbbbbbbbbb.",
+                    ".bbwwbbbbbbbbbb.",
+                    ".bwwwwbbbbBbbbb.",
+                    ".bbbbbbbbwbbbbb.",
+                    ".bbbbbbbwwwbbbb.",
+                    ".bbbbBBbbbbbbBb.",
+                    ".bbbbbbbbbbbbbb.",
+                    ".bbbbBbbbbbbbbb.",
+                    ".bbbbbbbbbbbbbb.",
+                    "..bbbbbbbbbbbb..",
+                    "................"
+            },
+            // 7: WATER_3
+            {
+                    "................",
+                    "..bbbbbbbbbbbb..",
+                    ".bbbbbbbbBBbbbb.",
+                    ".bbwwbbbbbbBbbb.",
+                    ".bwwwwbbbbbbbbb.",
+                    ".bbbbbbbbbbbbbb.",
+                    ".bbbbwwbbbbBbbb.",
+                    ".bbbwwwwbbbbbbb.",
+                    ".bbbbbbbbbbwbbb.",
+                    ".bbbbbbbbbwwwbb.",
+                    ".bbBbbbbbbbbbbb.",
+                    ".bbBbbbbBBbbbbb.",
+                    ".bbbbbbbbbbbbbb.",
+                    ".bbbbbbbbbbbbbb.",
+                    "..bbbbbbbbbbbb..",
+                    "................"
+            },
+            // 8: ACID_0
             {
                     "................",
                     "..aaaaaaaaaaaa..",
@@ -158,26 +209,64 @@ public final class PixelAtlas {
                     "..aaaaaaaaaaaa..",
                     "................"
             },
-            // 7: ACID_1
+            // 9: ACID_1
             {
                     "................",
                     "..aaaaaaaaaaaa..",
-                    ".aaaaaaaaLLaaaa.",
-                    ".aaaAaaaLLLLaaa.",
-                    ".aaaaaaaaLLaaaa.",
-                    ".aaLLaaaaaaaaaa.",
-                    ".aLLLLaaaaAaaaa.",
-                    ".aaLLaaaaLLaaaa.",
-                    ".aaaaaaaLLLLaaa.",
-                    ".aaaaaaaaLLaaaa.",
-                    ".aaaaLLaaaaaaaa.",
-                    ".aaaLLLLaaaLLaa.",
-                    ".aaaaLLaaaLLLLa.",
+                    ".aaALLaaaaaAAaa.",
+                    ".aaLaaLaaaaaaaa.",
+                    ".aaaAAaaaaaaaaa.",
+                    ".aaaaaaaLLaaaaa.",
+                    ".aaaaaaLLLLaaaa.",
+                    ".aaaaaaaLLaaaaa.",
                     ".aaaaaaaaaaLLaa.",
+                    ".aaaaaaaaaLaaLa.",
+                    ".aaaaLLaaaaAAaa.",
+                    ".aaaLLLLaaaaaaa.",
+                    ".aaaaLLaaaaAAaa.",
+                    ".aaaaaaaaaALLAa.",
                     "..aaaaaaaaaaaa..",
                     "................"
             },
-            // 8: OIL_SLICK
+            // 10: ACID_2
+            {
+                    "................",
+                    "..aaaaaaaaaaaa..",
+                    ".aaaAAaaaaaaaaa.",
+                    ".aaaaaaaaLLaaaa.",
+                    ".aaaaaaALaaLAaa.",
+                    ".aaaaaaaaAAaaaa.",
+                    ".aaaaaaaaaaaaAa.",
+                    ".aaAaaaaaAAaaaa.",
+                    ".aaaaLLaaaaaaaa.",
+                    ".aaaLaaLaaaaaaa.",
+                    ".aaaaAAaaaaLLaa.",
+                    ".aaaaaaaaaLLLLa.",
+                    ".aaAAaaaaaaLLaa.",
+                    ".aaLLaaaaaaaaaa.",
+                    "..aaaaaaaaaaaa..",
+                    "................"
+            },
+            // 11: ACID_3
+            {
+                    "................",
+                    "..aaaaaaaaaaaa..",
+                    ".aaaaaaaaAAaaaa.",
+                    ".aaaAAaaaaaaaaa.",
+                    ".aaALLAaAAaaaaa.",
+                    ".aaaLLaaaaaaaaa.",
+                    ".aaaaaaaAAaaaaa.",
+                    ".aaaaaaaLLaaaaa.",
+                    ".aaaaaaaAAaaaaa.",
+                    ".aaaaaaaaaALLAa.",
+                    ".aaaaAAaaaLLLLa.",
+                    ".aaaLLLLaaaLLaa.",
+                    ".aaaLLLLaaaaaaa.",
+                    ".aaaaAAaaaaaaaa.",
+                    "..aaaaaaaaaaaa..",
+                    "................"
+            },
+            // 12: OIL_SLICK
             {
                     "................",
                     "...oooooooooo...",
@@ -196,7 +285,7 @@ public final class PixelAtlas {
                     "...oooooooooo...",
                     "................"
             },
-            // 9: ICE_TILE
+            // 13: ICE_TILE
             {
                     "................",
                     ".iiiiiiwwiiiiii.",
@@ -215,7 +304,7 @@ public final class PixelAtlas {
                     ".iiiiiwwwwiiiii.",
                     "................"
             },
-            // 10: TAR_TILE
+            // 14: TAR_TILE
             {
                     "................",
                     "..oooooooooooo..",
@@ -234,7 +323,7 @@ public final class PixelAtlas {
                     "..oooooooooooo..",
                     "................"
             },
-            // 11: FIRE_0
+            // 15: FIRE_0
             {
                     ".......f........",
                     "......fYf.......",
@@ -253,7 +342,7 @@ public final class PixelAtlas {
                     ".....ffff.......",
                     "................"
             },
-            // 12: FIRE_1
+            // 16: FIRE_1
             {
                     "....f...........",
                     "...fYf.....f....",
@@ -272,7 +361,45 @@ public final class PixelAtlas {
                     ".....ffff.......",
                     "................"
             },
-            // 13: GAS_PUFF
+            // 17: FIRE_2
+            {
+                    "........f.......",
+                    "....f..fYf......",
+                    "...fYffYYYf.....",
+                    "...fYYfYYYf..f..",
+                    "..fYYYfYYff.fYf.",
+                    "..fYYffYYff.fYf.",
+                    ".fYYYfYYYYffYYf.",
+                    ".fYYYYYYYYYYYf..",
+                    "..fYYWWWWYYYf...",
+                    "..fYWWWWWWYYf...",
+                    "..ffYWWWWYYff...",
+                    "...fYWWWWYYf....",
+                    "...fYYWWYYf.....",
+                    "....fYYYYf......",
+                    ".....ffff.......",
+                    "................"
+            },
+            // 18: FIRE_3
+            {
+                    "..........f.....",
+                    ".....f...fYf....",
+                    "....fYf..fYYf...",
+                    "...fYYf..fYYf...",
+                    ".f.fYYYffYYYf...",
+                    "fYffYYYffYYff...",
+                    ".fYYYYYYYYYYf...",
+                    "..fYYYYYYYYff...",
+                    "..fYYYWWWWYf....",
+                    "..fYYYWWWWYf....",
+                    "..ffYYWWWWff....",
+                    "...fYYWWWWf.....",
+                    "...fYWWWWYf.....",
+                    "....fYYYYf......",
+                    ".....ffff.......",
+                    "................"
+            },
+            // 19: GAS_PUFF
             {
                     "................",
                     "....wwwwwwww....",
@@ -291,7 +418,7 @@ public final class PixelAtlas {
                     "................",
                     "................"
             },
-            // 14: THRALL_0
+            // 20: THRALL_0
             {
                     "......kkkk......",
                     ".....kTTTTk.....",
@@ -310,7 +437,26 @@ public final class PixelAtlas {
                     "....kddk.kddk...",
                     "....kkkk.kkkk..."
             },
-            // 15: THRALL_1
+            // 21: THRALL_1
+            {
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk....",
+                    "..f.kTkkkkTk....",
+                    ".fYfkTkCCkTk....",
+                    "fYYfkTkkkkTk....",
+                    "fWYfkkttttkk..S.",
+                    "kWkkttTTTTttkSS.",
+                    "kwkktTTTTTTtkss.",
+                    "kwkkttTTTTttks..",
+                    "kdk.kttttttksk..",
+                    ".k..kttttttkk...",
+                    "....kttkkttk....",
+                    "....kttk.kttk...",
+                    "....kddk.kddk...",
+                    "....kkkk.kkkk..."
+            },
+            // 22: THRALL_2
             {
                     "................",
                     "......kkkk......",
@@ -321,15 +467,34 @@ public final class PixelAtlas {
                     "kWkkkTkkkkTk....",
                     "kwkk.kkttttk.s..",
                     "kwkkttTTTTtkss..",
-                    "kdkktTTTTTTtks..",
-                    ".k.kttTTTTttkk..",
-                    "....kttttttkk...",
+                    "kdkktTTTTTTtksS.",
+                    ".k.kttTTTTttks..",
+                    "....kttttttkksk.",
                     "....kttkkttk....",
                     "....kttk.kttk...",
                     "....kddk.kddk...",
                     "....kkkk.kkkk..."
             },
-            // 16: ORC_0
+            // 23: THRALL_3
+            {
+                    "................",
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk....",
+                    ".f..kTkkkkTk....",
+                    "fYf.kTkCCkTk....",
+                    "fWffkTkkkkTk....",
+                    "kWkk.kkttttk.s..",
+                    "kwkkttTTTTtkss..",
+                    "kwkktTTTTTTtks..",
+                    "kdkkttTTTTttkk..",
+                    ".k..kttttttksk..",
+                    "....kttkkttk....",
+                    "....kttk.kttk...",
+                    "....kddk.kddk...",
+                    "....kkkk.kkkk..."
+            },
+            // 24: ORC_0
             {
                     ".....kkkkkk.....",
                     "....kggggggk....",
@@ -348,7 +513,26 @@ public final class PixelAtlas {
                     "....kddkkddk....",
                     "....kkkkkkkk...."
             },
-            // 17: ORC_1
+            // 25: ORC_1
+            {
+                    ".....kkkkkk.....",
+                    "....kggggggk....",
+                    "...kgwggggwgk...",
+                    "...kgkggggkgk...",
+                    "...kggggggggk...",
+                    "...kggwkkwggk...",
+                    "..ksskkkkkkssk..",
+                    ".kssssSSSSssssk.",
+                    ".ksssksSSsksssk.",
+                    ".kggkksSSskkggk.",
+                    ".kggksssssskgSk.",
+                    "..kk.kssssk.kS..",
+                    ".....kssskk.....",
+                    "....ksskkssk....",
+                    "....kddkkddk....",
+                    "....kkkkkkkk...."
+            },
+            // 26: ORC_2
             {
                     "................",
                     ".....kkkkkk.....",
@@ -367,7 +551,26 @@ public final class PixelAtlas {
                     "....kddkkddk....",
                     "....kkkkkkkk...."
             },
-            // 18: GOBLIN_0
+            // 27: ORC_3
+            {
+                    "................",
+                    ".....kkkkkk.....",
+                    "....kggggggk....",
+                    "...kgwggggwgk...",
+                    "...kgkggggkgk...",
+                    "...kggggggggk...",
+                    "...kggwkkwggk...",
+                    "..ksskkkkkkssk..",
+                    ".kssssSSSSssssk.",
+                    ".ksssksSSsksssk.",
+                    ".kggkksSSskkggk.",
+                    ".kggksssssskgsk.",
+                    "..kk.kssssk.ks..",
+                    "....ksskkssk....",
+                    "....kddkkddk....",
+                    "....kkkkkkkk...."
+            },
+            // 28: GOBLIN_0
             {
                     "................",
                     "....kkkkkkkk....",
@@ -386,7 +589,26 @@ public final class PixelAtlas {
                     ".....kkkkkk.....",
                     "................"
             },
-            // 19: GOBLIN_1
+            // 29: GOBLIN_1
+            {
+                    "................",
+                    ".kk.kkkkkkkk.kk.",
+                    ".kGGGGGGGGGGGGk.",
+                    "..kkGGGGGGGGkk..",
+                    "...kGGkGGkGGk...",
+                    "....kGwkGwkGk...",
+                    "....kGGGGGGkkb..",
+                    "...kkddddddkkkb.",
+                    "..kddddddddddkb.",
+                    "..kGGkddddkGGkbS",
+                    "...kk.kddk.ksks.",
+                    "......kddk..kb..",
+                    ".....kdkkdk.....",
+                    ".....kdkkdk.....",
+                    ".....kkkkkk.....",
+                    "................"
+            },
+            // 30: GOBLIN_2
             {
                     "................",
                     "................",
@@ -405,7 +627,26 @@ public final class PixelAtlas {
                     ".....kkkkkk.....",
                     "................"
             },
-            // 20: OGRE_0
+            // 31: GOBLIN_3
+            {
+                    "................",
+                    "................",
+                    "....kkkkkkkk....",
+                    "..kkGGGGGGGGkk..",
+                    "..kGGGGGGGGGGk..",
+                    ".kGGkkGGkGGkkGk.",
+                    "....kGwkGwkGk...",
+                    "....kGGGGGGkk...",
+                    "...kkddddddkkb..",
+                    "..kddddddddddkb.",
+                    "..kGGkddddkGGkb.",
+                    "...kk.kddk.kskS.",
+                    ".....kdkkdk..kb.",
+                    ".....kdkkdk..b..",
+                    ".....kkkkkk.....",
+                    "................"
+            },
+            // 32: OGRE_0
             {
                     "...kkkkkkkkkk...",
                     "..koooooooooook.",
@@ -424,7 +665,26 @@ public final class PixelAtlas {
                     "....kkkkkkkk....",
                     "................"
             },
-            // 21: OGRE_1
+            // 33: OGRE_1
+            {
+                    "...kkkkkkkkkk...",
+                    "..koooooooooook.",
+                    ".kooookkkkoooook",
+                    ".kookrkkkkkrokok",
+                    ".koooowkkwoooook",
+                    ".kkoooooooooookb",
+                    "koooddddddddoobB",
+                    "koooddddddddookB",
+                    "koodddddddddddkb",
+                    "koodddddddddddkb",
+                    "kookddddddddkkb.",
+                    ".kk.kddkkddk.k..",
+                    "....kddkkddk....",
+                    "....kddkkddk....",
+                    "....kkkkkkkk....",
+                    "................"
+            },
+            // 34: OGRE_2
             {
                     "................",
                     "...kkkkkkkkkk...",
@@ -437,13 +697,32 @@ public final class PixelAtlas {
                     "koooddddddddookb",
                     "koodddddddddddkb",
                     "kookddddddddkkbb",
-                    ".kk.kddkkddkkbbb",
+                    ".kk.kddkkddkkbBb",
                     "....kddkkddk.kbb",
+                    "....kddkkddk..k.",
+                    "....kkkkkkkk....",
+                    "................"
+            },
+            // 35: OGRE_3
+            {
+                    "................",
+                    "...kkkkkkkkkk...",
+                    "..koooooooooook.",
+                    ".kooookkkkoooook",
+                    ".kookrkkkkkrokok",
+                    ".koooowkkwoooook",
+                    ".kkoooooooooookk",
+                    "koooddddddddooob",
+                    "koooddddddddookb",
+                    "koodddddddddddkb",
+                    "kookddddddddkkbB",
+                    ".kk.kddkkddk.kbb",
+                    "....kddkkddk.kb.",
                     "....kddkkddk....",
                     "....kkkkkkkk....",
                     "................"
             },
-            // 22: RAT_0
+            // 36: RAT_0
             {
                     "................",
                     "................",
@@ -462,7 +741,26 @@ public final class PixelAtlas {
                     ".....kk....kk.p.",
                     "................"
             },
-            // 23: RAT_1
+            // 37: RAT_1
+            {
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "...kk....kk.....",
+                    "..kppk..kppk....",
+                    "..ksskkkkssk....",
+                    "..kssrksrkSsk...",
+                    "..ksssssssssskkp",
+                    "...ksssssssssskp",
+                    "....ksssssssskp.",
+                    "....kssk..kssk..",
+                    ".....kk....kk...",
+                    "................"
+            },
+            // 38: RAT_2
             {
                     "................",
                     "................",
@@ -476,12 +774,31 @@ public final class PixelAtlas {
                     "..ksskkkkssk....",
                     "..kssrksrkssk...",
                     "..ksssssssssskk.",
-                    "...ksssssssssssk",
-                    "....ksskssskkkpk",
-                    ".....kk..kk..p..",
+                    "...ksssssssssspk",
+                    "....ksskssskkkpp",
+                    ".....kk..kk.....",
                     "................"
             },
-            // 24: BRAZIER_0
+            // 39: RAT_3
+            {
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "................",
+                    "..kk......kk....",
+                    "..kppk..kppk....",
+                    "..ksskkkkssk....",
+                    "..kssrksrkssk...",
+                    "..ksssssssssskk.",
+                    "...ksssssssssssk",
+                    "....ksskssskkpk.",
+                    ".....kk..kk..pp.",
+                    "................"
+            },
+            // 40: BRAZIER_0
             {
                     ".......f........",
                     "......fYf.......",
@@ -500,7 +817,7 @@ public final class PixelAtlas {
                     "..kkkk....kkkk..",
                     "................"
             },
-            // 25: BRAZIER_1
+            // 41: BRAZIER_1
             {
                     ".....f..........",
                     "....fYf....f....",
@@ -519,7 +836,45 @@ public final class PixelAtlas {
                     "..kkkk....kkkk..",
                     "................"
             },
-            // 26: BARREL
+            // 42: BRAZIER_2
+            {
+                    "........f.......",
+                    "...f...fYf......",
+                    "......fYYYf.f...",
+                    "....ffYYYYffYf..",
+                    "....fYYWWWYYYf..",
+                    ".....fYWWWYYf...",
+                    "...kkkkkkkkkk...",
+                    "..kssssssssssk..",
+                    "..ksSSSSSSSSsk..",
+                    "...kssssssssk...",
+                    "....ksskkssk....",
+                    "....ksk..ksk....",
+                    "...kssk..kssk...",
+                    "...ksk....ksk...",
+                    "..kkkk....kkkk..",
+                    "................"
+            },
+            // 43: BRAZIER_3
+            {
+                    "..........f.....",
+                    ".....f...fYf....",
+                    "....fYf..fYYf...",
+                    "...fYYfffYYYf...",
+                    "....fYYYWWYYf...",
+                    ".....fYYWWYf....",
+                    "...kkkkkkkkkk...",
+                    "..kssssssssssk..",
+                    "..ksSSSSSSSSsk..",
+                    "...kssssssssk...",
+                    "....ksskkssk....",
+                    "....ksk..ksk....",
+                    "...kssk..kssk...",
+                    "...ksk....ksk...",
+                    "..kkkk....kkkk..",
+                    "................"
+            },
+            // 44: BARREL
             {
                     "................",
                     "...kkkkkkkkkk...",
@@ -538,7 +893,7 @@ public final class PixelAtlas {
                     "...kkkkkkkkkk...",
                     "................"
             },
-            // 27: CRATE
+            // 45: CRATE
             {
                     "................",
                     ".kkkkkkkkkkkkkk.",
@@ -557,7 +912,7 @@ public final class PixelAtlas {
                     ".kkkkkkkkkkkkkk.",
                     "................"
             },
-            // 28: PILLAR
+            // 46: PILLAR
             {
                     "................",
                     "..kkkkkkkkkkkk..",
@@ -576,7 +931,7 @@ public final class PixelAtlas {
                     ".kddddddddddddk.",
                     ".kkkkkkkkkkkkkk."
             },
-            // 29: DOOR
+            // 47: DOOR
             {
                     "................",
                     "..kkkkkkkkkkkk..",
@@ -595,7 +950,7 @@ public final class PixelAtlas {
                     ".kkkkkkkkkkkkkk.",
                     "................"
             },
-            // 30: LOOT_BLADE
+            // 48: LOOT_BLADE
             {
                     "................",
                     "................",
@@ -614,7 +969,7 @@ public final class PixelAtlas {
                     ".kkk............",
                     "................"
             },
-            // 31: LOOT_OIL
+            // 49: LOOT_OIL
             {
                     "................",
                     "......kkkk......",
@@ -633,7 +988,7 @@ public final class PixelAtlas {
                     "................",
                     "................"
             },
-            // 32: LOOT_WATER
+            // 50: LOOT_WATER
             {
                     "................",
                     "......kkkk......",
@@ -652,7 +1007,7 @@ public final class PixelAtlas {
                     "................",
                     "................"
             },
-            // 33: LOOT_ACID
+            // 51: LOOT_ACID
             {
                     "................",
                     "......kkkk......",
@@ -671,7 +1026,7 @@ public final class PixelAtlas {
                     "................",
                     "................"
             },
-            // 34: LOOT_STONE
+            // 52: LOOT_STONE
             {
                     "................",
                     "................",
@@ -690,7 +1045,7 @@ public final class PixelAtlas {
                     "................",
                     "................"
             },
-            // 35: BRAZIER_OFF
+            // 53: BRAZIER_OFF
             {
                     "................",
                     "................",
@@ -708,12 +1063,280 @@ public final class PixelAtlas {
                     "...ksk....ksk...",
                     "..kkkk....kkkk..",
                     "................"
+            },
+            // 54: THRALL_MOVE_0
+            {
+                    "................",
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    ".f..kTTttTTk....",
+                    "fYf.kTkkkkTk....",
+                    "fYffkTkCCkTk....",
+                    "kWkkkTkkkkTk....",
+                    "kwkk.kkttttk..s.",
+                    "kwkkttTTTTtk.ss.",
+                    "kdkktTTTTTTtksk.",
+                    ".k.kttTTTTttkk..",
+                    "....kttttttkk...",
+                    "....kttk.kttk...",
+                    "...kttk...kttk..",
+                    "...kddk...kddk..",
+                    "...kkkk...kkkk.."
+            },
+            // 55: THRALL_MOVE_1
+            {
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk....",
+                    "..f.kTkkkkTk....",
+                    "fYffkTkCCkTk....",
+                    "fWYfkTkkkkTk....",
+                    "kWkk.kkttttkk...",
+                    "kwkkttTTTTttks..",
+                    "kwkktTTTTTTtkss.",
+                    "kdk.kttTTTTtksk.",
+                    ".k..kttttttkk...",
+                    "....kttttttkk...",
+                    ".....kttkkttk...",
+                    ".....kttk.kdk...",
+                    ".....kddk.kkk...",
+                    ".....kkkk......."
+            },
+            // 56: THRALL_MOVE_2
+            {
+                    "................",
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    ".f..kTTttTTk....",
+                    "fYffkTkkkkTk....",
+                    "fWffkTkCCkTk....",
+                    "kWkkkTkkkkTk....",
+                    "kwkk.kkttttkk...",
+                    "kwkkttTTTTttks..",
+                    "kdkktTTTTTTtkss.",
+                    ".k..kttTTTTtksk.",
+                    "....kttttttkk...",
+                    "....kttk.kttk...",
+                    "...kttk...kttk..",
+                    "..kddk.....kddk.",
+                    "..kkkk.....kkkk."
+            },
+            // 57: THRALL_MOVE_3
+            {
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk....",
+                    ".f..kTkkkkTk....",
+                    "fYf.kTkCCkTk....",
+                    "fYYfkTkkkkTk....",
+                    "kWkk.kkttttkk.s.",
+                    "kwkkttTTTTttkss.",
+                    "kwkktTTTTTTtksk.",
+                    "kdk.kttTTTTtkk..",
+                    ".k..kttttttkk...",
+                    "....kttttttkk...",
+                    "....kttkkttk....",
+                    "....kdk..kttk...",
+                    "....kkk..kddk...",
+                    ".........kkkk..."
+            },
+            // 58: THRALL_ATTACK_0
+            {
+                    ".....kkkk.......",
+                    "....kTTTTk...k..",
+                    "...kTTttTTk.kSk.",
+                    "...kTkkkkTkkSSk.",
+                    "...kTkCCkTkSSk..",
+                    ".f.kTkkkkTksSk..",
+                    "fYfk.kkttttkk...",
+                    "fYfkttTTTTtk....",
+                    "kWkk.tTTTTttk...",
+                    "kwk..ktttttk....",
+                    "kdk..ktttttk....",
+                    ".k...kttkkttk...",
+                    "....kttk..kttk..",
+                    "....kttk..kttk..",
+                    "....kddk..kddk..",
+                    "....kkkk..kkkk.."
+            },
+            // 59: THRALL_ATTACK_1
+            {
+                    "................",
+                    ".......kkkk.....",
+                    "......kTTTTk.ww.",
+                    ".....kTTttTTkwSw",
+                    ".....kTkkkkTk.Sw",
+                    "..f..kTkCCkTk.SS",
+                    ".fYf.kTkkkkTkSSs",
+                    ".fYfk.kkttttkSS.",
+                    ".kWkktTTTTttkss.",
+                    ".kwkktTTTTTTtk..",
+                    ".kdk.kttttttkk..",
+                    "..k..kttkkttk...",
+                    "....kttk..kttk..",
+                    "....kttk..kttk..",
+                    "....kddk..kddk..",
+                    "....kkkk..kkkk.."
+            },
+            // 60: THRALL_ATTACK_2
+            {
+                    "................",
+                    ".......kkkk.....",
+                    "......kTTTTk....",
+                    ".....kTTttTTk...",
+                    ".....kTkkkkTk..s",
+                    "..f..kTkCCkTk..S",
+                    ".fYf.kTkkkkTk..s",
+                    ".fYfkkttttkk....",
+                    ".kWkkTTTTTTtk...",
+                    ".kwkktTTTTTTkk..",
+                    ".kdk.kttttttksS.",
+                    "..k..kttkkttkkSS",
+                    ".....kttk.kttk.w",
+                    "....kttk...kttk.",
+                    "....kddk...kddk.",
+                    "....kkkk...kkkk."
+            },
+            // 61: THRALL_ATTACK_3
+            {
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk....",
+                    "....kTkkkkTk....",
+                    "....kTkCCkTk....",
+                    ".f..kTkkkkTk....",
+                    "fYf.kkttttkk....",
+                    "fYfkttTTTTttk...",
+                    "kWkktTTTTTTtk.s.",
+                    "kwkkttTTTTttksS.",
+                    "kdk.kttttttkksk.",
+                    ".k..kttkkttk.k..",
+                    "....kttk.kttk...",
+                    "....kttk.kttk...",
+                    "....kddk.kddk...",
+                    "....kkkk.kkkk..."
+            },
+            // 62: THRALL_CAST_0
+            {
+                    "................",
+                    "......kkkk......",
+                    ".....kTTTTk..C..",
+                    ".f..kTTttTTkCwC.",
+                    "fYf.kTkkkkTkTCk.",
+                    "fYffkTkCCkTktkk.",
+                    "kWkkkTkkkkTktk..",
+                    "kwkk.kkttttkk...",
+                    "kwk.ttTTTTttk...",
+                    "kdk.kttttttkk...",
+                    ".k..kttttttkk...",
+                    "....kttttttkk...",
+                    "....kttkkttk....",
+                    "...kttk..kttk...",
+                    "...kddk..kddk...",
+                    "...kkkk..kkkk..."
+            },
+            // 63: THRALL_CAST_1
+            {
+                    "...C..kkkk..C...",
+                    "..CwCkTTTTkCwC..",
+                    ".f.CkTTttTTkC...",
+                    "fYf.kTkkkkTk.C..",
+                    "fWffkTkCCkTkwCC.",
+                    "kWkkkTkkkkTkCwC.",
+                    "kwk.kkttttkkCT..",
+                    "kwkttTTTTTTtk...",
+                    "kdk.ktTTTTttk...",
+                    ".k..ktttttttk...",
+                    "...kttttttttkk..",
+                    "...ktttkktttk...",
+                    "....kttk.kttk...",
+                    "....kddk.kddk...",
+                    "....kkkk.kkkk...",
+                    "..C..........C.."
+            },
+            // 64: THRALL_CAST_2
+            {
+                    ".......kkkk...C.",
+                    "......kTTTTk.Cw.",
+                    ".....kTTttTTkCwC",
+                    ".f...kTkkkkTkwwC",
+                    "fYf..kTkCCkTkwCC",
+                    "fWff.kTkkkkTkCwC",
+                    "kWkk.kkttttkkTC.",
+                    "kwk.ttTTTTTTTtk.",
+                    "kwkktTTTTTTTtk..",
+                    "kdk.ktttttttkk..",
+                    ".k.kttttttttk...",
+                    "...ktttk.ktttk..",
+                    "...kttk...kttk..",
+                    "...kttk...kttk..",
+                    "...kddk...kddk..",
+                    "...kkkk...kkkk.."
+            },
+            // 65: THRALL_CAST_3
+            {
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk.C..",
+                    "....kTkkkkTk..C.",
+                    "....kTkCCkTk.Cw.",
+                    ".f..kTkkkkTk..C.",
+                    "fYf.kkttttkkT...",
+                    "fYfkttTTTTttk...",
+                    "kWkktTTTTTTtk.s.",
+                    "kwkkttTTTTttks..",
+                    "kwk.kttttttksk..",
+                    "kdk.kttttttkk...",
+                    ".k..kttkkttk....",
+                    "....kttk.kttk...",
+                    "....kddk.kddk...",
+                    "....kkkk.kkkk..."
+            },
+            // 66: THRALL_GUARD
+            {
+                    "................",
+                    "......kkkk......",
+                    ".....kTTTTk.....",
+                    "....kTTttTTk....",
+                    ".f..kTkkkkTk.S..",
+                    "fYf.kTkCCkTkkSk.",
+                    "fYffkTkkkkTkkSk.",
+                    "kWkk.kkttttkSSk.",
+                    "kwkkttTTTTtkssk.",
+                    "kwkktTTTTTTkYYk.",
+                    "kdk.kttTTTTkdk..",
+                    ".k..kttttttkk...",
+                    "....kttkkttk....",
+                    "...kttk..kttk...",
+                    "...kddk..kddk...",
+                    "...kkkk..kkkk..."
+            },
+            // 67: THRALL_HURT
+            {
+                    "................",
+                    "....kkkk........",
+                    "...kTTTTk.......",
+                    "..kTTttTTk...r..",
+                    "..kTkkkkTk..r...",
+                    "..kTkrwkTk......",
+                    ".f.kTkkkkTk.....",
+                    "fYfk.kkttttk....",
+                    "kWkkttTTTTttk...",
+                    "kwk.ktTTTTTTks..",
+                    "kdk.ktttttttkss.",
+                    ".k..kttkkttkk...",
+                    "...kttk..kttk...",
+                    "...kttk...kttk..",
+                    "...kddk...kddk..",
+                    "...kkkk...kkkk.."
             }
     };
 
-    public final Texture texture;
+    public static final int GLOW_SIZE = 32;
+
+    public final Texture texture, glowTex;
     public final TextureRegion[] regions = new TextureRegion[COUNT];
-    public final TextureRegion white;
+    public final TextureRegion white, glow;
 
     public PixelAtlas() {
         int[] pixels = bakeRgbaPixels();
@@ -735,13 +1358,43 @@ public final class PixelAtlas {
         int wx = (COUNT % COLS) * CELL + 4;
         int wy = (COUNT / COLS) * CELL + 4;
         white = new TextureRegion(texture, wx, wy, 4, 4);
+
+        int[] glowPixels = bakeGlowPixels();
+        Pixmap gp = new Pixmap(GLOW_SIZE, GLOW_SIZE, Pixmap.Format.RGBA8888);
+        for (int y = 0; y < GLOW_SIZE; y++) {
+            for (int x = 0; x < GLOW_SIZE; x++) {
+                gp.drawPixel(x, y, glowPixels[y * GLOW_SIZE + x]);
+            }
+        }
+        glowTex = new Texture(gp);
+        glowTex.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        gp.dispose();
+        glow = new TextureRegion(glowTex);
     }
 
     public void dispose() {
         texture.dispose();
+        glowTex.dispose();
     }
 
-    /** Bakes all 36 16x16 sprites + cell 36 solid white block into RGBA8888 pixels. */
+    /** Bakes a smooth 32x32 radial gradient for Linear-filtered shadows and additive light halos. */
+    public static int[] bakeGlowPixels() {
+        int[] out = new int[GLOW_SIZE * GLOW_SIZE];
+        float mid = (GLOW_SIZE - 1) * 0.5f;
+        for (int y = 0; y < GLOW_SIZE; y++) {
+            for (int x = 0; x < GLOW_SIZE; x++) {
+                float dx = (x - mid) / mid, dy = (y - mid) / mid;
+                float d = (float) Math.sqrt(dx * dx + dy * dy);
+                if (d >= 1f) continue;
+                float f = 1f - d;
+                int a = Math.min(255, Math.round(255f * f * f));
+                out[y * GLOW_SIZE + x] = 0xFFFFFF00 | a;
+            }
+        }
+        return out;
+    }
+
+    /** Bakes all 68 16x16 sprites + cell 68 solid white block into RGBA8888 pixels. */
     public static int[] bakeRgbaPixels() {
         int[] out = new int[ATLAS_W * ATLAS_H];
         for (int idx = 0; idx < COUNT; idx++) {
@@ -788,6 +1441,17 @@ public final class PixelAtlas {
         };
     }
 
+    public static int thrallSprite(int pose, int frame) {
+        return switch (pose) {
+            case POSE_MOVE -> THRALL_MOVE_0 + frame;
+            case POSE_ATTACK -> THRALL_ATTACK_0 + frame;
+            case POSE_CAST -> THRALL_CAST_0 + frame;
+            case POSE_GUARD -> THRALL_GUARD;
+            case POSE_HURT -> THRALL_HURT;
+            default -> THRALL_0 + frame;
+        };
+    }
+
     public static int spriteForLoot(byte lootKind) {
         return switch (lootKind) {
             case Scene.LOOT_BLADE -> LOOT_BLADE;
@@ -814,7 +1478,7 @@ public final class PixelAtlas {
             };
         }
         // Water / Ice / Acid / Oil / Tar / Fire / Gas
-        if (idx == WATER_0 || idx == WATER_1) {
+        if (idx >= WATER_0 && idx <= WATER_3) {
             return switch (ch) {
                 case 'b' -> 0x1B4D7ACC;
                 case 'B' -> 0x2B72AACC;
@@ -822,7 +1486,7 @@ public final class PixelAtlas {
                 default -> 0x1B4D7ACC;
             };
         }
-        if (idx == ACID_0 || idx == ACID_1) {
+        if (idx >= ACID_0 && idx <= ACID_3) {
             return switch (ch) {
                 case 'a' -> 0x4A9228DD;
                 case 'A' -> 0x73C73CEE;
@@ -848,7 +1512,7 @@ public final class PixelAtlas {
                 default -> 0x6BBBD8CC;
             };
         }
-        if (idx == FIRE_0 || idx == FIRE_1) {
+        if (idx >= FIRE_0 && idx <= FIRE_3) {
             return switch (ch) {
                 case 'f' -> 0xD94E28E6;
                 case 'Y' -> 0xF59E2BFF;
