@@ -1,0 +1,3 @@
+Versilian Studios Chamber Orchestra 2 - Community Edition (VSCO 2 CE)
+Source: https://github.com/sgossner/VSCO-2-CE
+License: CC0 1.0 Universal (Public Domain Dedication)

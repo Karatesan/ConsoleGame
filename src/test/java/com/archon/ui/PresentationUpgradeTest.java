@@ -10,6 +10,7 @@ import com.archon.model.World;
 import com.archon.verb.ExitCode;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -73,13 +74,13 @@ class PresentationUpgradeTest {
 
     @Test
     void synthAudioBuildsValidRiffWaveForEverySoundKind() {
-        assertEquals(16, SynthAudio.COUNT);
+        assertEquals(22, SynthAudio.COUNT);
         SynthAudio audio = new SynthAudio();
         for (int k = 0; k < SynthAudio.COUNT; k++) {
-            int variants = SynthAudio.variantsFor(k);
+            int variants = SfxGen.variantsFor(k);
             assertTrue(variants >= 1);
             for (int v = 0; v < variants; v++) {
-                byte[] wav = v == 0 ? SynthAudio.buildWav(k) : SynthAudio.buildWav(k, v);
+                byte[] wav = v == 0 ? SfxGen.buildWav(k) : SfxGen.buildWav(k, v);
                 assertTrue(wav.length > 44, "WAV too short for kind " + k + " v=" + v);
                 assertEquals('R', wav[0]);
                 assertEquals('I', wav[1]);
@@ -117,48 +118,37 @@ class PresentationUpgradeTest {
             }
             audio.play(k, 0.5f, 1.05f, -0.3f);
         }
-        byte[] amb = SynthAudio.buildAmbientWav();
-        int ambChannels = (amb[22] & 0xFF) | ((amb[23] & 0xFF) << 8);
-        assertEquals(2, ambChannels);
-        assertEquals(44 + 44100 * 4 * 4, amb.length);
-
-        byte[] theme = SynthAudio.buildThemeWav();
-        int themeChannels = (theme[22] & 0xFF) | ((theme[23] & 0xFF) << 8);
-        assertEquals(2, themeChannels);
-        assertEquals(44 + 44100 * 16 * 4, theme.length);
-        boolean themeNonZero = false;
-        for (int i = 44; i < theme.length; i++) {
-            if (theme[i] != 0) {
-                themeNonZero = true;
-                break;
-            }
+        assertFalse(Arrays.equals(SfxGen.buildWav(SfxGen.BLOOD_BOLT, 0), SfxGen.buildWav(SfxGen.ZAP, 0)),
+                "BLOOD_BOLT should differ from ZAP");
+        int[] variedKinds = {SfxGen.BOOM, SfxGen.SPLASH, SfxGen.SIZZLE, SfxGen.BLOOD_BOLT};
+        for (int i = 0; i < variedKinds.length; i++) {
+            int k = variedKinds[i];
+            assertFalse(Arrays.equals(SfxGen.buildWav(k, 0), SfxGen.buildWav(k, 1)),
+                    "Variants 0 and 1 should differ for kind " + k);
         }
-        assertTrue(themeNonZero, "Theme PCM samples should be non-zero");
+        for (int t = 0; t < 3; t++) {
+            audio.playTier(SynthAudio.CRIT, t, 0.75f, 1.0f, 0f);
+        }
 
         assertFalse(audio.toggleMute());
         assertTrue(audio.toggleMute());
         assertTrue(audio.toggleMusic());
         assertFalse(audio.toggleMusic());
 
-        for (int v = 0; v < SynthAudio.COMBAT_VARIANTS; v++) {
-            byte[] combat = SynthAudio.buildCombatWav(v);
-            int cChannels = (combat[22] & 0xFF) | ((combat[23] & 0xFF) << 8);
-            assertEquals(2, cChannels);
-            assertEquals(44 + 44100 * 16 * 4, combat.length);
-            boolean combatNonZero = false;
-            for (int i = 44; i < combat.length; i++) {
-                if (combat[i] != 0) {
-                    combatNonZero = true;
-                    break;
-                }
-            }
-            assertTrue(combatNonZero, "Combat PCM samples should be non-zero for variant " + v);
-        }
-        audio.setCombat(true);
+        audio.setHpRatio(1f);
         audio.updateMusic(0.5f);
-        audio.setCombat(true, 2);
-        audio.setCombat(false);
-        audio.updateMusic(1.5f);
+        for (int t = 0; t < SynthAudio.TRACK_COUNT; t++) {
+            audio.setTrack(t);
+            audio.updateMusic(0.2f);
+        }
+        audio.setHpRatio(0.25f);
+        audio.setTrack(-1);
+        audio.playDelayed(SynthAudio.SIPHON, 0.26f, 0.6f, 1.0f, 0f);
+        audio.playTierDelayed(SynthAudio.CRIT, 2, 0.36f, 0.8f, 1.0f, 0f);
+        audio.updateMusic(0.5f);
+        audio.setHpRatio(1f);
+        audio.updateMusic(0.5f);
+        audio.dispose();
     }
 
     @Test

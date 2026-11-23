@@ -128,9 +128,11 @@ public final class GdxView extends ApplicationAdapter implements View {
 
     private final float[] hitFlash = new float[MAX_ENT],
             lungeX = new float[MAX_ENT], lungeY = new float[MAX_ENT], lungeAge = new float[MAX_ENT];
+    private static final float PIPE_STEP_DELAY = 0.26f;
     private float shakeTime, shakeMaxTime = 0.28f, shakeMag, shakeX, shakeY, hitStop, critFlashTime;
     private final int[] targetX = new int[8], targetY = new int[8];
-    private int vfxRng = 0x13572468, pipeElem = ELEM_FORCE;
+    private int vfxRng = 0x13572468, pipeElem = ELEM_FORCE, lastImpactElem = ELEM_FORCE;
+    private float curVfxDelay = 0f, lastPipeDelay = 0f;
     private int thrallPose = PixelAtlas.POSE_IDLE, thrallFacing = 1, thrallCastElem = ELEM_FORCE;
     private float thrallPoseAge, thrallPoseMax;
     private final String[] critMsg = new String[MAX_CRIT_QUEUE];
@@ -506,12 +508,16 @@ public final class GdxView extends ApplicationAdapter implements View {
             }
             case GameEvent.EnemyPhaseStart e -> {
                 openStage = null;
+                lastImpactElem = ELEM_FORCE;
+                lastPipeDelay = 0f;
                 curGroup = G_HOSTILE;
                 curBlock = 0;
                 addRow(K_PHASE, G_HOSTILE, "HOSTILE PHASE", CREATURE, null, null);
             }
             case GameEvent.ActorBeat e -> {
                 actingId = e.id();
+                lastImpactElem = ELEM_FORCE;
+                lastPipeDelay = 0f;
                 curGroup = G_HOSTILE;
                 curBlock = nextBlock++;
                 triggerActorBeatVfx(e);
@@ -566,12 +572,12 @@ public final class GdxView extends ApplicationAdapter implements View {
                 openStage = null;
                 round = e.round();
                 ap = e.ap();
-                if (e.round() > 1) playSfx(SynthAudio.SUBMIT, 0.22f, 0.02f);
+                if (e.round() > 1) playSfx(SynthAudio.SUBMIT, 0.22f, 0f);
                 addRow(K_ROUND, G_NONE, "ROUND " + e.round(), THRALL, e.ap() + " AP READY", THRALL);
             }
             case GameEvent.ThrallDied e -> {
                 curBlock = 0;
-                playSfx(SynthAudio.BOOM, 0.78f, 0.06f);
+                playSfx(SynthAudio.STING_DEATH, 0.72f, 0f);
                 addRow(K_ALERT, G_NONE, "THE THRALL COLLAPSES. THE LINK GOES DARK.", CREATURE, "FATAL", CREATURE);
             }
             default -> { }
@@ -666,15 +672,21 @@ public final class GdxView extends ApplicationAdapter implements View {
 
     private void triggerStageVfx(String cmd) {
         if (cur == null || cmd == null || cmd.isBlank()) return;
-        int len = cmd.length(), segStart = 0;
+        int len = cmd.length(), segStart = 0, pipeIdx = 0;
         while (segStart < len) {
             int bar = cmd.indexOf('|', segStart);
             int segEnd = bar < 0 ? len : bar;
             String seg = cmd.substring(segStart, segEnd).trim();
-            if (!seg.isEmpty()) triggerInvocationVfx(seg);
+            if (!seg.isEmpty()) {
+                curVfxDelay = pipeIdx * PIPE_STEP_DELAY;
+                triggerInvocationVfx(seg, pipeIdx++);
+            }
             if (bar < 0) break;
             segStart = bar + 1;
         }
+        lastPipeDelay = pipeIdx > 1 ? (pipeIdx - 1) * PIPE_STEP_DELAY : 0f;
+        curVfxDelay = 0f;
+        lastImpactElem = pipeElem;
         pipeElem = ELEM_FORCE;
     }
 
@@ -722,19 +734,37 @@ public final class GdxView extends ApplicationAdapter implements View {
         if (floaterSlot >= 0) {
             floatText[floaterSlot] = (tier > 1 ? "CRIT T" + tier + "! " : "CRIT! ") + delta;
         }
-        playSfxAt(SynthAudio.CRIT, 0.75f, 0.08f, cx);
-        if (elem == ELEM_FIRE) playSfxAt(SynthAudio.FIRE, 0.55f, 0.12f, cx);
-        else if (elem == ELEM_ACID) playSfxAt(SynthAudio.SIZZLE, 0.50f, 0.12f, cx);
-        else if (tier >= 2 && elem != ELEM_FORCE) playSfxAt(SynthAudio.BOOM, 0.50f, 0.10f, cx);
+        audio.playTierDelayed(SynthAudio.CRIT, tier - 1, curVfxDelay, 0.70f + 0.06f * tier, 1f + (nextRand01() - 0.5f) * 0.06f, panFor(cx));
+        if (elem == ELEM_FIRE) playSfxAtPitched(SynthAudio.FIRE, 0.55f, 1f, 0.12f, cx);
+        else if (elem == ELEM_ACID) playSfxAtPitched(SynthAudio.SIZZLE, 0.50f, 1f, 0.12f, cx);
+        else if (elem == ELEM_BLOOD) playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.52f, 1.06f, 0.08f, cx);
+        else if (elem == ELEM_FORCE && tier >= 2) playSfxAtPitched(SynthAudio.ZAP, 0.48f, 1.12f, 0.08f, cx);
+        if (tier >= 2 && elem != ELEM_FORCE && elem != ELEM_FIRE && elem != ELEM_ACID) {
+            playSfxAtPitched(SynthAudio.BOOM, 0.50f, 1f, 0.10f, cx);
+        }
+        if (cur.hp[entIdx] <= 0 && cur.kind[entIdx] == Entity.Kind.CREATURE) {
+            playSfxAtPitched(SynthAudio.STING_KILL, 0.42f, 1f, 0f, cx);
+        }
     }
 
     private void playSfx(int kind, float vol, float jitter) {
         audio.play(kind, vol, 1f + (nextRand01() - 0.5f) * jitter, 0f);
     }
 
+    private float panFor(float tx) {
+        return cur == null ? 0f : MathUtils.clamp((tx / Math.max(1f, cur.w) - 0.5f) * 1.15f, -0.6f, 0.6f);
+    }
+
     private void playSfxAt(int kind, float vol, float jitter, float tx) {
-        float pan = cur == null ? 0f : MathUtils.clamp((tx / Math.max(1f, cur.w) - 0.5f) * 1.15f, -0.6f, 0.6f);
-        audio.play(kind, vol, 1f + (nextRand01() - 0.5f) * jitter, pan);
+        audio.play(kind, vol, 1f + (nextRand01() - 0.5f) * jitter, panFor(tx));
+    }
+
+    private void playSfxAtPitched(int kind, float vol, float basePitch, float jitter, float tx) {
+        playSfxAtDelayed(kind, curVfxDelay, vol, basePitch, jitter, tx);
+    }
+
+    private void playSfxAtDelayed(int kind, float delay, float vol, float basePitch, float jitter, float tx) {
+        audio.playDelayed(kind, delay, vol, basePitch * (1f + (nextRand01() - 0.5f) * jitter), panFor(tx));
     }
 
     private void setThrallPose(int pose, float dur, int targetTileX, boolean hasTarget, int elem) {
@@ -748,7 +778,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         }
     }
 
-    private void triggerInvocationVfx(String cmd) {
+    private void triggerInvocationVfx(String cmd, int pipeIdx) {
         int nTargets = findTargets(cmd, cur, targetX, targetY, targetX.length);
         float sx = cur.x[0] + 0.5f, sy = cur.y[0] + 0.5f;
         int ex = nTargets > 0 ? targetX[0] : cur.x[0];
@@ -757,6 +787,8 @@ public final class GdxView extends ApplicationAdapter implements View {
 
         String verb = firstWord(cmd);
         int elem = inferStageElement(cmd, verb, nTargets);
+        boolean channeled = cur != null && cur.channel != null && !"none".equals(cur.channel);
+        float pipePitch = 1f + Math.min(3, pipeIdx) * 0.045f + (channeled ? 0.03f : 0f);
         pipeElem = elem;
         switch (verb) {
             case "bolt" -> {
@@ -764,24 +796,25 @@ public final class GdxView extends ApplicationAdapter implements View {
                 if (elem == ELEM_FIRE) {
                     if (nTargets > 0) spawnFx(FX_FIREBALL, sx, sy, tx, ty, 0.34f, FIRE, ELEM_FIRE);
                     spawnBurst(tx, ty, 20, EMBER, -0.9f);
-                    playSfxAt(SynthAudio.FIRE, 0.68f, 0.14f, tx);
+                    playSfxAtPitched(SynthAudio.FIRE, 0.68f, pipePitch, 0.14f, tx);
                 } else if (elem == ELEM_BLOOD) {
                     if (nTargets > 0) spawnFx(FX_BLOOD_BOLT, sx, sy, tx, ty, 0.36f, BLOOD_BRIGHT, ELEM_BLOOD);
                     spawnBurst(tx, ty, 18, BLOOD_BRIGHT, -0.4f);
                     spawnBurst(sx, sy, 8, BLOOD_DEEP, -0.6f);
-                    playSfxAt(SynthAudio.ZAP, 0.58f, 0.12f, tx);
+                    playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.76f, pipePitch, 0.10f, tx);
                 } else if (elem == ELEM_ACID || elem == ELEM_WATER || elem == ELEM_OIL || elem == ELEM_ITEM) {
                     Color ec = elemColor(elem);
                     if (nTargets > 0) spawnFx(FX_ELEM_BOLT, sx, sy, tx, ty, 0.32f, ec, elem);
                     spawnBurst(tx, ty, 14, ec, -0.5f);
                     int sfx = elem == ELEM_ITEM ? SynthAudio.SHOOT
                             : elem == ELEM_ACID ? SynthAudio.SIZZLE : SynthAudio.SPLASH;
-                    playSfxAt(sfx, 0.58f, 0.14f, tx);
+                    playSfxAtPitched(sfx, 0.58f, pipePitch, 0.14f, tx);
                 } else {
                     if (nTargets > 0) spawnFx(FX_PSIONIC_SPIKE, sx, sy, tx, ty, 0.36f, BOLT_COL, ELEM_FORCE);
                     spawnBurst(tx, ty, 14, Color.WHITE, -0.5f);
-                    playSfxAt(SynthAudio.ZAP, 0.58f, 0.12f, tx);
+                    playSfxAtPitched(SynthAudio.ZAP, 0.74f, pipePitch, 0.12f, tx);
                 }
+                if (channeled) playSfxAtPitched(SynthAudio.PSIONIC, 0.22f, pipePitch, 0.08f, sx);
             }
             case "blast" -> {
                 setThrallPose(PixelAtlas.POSE_CAST, 0.68f, ex, nTargets > 0, elem);
@@ -791,16 +824,18 @@ public final class GdxView extends ApplicationAdapter implements View {
                 if (elem == ELEM_BLOOD) {
                     spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, BLOOD_DEEP, elem);
                     spawnCrossBurst(ex, ey, 6, BLOOD_BRIGHT, -0.4f);
+                    playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.52f, pipePitch * 0.92f, 0.10f, tx);
                 } else if (elem == ELEM_FIRE) {
                     spawnCrossBurst(ex, ey, 6, EMBER, -0.9f);
-                    playSfxAt(SynthAudio.FIRE, 0.60f, 0.12f, tx);
+                    playSfxAtPitched(SynthAudio.FIRE, 0.60f, pipePitch, 0.12f, tx);
                 } else {
                     spawnCrossBurst(ex, ey, 5, ec, -0.6f);
-                    if (elem == ELEM_ACID) playSfxAt(SynthAudio.SIZZLE, 0.54f, 0.12f, tx);
-                    else if (elem == ELEM_WATER || elem == ELEM_OIL) playSfxAt(SynthAudio.SPLASH, 0.54f, 0.12f, tx);
+                    if (elem == ELEM_ACID) playSfxAtPitched(SynthAudio.SIZZLE, 0.54f, pipePitch, 0.12f, tx);
+                    else if (elem == ELEM_WATER || elem == ELEM_OIL) playSfxAtPitched(SynthAudio.SPLASH, 0.54f, pipePitch, 0.12f, tx);
                 }
                 triggerShake(0.24f, 4f);
-                playSfxAt(SynthAudio.BOOM, 0.68f, 0.12f, tx);
+                playSfxAtPitched(SynthAudio.BOOM, 0.68f, pipePitch, 0.12f, tx);
+                if (channeled) playSfxAtPitched(SynthAudio.PSIONIC, 0.22f, pipePitch, 0.08f, sx);
             }
             case "push", "pull" -> {
                 setThrallPose(PixelAtlas.POSE_CAST, 0.56f, ex, nTargets > 0, elem);
@@ -809,7 +844,7 @@ public final class GdxView extends ApplicationAdapter implements View {
                     spawnFx(FX_PROJ, verb.equals("push") ? sx : tx, verb.equals("push") ? sy : ty,
                             verb.equals("push") ? tx : sx, verb.equals("push") ? ty : sy, 0.22f, THRALL, elem);
                 }
-                playSfxAt(SynthAudio.PSIONIC, 0.52f, 0.14f, tx);
+                playSfxAtPitched(SynthAudio.PSIONIC, 0.52f, pipePitch, 0.14f, tx);
             }
             case "throw", "shoot" -> {
                 setThrallPose(PixelAtlas.POSE_ATTACK, 0.36f, ex, nTargets > 0, elem);
@@ -829,10 +864,12 @@ public final class GdxView extends ApplicationAdapter implements View {
                     spawnFx(FX_DRAIN, tx, ty, sx, sy, 0.34f, sc, elem);
                     spawnBurst(tx, ty, 10, sc, -0.5f);
                 }
-                int sfx = elem == ELEM_FIRE ? SynthAudio.FIRE
-                        : elem == ELEM_ACID ? SynthAudio.SIZZLE
-                        : (elem == ELEM_WATER || elem == ELEM_OIL) ? SynthAudio.SPLASH : SynthAudio.PSIONIC;
-                playSfxAt(sfx, 0.52f, 0.14f, tx);
+                playSfxAtPitched(SynthAudio.SIPHON, 0.62f, pipePitch, 0.10f, tx);
+                if (elem == ELEM_FIRE || elem == ELEM_ACID || elem == ELEM_WATER || elem == ELEM_OIL) {
+                    int hint = elem == ELEM_FIRE ? SynthAudio.FIRE
+                            : elem == ELEM_ACID ? SynthAudio.SIZZLE : SynthAudio.SPLASH;
+                    playSfxAtPitched(hint, 0.26f, pipePitch, 0.12f, tx);
+                }
             }
             case "pour" -> {
                 setThrallPose(PixelAtlas.POSE_ATTACK, 0.32f, ex, nTargets > 0, elem);
@@ -844,7 +881,7 @@ public final class GdxView extends ApplicationAdapter implements View {
                 setThrallPose(PixelAtlas.POSE_CAST, 0.60f, ex, nTargets > 0, ELEM_FIRE);
                 spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, FIRE, ELEM_FIRE);
                 spawnBurst(tx, ty, 16, FIRE, -1.0f);
-                playSfxAt(SynthAudio.FIRE, 0.62f, 0.16f, tx);
+                playSfxAtPitched(SynthAudio.FIRE, 0.62f, pipePitch, 0.16f, tx);
             }
             case "strike" -> {
                 setThrallPose(PixelAtlas.POSE_ATTACK, 0.36f, ex, nTargets > 0, elem);
@@ -865,7 +902,10 @@ public final class GdxView extends ApplicationAdapter implements View {
                     Color cc = elem == ELEM_FORCE ? BOLT_COL : elemColor(elem);
                     spawnFx(FX_RING, sx, sy, 1.1f, 0f, 0.35f, cc, elem);
                 }
-                playSfxAt(elem == ELEM_FIRE ? SynthAudio.FIRE : SynthAudio.PSIONIC, 0.48f, 0.12f, sx);
+                playSfxAt(elem == ELEM_BLOOD ? SynthAudio.STING_BLOOD
+                        : (elem == ELEM_FIRE ? SynthAudio.FIRE : SynthAudio.PSIONIC),
+                        elem == ELEM_BLOOD ? 0.58f : 0.48f,
+                        elem == ELEM_BLOOD ? 0f : 0.12f, sx);
             }
             case "guard" -> {
                 setThrallPose(PixelAtlas.POSE_GUARD, 0.45f, ex, false, elem);
@@ -918,10 +958,11 @@ public final class GdxView extends ApplicationAdapter implements View {
         cur = s;
         hp = s.hp[0];
         maxHp = s.maxHp[0];
-        audio.setCombat(hasVisibleEnemy(s));
+        updateAudioMusicState(s);
         anim = 0;
         prevIdx = new int[s.n];
-        int firstDamagedIdx = -1, firstDamagedDelta = 0, firstDamagedSlot = -1;
+        float impactDelay = lastPipeDelay > 0f ? lastPipeDelay + 0.10f : 0f;
+        int firstDamagedIdx = -1, firstDamagedDelta = 0, firstDamagedSlot = -1, normalHitCount = 0;
         for (int i = 0; i < s.n; i++) {
             prevIdx[i] = p == null ? -1 : p.indexOf(s.id[i]);
             if (i == 0 && prevIdx[0] >= 0 && s.moved(0, p)) {
@@ -945,28 +986,32 @@ public final class GdxView extends ApplicationAdapter implements View {
                     }
                     if (i < MAX_ENT) hitFlash[i] = 0.28f;
                     Color bloodOrSpark = s.kind[i] == Entity.Kind.CREATURE ? BLEED_COL : PROP;
+                    curVfxDelay = impactDelay;
                     spawnBurst(s.x[i] + 0.5f, s.y[i] + 0.5f, 14, bloodOrSpark, -0.4f);
                     int critSlot = consumeCritFor(s.name[i]);
                     if (critSlot >= 0) {
                         triggerCritImpact(i, critTierQ[critSlot], critElemQ[critSlot], delta, slot);
-                    } else {
+                    } else if (!(i == 0 && lastImpactElem == ELEM_BLOOD)) {
                         triggerShake(0.16f, -delta >= 10 ? 5f : 2.5f);
-                        playSfxAt(SynthAudio.HIT, 0.64f, 0.16f, s.x[i] + 0.5f);
+                        playNormalHit(s, i, normalHitCount++);
                     }
+                    curVfxDelay = 0f;
                 } else if (delta > 0 && p != null) {
                     spawnBurst(s.x[i] + 0.5f, s.y[i] + 0.5f, 10, SAGE, -0.7f);
-                    playSfxAt(SynthAudio.HEAL, 0.45f, 0.08f, s.x[i] + 0.5f);
+                    playSfxAt(SynthAudio.HEAL, 0.45f, 0f, s.x[i] + 0.5f);
                 }
             }
         }
         if (p != null) {
             if (firstDamagedIdx >= 0) {
+                curVfxDelay = impactDelay;
                 for (int k = 0; k < critCount; k++) {
                     if (critMsg[k] != null) {
                         triggerCritImpact(firstDamagedIdx, critTierQ[k], critElemQ[k], firstDamagedDelta, firstDamagedSlot);
                         break;
                     }
                 }
+                curVfxDelay = 0f;
             }
             critCount = 0;
             boolean newSteam = false, newFire = false;
@@ -988,6 +1033,43 @@ public final class GdxView extends ApplicationAdapter implements View {
             if (newSteam) playSfxAt(SynthAudio.SIZZLE, 0.40f, 0.14f, steamX);
             else if (newFire) playSfxAt(SynthAudio.FIRE, 0.38f, 0.16f, fireX);
         }
+        lastImpactElem = ELEM_FORCE;
+        lastPipeDelay = 0f;
+    }
+
+    private void playNormalHit(Scene s, int i, int hitIdx) {
+        float tx = s.x[i] + 0.5f;
+        boolean isProp = s.kind[i] == Entity.Kind.PROP || s.kind[i] == Entity.Kind.DOOR;
+        int baseKind = isProp ? SynthAudio.HIT_PROP : SynthAudio.HIT;
+        float basePitch = (i == 0 ? 0.88f : 1.0f) + Math.min(3, hitIdx) * 0.03f;
+        float baseVol = Math.max(0.42f, 0.64f - 0.06f * Math.min(3, hitIdx));
+        playSfxAtPitched(baseKind, baseVol, basePitch, 0.14f, tx);
+
+        if (s.frozenEntity[i]) {
+            playSfxAtPitched(SynthAudio.SHATTER, 0.30f, 1.18f, 0.10f, tx);
+        } else if (s.wetEntity[i] || s.oiledEntity[i]) {
+            playSfxAtPitched(SynthAudio.SPLASH, 0.28f, 1.10f, 0.12f, tx);
+        } else if (s.burningEntity[i]) {
+            playSfxAtPitched(SynthAudio.FIRE, 0.26f, 1.05f, 0.12f, tx);
+        }
+
+        if (i != 0) {
+            if (lastImpactElem == ELEM_FIRE) playSfxAtPitched(SynthAudio.FIRE, 0.28f, 1.02f, 0.12f, tx);
+            else if (lastImpactElem == ELEM_ACID) playSfxAtPitched(SynthAudio.SIZZLE, 0.28f, 1.02f, 0.12f, tx);
+            else if (lastImpactElem == ELEM_BLOOD) playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.30f, 0.92f, 0.10f, tx);
+        }
+
+        if (s.hp[i] <= 0) {
+            if (isProp || s.frozenEntity[i]) playSfxAtPitched(SynthAudio.SHATTER, 0.56f, 1f, 0.12f, tx);
+            else if (s.kind[i] == Entity.Kind.CREATURE) playSfxAtPitched(SynthAudio.STING_KILL, 0.44f, 1f, 0f, tx);
+        }
+    }
+
+    private void updateAudioMusicState(Scene s) {
+        if (s == null || s.maxHp[0] <= 0) return;
+        float hpRatio = Math.max(0f, Math.min(1f, s.hp[0] / (float) s.maxHp[0]));
+        audio.setCombat(hasVisibleEnemy(s));
+        audio.setHpRatio(hpRatio);
     }
 
     static boolean hasVisibleEnemy(Scene s) {
@@ -1031,7 +1113,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         partY[nextPart] = ty;
         partVX[nextPart] = vx;
         partVY[nextPart] = vy;
-        partAge[nextPart] = 0f;
+        partAge[nextPart] = -curVfxDelay;
         partMaxAge[nextPart] = maxAge;
         partSize[nextPart] = size;
         partCol[nextPart].set(col);
@@ -1058,7 +1140,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         fxY0[nextFx] = y0;
         fxX1[nextFx] = x1;
         fxY1[nextFx] = y1;
-        fxAge[nextFx] = 0f;
+        fxAge[nextFx] = -curVfxDelay;
         fxMaxAge[nextFx] = maxAge;
         fxParam[nextFx] = param;
         fxCol[nextFx].set(col);
@@ -1098,8 +1180,10 @@ public final class GdxView extends ApplicationAdapter implements View {
         for (int i = 0; i < MAX_PARTICLES; i++) {
             if (partAge[i] < partMaxAge[i]) {
                 partAge[i] += simDt;
-                partX[i] += partVX[i] * simDt;
-                partY[i] += partVY[i] * simDt;
+                if (partAge[i] >= 0f) {
+                    partX[i] += partVX[i] * simDt;
+                    partY[i] += partVY[i] * simDt;
+                }
             }
         }
         for (int i = 0; i < MAX_FX; i++) {
@@ -1634,7 +1718,7 @@ public final class GdxView extends ApplicationAdapter implements View {
 
         // 3. Crisp 3x/4x projectile & cross sprites + particles
         for (int i = 0; i < MAX_FX; i++) {
-            if (fxAge[i] >= fxMaxAge[i]) continue;
+            if (fxAge[i] < 0f || fxAge[i] >= fxMaxAge[i]) continue;
             float u = fxAge[i] / fxMaxAge[i];
             float a = 1f - u;
             Color fc = fxCol[i];
@@ -1684,7 +1768,7 @@ public final class GdxView extends ApplicationAdapter implements View {
             }
         }
         for (int i = 0; i < MAX_PARTICLES; i++) {
-            if (partAge[i] >= partMaxAge[i]) continue;
+            if (partAge[i] < 0f || partAge[i] >= partMaxAge[i]) continue;
             float a = 1f - partAge[i] / partMaxAge[i];
             Color pc = partCol[i];
             batch.setColor(pc.r, pc.g, pc.b, a);
@@ -1722,7 +1806,7 @@ public final class GdxView extends ApplicationAdapter implements View {
             }
         }
         for (int i = 0; i < MAX_FX; i++) {
-            if (fxAge[i] >= fxMaxAge[i]) continue;
+            if (fxAge[i] < 0f || fxAge[i] >= fxMaxAge[i]) continue;
             float u = fxAge[i] / fxMaxAge[i];
             float a = 1f - u;
             Color fc = fxCol[i];
@@ -1871,7 +1955,7 @@ public final class GdxView extends ApplicationAdapter implements View {
 
         // Active spell / combat VFX
         for (int i = 0; i < MAX_FX; i++) {
-            if (fxAge[i] >= fxMaxAge[i]) continue;
+            if (fxAge[i] < 0f || fxAge[i] >= fxMaxAge[i]) continue;
             float u = fxAge[i] / fxMaxAge[i];
             float a = 1f - u;
             Color fc = fxCol[i];
