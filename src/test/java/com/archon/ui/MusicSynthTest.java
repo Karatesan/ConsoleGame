@@ -1,5 +1,7 @@
 package com.archon.ui;
 
+import com.archon.ui.audio.Dsp;
+import com.archon.ui.audio.MusicSynth;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

@@ -1,4 +1,4 @@
-package com.archon.ui;
+package com.archon.ui.audio;
 
 import java.io.BufferedReader;
 import java.io.IOException;

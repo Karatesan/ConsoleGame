@@ -1,4 +1,4 @@
-package com.archon.ui;
+package com.archon.ui.audio;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.audio.AudioDevice;
@@ -21,8 +21,8 @@ public final class MusicSynth {
     private static final double GAIN_STEP = 1.0 / (SR * 0.015);
     private static final double COMBAT_STEP = 1.0 / (SR * 1.5);
     private static final double MIX_STEP = 1.0 / (SR * 0.30);
-    private static final double AMBIENT_VOL = 0.05;
-    private static final double MUSIC_VOL = 0.13;
+    private static final double AMBIENT_VOL = 0.035;
+    private static final double MUSIC_VOL = 0.065;
     private static final double COMP_THR = 0.36, COMP_RATIO = 3.0, COMP_MAKEUP = 1.35;
     private static final double COMP_ATT = 1.0 - Math.exp(-1.0 / (SR * 0.005));
     private static final double COMP_REL = 1.0 - Math.exp(-1.0 / (SR * 0.150));
@@ -95,11 +95,11 @@ public final class MusicSynth {
     };
 
     // Lock-free controls
-    volatile boolean muted = false;
-    volatile boolean musicMuted = false;
-    volatile boolean inCombat = false;
-    volatile float targetTension = 0f;
-    volatile int forcedTrack = -1;
+    public volatile boolean muted = false;
+    public volatile boolean musicMuted = false;
+    public volatile boolean inCombat = false;
+    public volatile float targetTension = 0f;
+    public volatile int forcedTrack = -1;
 
     private AudioDevice device;
     private Thread thread;
@@ -158,7 +158,7 @@ public final class MusicSynth {
         }
     }
 
-    void seedRng(int seed) {
+    public void seedRng(int seed) {
         int s = seed == 0 ? 0x51A7F3B9 : seed;
         rngL = Dsp.xorshift(s ^ 0x13579BDF);
         rngR = Dsp.xorshift(s ^ 0x2468ACE1);

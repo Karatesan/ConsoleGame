@@ -7,6 +7,8 @@ import com.archon.model.Dice;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
+import com.archon.ui.audio.SfxGen;
+import com.archon.ui.audio.SynthAudio;
 import com.archon.verb.ExitCode;
 import org.junit.jupiter.api.Test;
 

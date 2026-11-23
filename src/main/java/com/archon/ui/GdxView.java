@@ -6,6 +6,7 @@ import com.archon.exec.RoundState;
 import com.archon.model.Entity;
 import com.archon.model.Vec2;
 import com.archon.model.World;
+import com.archon.ui.audio.SynthAudio;
 import com.archon.verb.ExitCode;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -734,7 +735,9 @@ public final class GdxView extends ApplicationAdapter implements View {
         if (floaterSlot >= 0) {
             floatText[floaterSlot] = (tier > 1 ? "CRIT T" + tier + "! " : "CRIT! ") + delta;
         }
-        audio.playTierDelayed(SynthAudio.CRIT, tier - 1, curVfxDelay, 0.70f + 0.06f * tier, 1f + (nextRand01() - 0.5f) * 0.06f, panFor(cx));
+        float critDelay = curVfxDelay + (elem == ELEM_FORCE ? 0.05f : 0f);
+        audio.playTierDelayed(SynthAudio.CRIT, tier - 1, critDelay, Math.min(1f, 0.84f + 0.06f * tier),
+                1f + (nextRand01() - 0.5f) * 0.06f, panFor(cx));
         if (elem == ELEM_FIRE) playSfxAtPitched(SynthAudio.FIRE, 0.55f, 1f, 0.12f, cx);
         else if (elem == ELEM_ACID) playSfxAtPitched(SynthAudio.SIZZLE, 0.50f, 1f, 0.12f, cx);
         else if (elem == ELEM_BLOOD) playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.52f, 1.06f, 0.08f, cx);
@@ -812,7 +815,7 @@ public final class GdxView extends ApplicationAdapter implements View {
                 } else {
                     if (nTargets > 0) spawnFx(FX_PSIONIC_SPIKE, sx, sy, tx, ty, 0.36f, BOLT_COL, ELEM_FORCE);
                     spawnBurst(tx, ty, 14, Color.WHITE, -0.5f);
-                    playSfxAtPitched(SynthAudio.ZAP, 0.74f, pipePitch, 0.12f, tx);
+                    playSfxAtPitched(SynthAudio.ZAP, 0.62f, pipePitch, 0.12f, tx);
                 }
                 if (channeled) playSfxAtPitched(SynthAudio.PSIONIC, 0.22f, pipePitch, 0.08f, sx);
             }
@@ -824,7 +827,9 @@ public final class GdxView extends ApplicationAdapter implements View {
                 if (elem == ELEM_BLOOD) {
                     spawnFx(FX_RING, tx, ty, 1.2f, 0f, 0.35f, BLOOD_DEEP, elem);
                     spawnCrossBurst(ex, ey, 6, BLOOD_BRIGHT, -0.4f);
-                    playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.52f, pipePitch * 0.92f, 0.10f, tx);
+                    playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.78f, pipePitch * 0.84f, 0.10f, tx);
+                    playSfxAtPitched(SynthAudio.SPLASH, 0.74f, pipePitch * 0.78f, 0.12f, tx);
+                    playSfxAtPitched(SynthAudio.STING_BLOOD, 0.46f, pipePitch * 0.94f, 0.06f, tx);
                 } else if (elem == ELEM_FIRE) {
                     spawnCrossBurst(ex, ey, 6, EMBER, -0.9f);
                     playSfxAtPitched(SynthAudio.FIRE, 0.60f, pipePitch, 0.12f, tx);
@@ -834,7 +839,7 @@ public final class GdxView extends ApplicationAdapter implements View {
                     else if (elem == ELEM_WATER || elem == ELEM_OIL) playSfxAtPitched(SynthAudio.SPLASH, 0.54f, pipePitch, 0.12f, tx);
                 }
                 triggerShake(0.24f, 4f);
-                playSfxAtPitched(SynthAudio.BOOM, 0.68f, pipePitch, 0.12f, tx);
+                if (elem != ELEM_BLOOD) playSfxAtPitched(SynthAudio.BOOM, 0.68f, pipePitch, 0.12f, tx);
                 if (channeled) playSfxAtPitched(SynthAudio.PSIONIC, 0.22f, pipePitch, 0.08f, sx);
             }
             case "push", "pull" -> {
@@ -864,11 +869,18 @@ public final class GdxView extends ApplicationAdapter implements View {
                     spawnFx(FX_DRAIN, tx, ty, sx, sy, 0.34f, sc, elem);
                     spawnBurst(tx, ty, 10, sc, -0.5f);
                 }
-                playSfxAtPitched(SynthAudio.SIPHON, 0.62f, pipePitch, 0.10f, tx);
-                if (elem == ELEM_FIRE || elem == ELEM_ACID || elem == ELEM_WATER || elem == ELEM_OIL) {
-                    int hint = elem == ELEM_FIRE ? SynthAudio.FIRE
-                            : elem == ELEM_ACID ? SynthAudio.SIZZLE : SynthAudio.SPLASH;
-                    playSfxAtPitched(hint, 0.26f, pipePitch, 0.12f, tx);
+                playSfxAtPitched(SynthAudio.SIPHON, 0.58f, pipePitch, 0.08f, tx);
+                if (elem == ELEM_FIRE) {
+                    playSfxAtPitched(SynthAudio.FIRE, 0.40f, pipePitch * 1.06f, 0.10f, tx);
+                } else if (elem == ELEM_ACID) {
+                    playSfxAtPitched(SynthAudio.SIZZLE, 0.42f, pipePitch * 1.04f, 0.10f, tx);
+                } else if (elem == ELEM_WATER || elem == ELEM_OIL) {
+                    playSfxAtPitched(SynthAudio.SPLASH, 0.40f, pipePitch * (elem == ELEM_OIL ? 0.84f : 1.04f), 0.10f, tx);
+                } else if (elem == ELEM_BLOOD) {
+                    playSfxAtPitched(SynthAudio.SPLASH, 0.42f, pipePitch * 0.74f, 0.10f, tx);
+                    playSfxAtPitched(SynthAudio.STING_BLOOD, 0.26f, pipePitch * 1.06f, 0.06f, tx);
+                } else {
+                    playSfxAtPitched(SynthAudio.PSIONIC, 0.26f, pipePitch * 1.12f, 0.08f, tx);
                 }
             }
             case "pour" -> {
@@ -1056,7 +1068,7 @@ public final class GdxView extends ApplicationAdapter implements View {
         if (i != 0) {
             if (lastImpactElem == ELEM_FIRE) playSfxAtPitched(SynthAudio.FIRE, 0.28f, 1.02f, 0.12f, tx);
             else if (lastImpactElem == ELEM_ACID) playSfxAtPitched(SynthAudio.SIZZLE, 0.28f, 1.02f, 0.12f, tx);
-            else if (lastImpactElem == ELEM_BLOOD) playSfxAtPitched(SynthAudio.BLOOD_BOLT, 0.30f, 0.92f, 0.10f, tx);
+            else if (lastImpactElem == ELEM_BLOOD) playSfxAtPitched(SynthAudio.SPLASH, 0.34f, 0.78f, 0.10f, tx);
         }
 
         if (s.hp[i] <= 0) {

@@ -1,4 +1,4 @@
-package com.archon.ui;
+package com.archon.ui.audio;
 
 /** Pure DSP math primitives and PCM/WAV helpers (zero libGDX dependencies). */
 public final class Dsp {
@@ -205,7 +205,7 @@ public final class Dsp {
         return (0.52 * f1 + 0.48 * f2 + overtone) * env + mallet;
     }
 
-    static void writeWavHeader(byte[] out, int channels, int frames) {
+    public static void writeWavHeader(byte[] out, int channels, int frames) {
         int blockAlign = channels * 2;
         int dataBytes = frames * blockAlign;
         out[0] = 'R'; out[1] = 'I'; out[2] = 'F'; out[3] = 'F';
@@ -223,14 +223,14 @@ public final class Dsp {
         putIntLE(out, 40, dataBytes);
     }
 
-    static void putIntLE(byte[] b, int off, int v) {
+    public static void putIntLE(byte[] b, int off, int v) {
         b[off] = (byte) (v & 0xFF);
         b[off + 1] = (byte) ((v >>> 8) & 0xFF);
         b[off + 2] = (byte) ((v >>> 16) & 0xFF);
         b[off + 3] = (byte) ((v >>> 24) & 0xFF);
     }
 
-    static void putShortLE(byte[] b, int off, int v) {
+    public static void putShortLE(byte[] b, int off, int v) {
         b[off] = (byte) (v & 0xFF);
         b[off + 1] = (byte) ((v >>> 8) & 0xFF);
     }

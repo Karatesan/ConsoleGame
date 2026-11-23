@@ -1,0 +1,70 @@
+# Game SFX Sources (44.1 kHz, 16-bit mono PCM)
+# Primary sources: Sonniss #GameAudioGDC Royalty-Free Bundles (commercial OK, no attribution required, no standalone raw pack redistribution / AI training)
+# Layer accents (crit_2, stings): VSCO 2 Community Edition (CC0)
+
+key_0.wav: [2024] BluezoneCorp - Tiny Gears - Small Mechanism/Bluezone_BC0301_tiny_gears_small_mechanism_click_003.wav
+key_1.wav: [2024] CB Sounddesign - Activation 2/UIClick_UI Click 33_CB Sounddesign_ACTIVATION2.wav
+key_2.wav: [2016] George Karagioules - SFX for Board Games/Placing Pieces on the Board 2.wav
+key_3.wav: [2016] George Karagioules - SFX for Board Games/Backgammon Piece 21.wav
+submit_0.wav: [2026] CB_Sounddesign - Applicable Sounds - Organic UI and Building Games SFX/UIMisc_Kalimba 3 Up_CB Sounddesign_APPlicable Sounds.wav
+reject_0.wav: [2026] Cinematic Sound Design - System & UI Feedback Elements/Interface Deny Low Fat Dark.wav + [2026] Epic Stock Media - HD Lock And Mechanism Sound Design Kit/MECHLtch_Click Deep Mechanism Latch Button Nearfield Thunk 02_ESM_HDLM.wav
+hit_0.wav: [2017] Gamemaster Audio -  Punch Sound Pack/punch_general_body_impact_03.wav + [2024] Justsoundeffects - Melee Weapons/WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav (hit 0)
+hit_1.wav: [2017] Gamemaster Audio -  Punch Sound Pack/punch_grit_wet_impact_05.wav + [2024] Justsoundeffects - Melee Weapons/WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav (hit 1)
+hit_2.wav: [2018] The Chris Alan - Hand-to-Hand Combat - Body Hits & Vocal Excursions/Hand-to-Hand Combat - Body Hits - Deep Punch 02.wav + [2024] Justsoundeffects - Melee Weapons/WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav (hit 2)
+hit_3.wav: [2019] Sound Spark LLC – Gore/Melee_Deep_Wound_05.wav + [2024] Justsoundeffects - Melee Weapons/WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav (hit 3)
+shoot_0.wav: [2019] Eiravaein Works - Nocked/Nocked,archery,firing,loose,Vaeyanbow,midflight,wide,mythic,sleek,swirl,rattle,alt14.wav
+shoot_1.wav: [2019] Eiravaein Works - Nocked/Nocked,archery,firing,loose,Pinakabow,mythic,midflight,wide,hum,sizzle,energy,alt8.wav
+shoot_2.wav: [2020] SoundFxwizard - PARTICLES An Organic & Granular Journey/PARTICLES_WHOOSH_Arrow 01.wav
+shoot_3.wav: [2019] Eiravaein Works - Nocked/Nocked,archery,firing,loose,crossbow1,carbonbolt,atbow,snap,buzz,airy,bright,alt.wav + [2020] SoundFxwizard - PARTICLES An Organic & Granular Journey/PARTICLES_WHOOSH_Arrow 01.wav
+splash_0.wav: [2020] Bluezone - Splash/Bluezone_BC0256_water_splash_small_008.wav
+splash_1.wav: [2024] BluezoneCorp - Designed Water/Bluezone_BC0298_designed_water_impact_006.wav + [2020] Bluezone - Splash/Bluezone_BC0256_water_splash_drop_006.wav
+splash_2.wav: [2023] Rogue Waves - Druid Magic/MAGElem_Water Spell Splash Attack Medium 2_RogueWaves_DruidMagic.wav
+splash_3.wav: [2020] Bluezone - Splash/Bluezone_BC0256_water_splash_drop_006.wav + [2020] Articulated Sounds - Magic Elements vol.2/LIQUID HIT Lake, Branch, Splash, Lake, Seaweed in Water, Small, CU 04.wav
+zap_0.wav: [2026] Epic Stock Media - Elemental Mutation Whooshes and Impacts/ELECMisc_Impact Electric Tonal Deep Movement Motion Hiss Glitch 01_ESM_EMWI.wav
+zap_1.wav: [2023] David Dumais Audio - Magic Sound FX Pack 2/MagicPack2_ElectricitySpells_Spell2-002.wav
+zap_2.wav: [2020] David Dumais Audio - Electricity Magic 1/Magic_Spells_CastShort_Electricity_General08.wav
+zap_3.wav: [2018] Gamemaster Audio - Magic and Spell Sounds/electric_surge_blast_04.wav
+boom_0.wav: [2024] DavidDumais - Explosion SFX Pack/EXPLReal_Medium Realistic Explosion 15_DDUMAIS_NONE.wav
+boom_1.wav: [2017] Gamemaster Audio -  Explosion Sound Pack/explosion_large_no_tail_03.wav + [2024] BluezoneCorp - Modern Cinematic Impact/Bluezone_BC0294_modern_cinematic_impact_boom_003.wav
+boom_2.wav: [2017] Gamemaster Audio -  Explosion Sound Pack/explosion_med_long_tail_01.wav
+boom_3.wav: [2017] Gamemaster Audio -  Explosion Sound Pack/explosion_large_08.wav
+crit_0.wav: [2026] David Dumais Audio - Melee Weapons Sound Effects Pack 2/METLImpt_METAL SWING HIT Weapon Swing To Metallic Body Impact And Resonant Tail 01_DDUMAIS_MWP2.wav + [2019] 3maze - FINAL IMPACT/layered_material_hit_035.wav
+crit_1.wav: [2026] Cinematic Sound Design - Colossal Impacts/Impact Cut Sweep.wav + [2017] Gamemaster Audio -  Punch Sound Pack/punch_heavy_huge_distorted_01.wav + [2023] 344 Audio - Flesh, Bones & Gore/Beheading 02.wav
+crit_2.wav: [2024] Jake Fielding - Haunted Metal Vol.1 - Cinematic Hits & Impacts/DSGNBoom_Cinematic Metallic Hit, Boom, Trailer, Sub_JF_Haunted Metal Vol 1_02.wav + [2024] BluezoneCorp - Modern Cinematic Impact/Bluezone_BC0294_modern_cinematic_impact_022.wav + [2026] David Dumais Audio - Melee Weapons Sound Effects Pack 2/METLImpt_METAL SWING HIT Weapon Swing To Metallic Body Impact And Resonant Tail 01_DDUMAIS_MWP2.wav + VSCO wardrum_bdrum_fff_1
+fire_0.wav: [2020] SmartSoundFX – Medieval/WHOOSH Ball Crackle Small 02.wav + [2018] Soundrangers - Whooshes And Transitions/torch_whoosh_20.wav + [2018] The Sound Keeper - Small Fire/sm-fire-firewood-small-03-DPAmono.wav
+fire_1.wav: [2018] Soundrangers - Whooshes And Transitions/torch_whoosh_20.wav + [2018] Gregor Quendel – Designed Fire/Designed Fire - Impacts - Large, ignition 03.wav + [2026] Epic Stock Media - Synthesized Nature Loops and Sounds/FIREBurn_Loop Elements Fire Crackling Crunchy Flame Burn 03_ESM_SNLS.wav + [2018] The Sound Keeper - Small Fire/sm-fire-firewood-small-03-DPAmono.wav
+fire_2.wav: [2018] Gregor Quendel – Designed Fire/Designed Fire - Swooshes - Burst, evolving 34.wav (burst 1) + [2020] SmartSoundFX – Medieval/WHOOSH Ball Crackle Small 02.wav + [2018] The Sound Keeper - Small Fire/sm-fire-firewood-small-03-DPAmono.wav
+fire_3.wav: [2018] Gregor Quendel – Designed Fire/Designed Fire - Swooshes - Burst, evolving 34.wav (burst 2) + [2018] Gregor Quendel – Designed Fire/Designed Fire - Impacts - Large, ignition 03.wav + [2026] Epic Stock Media - Synthesized Nature Loops and Sounds/FIREBurn_Loop Elements Fire Crackling Crunchy Flame Burn 03_ESM_SNLS.wav + [2018] The Sound Keeper - Small Fire/sm-fire-firewood-small-03-DPAmono.wav
+sizzle_0.wav: [2020] Articulated Sounds - Magic Elements vol.2/CHEMICAL ACID Sizzle, Burn, Short 02.wav
+sizzle_1.wav: [2017] Mattia Cellotto - Water Volumes/Acid,Drop,Harsh,Sizzle,Burn,Melt,Corrosion_03.wav
+sizzle_2.wav: [2015] Eiravaein Works - Ilmarinen/Ilmarinen,blacksmith,forge,hotiron,water,squelch,sizzle,rough,popping.M.wav
+sizzle_3.wav: [2017] RedSonic - Frying Water/water_in_frying_pan_05.wav
+swing_0.wav: [2023] David Dumais Audio - Melee Weapons Sound Effects Pack 1/SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav
+swing_1.wav: [2020] David Dumais Audio - Weapon Sounds - Weapon Swings/MeleeSwingsPack_96khz_Stereo_HighSwings15.wav
+swing_2.wav: [2018] Gamemaster Audio - Punch and Combat Sounds/whoosh_weapon_knife_swing_04.wav
+swing_3.wav: [2015] Timothy McHugh - Gorification [HD]/gore - metal knife swing - 4.wav
+step_0.wav: [2019] PMSFX - STEPS Dirt & Gravel/PM_SDNG_Single_Step_Footstep_19.wav
+step_1.wav: [2019] PMSFX - STEPS Dirt & Gravel/PM_SDNG_Single_Step_Footstep_46.wav
+step_2.wav: [2016] Levan Nadashvili - Soldier Footsteps/FS Concrete Soldier Crouch N02.wav
+step_3.wav: [2016] Levan Nadashvili - Soldier Footsteps/FS Concrete Soldier Crouch N05.wav
+psionic_0.wav: [2020] David Dumais Audio - Spells Magic 1/Magic_Spells_CastShort_Push14.wav + [2023] Rogue Waves - Druid Magic/MAGEvil_Dark Spell Dark Energy Attack_RogueWaves_DruidMagic.wav
+shatter_0.wav: [2015] Soundopolis - Glass Smash Full/Glass_Break_ChampagneBottle_D50_Fienup_003.wav
+shatter_1.wav: [2015] Soundopolis - Glass Smash Full/Glass_Break_WineBottle_702T_Fienup_004.wav
+shatter_2.wav: [2023] BluezoneCorp - Broken Glass/Bluezone_BC0274_glass_impact_break_002.wav
+shatter_3.wav: [2019] 3maze - IMPACTUS/shatter_ice_001.wav + [2026] Alexander Kopeikin - 100 kHz Designed Ice/ice, block of ice crushed, heavy-015.wav
+heal_0.wav: [2026] Epic Stock Media - Fantasy Game 2 - Sound Kit for Enchanted Realms/MAGAngl_Magic Light Spell Enchantment Potion Effect Tonal Bright 03_ESM_FG2.wav
+hit_prop_0.wav: [2023] David Dumais Audio - Melee Weapons Sound Effects Pack 1/WOODImpt_Impact Wood 23_DDUMAIS_NONE.wav
+hit_prop_1.wav: [2024] BluezoneCorp - Stone Impact/Bluezone_BC0297_stone_impact_hammer_015.wav
+hit_prop_2.wav: [2017] Double Trouble Audio - Wood Impacts and Debris/Impacts Hard - Short Wobbly Tail 01.wav
+hit_prop_3.wav: [2024] Justsoundeffects - Melee Weapons/WEAPArmr_Metal Shield Block Hits_JSE_MW.wav
+sting_kill_0.wav: [2018] Bluezone Corporation - MOVIE TRAILER/Bluezone_BC0237_impact_017.wav + VSCO timpani_Timpani3 + harp_A2
+sting_death_0.wav: [2018] Sir Bedlam Productions – Bedlam Stingers - Cinematic Horror Sound FX/Stinger-Low13.wav + VSCO wardrum_bdrum_fff_1 + horn_D2 + horn_As1
+sting_blood_0.wav: [2026] Epic Stock Media - Halloween Game - Haunted House and Horror Audio Scare Kit/GORESplt_Gore Designed Transient Heavy Impact Smash 01_ESM_HALG.wav + VSCO timpani_Timpani1 + cello_D2
+siphon_0.wav: [2019] L.A. Sounds - Transition Movement Pack 002/Whoosh Vacuum Movement Medium.wav + [2019] MatiasMacSD - INFILTRATION/Fx_Reverse_Transition-03.wav + [2018] Gamemaster Audio - Magic and Spell Sounds/casting_charge_matter_grow_04.wav (var 0)
+siphon_1.wav: [2019] L.A. Sounds - Transition Movement Pack 002/Whoosh Vacuum Movement Medium.wav + [2019] MatiasMacSD - INFILTRATION/Fx_Reverse_Transition-03.wav + [2018] Gamemaster Audio - Magic and Spell Sounds/casting_charge_matter_grow_04.wav (var 1)
+siphon_2.wav: [2019] L.A. Sounds - Transition Movement Pack 002/Whoosh Vacuum Movement Medium.wav + [2019] MatiasMacSD - INFILTRATION/Fx_Reverse_Transition-03.wav + [2018] Gamemaster Audio - Magic and Spell Sounds/casting_charge_matter_grow_04.wav (var 2)
+siphon_3.wav: [2019] L.A. Sounds - Transition Movement Pack 002/Whoosh Vacuum Movement Medium.wav + [2019] MatiasMacSD - INFILTRATION/Fx_Reverse_Transition-03.wav + [2018] Gamemaster Audio - Magic and Spell Sounds/casting_charge_matter_grow_04.wav (var 3)
+blood_bolt_0.wav: [2020] David Dumais Audio - Weapon Sounds - Weapon Swings/MeleeSwingsPack_96khz_Stereo_HighSwings15.wav+[2024] Rescopic Sound - Distinct Whooshes/WHSH_Watery-Whoosh FIzzy Fast 03_RSCPC_DW.wav -> [2018] SoundMorph - Gore/GORE - Head_Explode_6.wav + [2019] PMSFX - BLOODBATH/PM_BB_DESIGNED_CINEMATIC_CHOPS_19.wav
+blood_bolt_1.wav: [2018] Gamemaster Audio - Punch and Combat Sounds/whoosh_weapon_knife_swing_04.wav+[2024] Rescopic Sound - Distinct Whooshes/WHSH_Watery-Whoosh FIzzy Fast 03_RSCPC_DW.wav -> [2024] Justsoundeffects - Gore Mini Pack/GORESplt_Gore Splatter 01_JSE_GMP.wav (hit 0) + [2019] PMSFX - BLOODBATH/PM_BB_DESIGNED_CINEMATIC_CHOPS_25.wav
+blood_bolt_2.wav: [2015] Timothy McHugh - Gorification [HD]/gore - metal knife swing - 4.wav+[2020] SoundFxwizard - PARTICLES An Organic & Granular Journey/PARTICLES_WHOOSH_Arrow 01.wav -> [2024] Justsoundeffects - Gore Mini Pack/GORESplt_Gore Splatter 01_JSE_GMP.wav (hit 1) + [2015] Timothy McHugh - Gorification [HD]/gore - crunchy flesh impact and blood squirt - hard -  8.wav
+blood_bolt_3.wav: [2023] David Dumais Audio - Melee Weapons Sound Effects Pack 1/SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav+[2024] Rescopic Sound - Distinct Whooshes/WHSH_Watery-Whoosh FIzzy Fast 03_RSCPC_DW.wav -> [2016] SoundBits -  Just Gore _ Add On/Splatter_Splat_153.wav + [2015] Timothy McHugh - Gorification [HD]/gore - flesh guts gore impact blood squirt wet - medium - 104.wav

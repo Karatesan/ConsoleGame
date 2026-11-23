@@ -1,4 +1,4 @@
-package com.archon.ui;
+package com.archon.ui.audio;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.audio.Sound;
@@ -8,10 +8,10 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 
 /**
- * Procedural audio coordinator (44.1 kHz):
- * - 22 spatialized mono SFX kinds x up to 4 timbre-distinct variants (synthesized by SfxGen)
- * - Constant-volume streaming procedural music & cavern ambience via MusicSynth (HP-loss tension only)
- * Zero external audio assets; zero allocations during play(). Starts muted for headless tests.
+ * Audio coordinator (44.1 kHz):
+ * - 22 spatialized mono SFX kinds x up to 4 studio variants (loaded by SfxGen from /audio/sfx/)
+ * - Constant-volume streaming orchestral music & cavern ambience via MusicSynth (HP-loss tension only)
+ * Zero heap allocations during play(). Starts muted for headless tests.
  */
 public final class SynthAudio {
     public static final int KEY = SfxGen.KEY, SUBMIT = SfxGen.SUBMIT, REJECT = SfxGen.REJECT,
