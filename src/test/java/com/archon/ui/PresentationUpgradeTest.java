@@ -4,6 +4,7 @@ import com.archon.app.Scenario;
 import com.archon.event.GameEvent;
 import com.archon.model.Balance;
 import com.archon.model.Dice;
+import com.archon.model.EquipmentSlot;
 import com.archon.model.Tag;
 import com.archon.model.Vec2;
 import com.archon.model.World;
@@ -21,24 +22,20 @@ class PresentationUpgradeTest {
 
     @Test
     void pixelAtlasBakesValidNonEmptyCells() {
-        int[] pixels = PixelAtlas.bakeRgbaPixels();
+        int[] pixels = PixelAtlas.loadRgbaPixels();
         assertEquals(PixelAtlas.ATLAS_W * PixelAtlas.ATLAS_H, pixels.length);
 
         for (int idx = 0; idx < PixelAtlas.COUNT; idx++) {
-            int ox = (idx % PixelAtlas.COLS) * PixelAtlas.CELL;
-            int oy = (idx / PixelAtlas.COLS) * PixelAtlas.CELL;
+            int ox = (idx % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+            int oy = (idx / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
             int opaque = 0;
             for (int y = 0; y < PixelAtlas.CELL; y++) {
                 for (int x = 0; x < PixelAtlas.CELL; x++) {
                     if ((pixels[(oy + y) * PixelAtlas.ATLAS_W + (ox + x)] & 0xFF) != 0) opaque++;
                 }
             }
-            assertTrue(opaque > 16, "Sprite cell " + idx + " should have visible pixels");
+            assertTrue(opaque > 256, "Sprite cell " + idx + " should have visible pixels");
         }
-
-        int wx = (PixelAtlas.COUNT % PixelAtlas.COLS) * PixelAtlas.CELL;
-        int wy = (PixelAtlas.COUNT / PixelAtlas.COLS) * PixelAtlas.CELL;
-        assertEquals(0xFFFFFFFF, pixels[wy * PixelAtlas.ATLAS_W + wx]);
 
         int[] glow = PixelAtlas.bakeGlowPixels();
         assertEquals(PixelAtlas.GLOW_SIZE * PixelAtlas.GLOW_SIZE, glow.length);
@@ -46,26 +43,108 @@ class PresentationUpgradeTest {
         int mid = PixelAtlas.GLOW_SIZE / 2;
         assertTrue((glow[mid * PixelAtlas.GLOW_SIZE + mid] & 0xFF) > 220, "Glow center should be opaque");
 
-        int[] animBases = {
-                PixelAtlas.WATER_0, PixelAtlas.ACID_0, PixelAtlas.FIRE_0,
-                PixelAtlas.THRALL_0, PixelAtlas.ORC_0, PixelAtlas.GOBLIN_0,
-                PixelAtlas.OGRE_0, PixelAtlas.RAT_0, PixelAtlas.BRAZIER_0,
-                PixelAtlas.THRALL_MOVE_0, PixelAtlas.THRALL_ATTACK_0, PixelAtlas.THRALL_CAST_0
-        };
-        for (int b = 0; b < animBases.length; b++) {
-            int base = animBases[b];
-            for (int f = 0; f < 4; f++) {
-                int next = (f + 1) & 3;
-                assertTrue(cellsDiffer(pixels, base + f, base + next),
-                        "Animated sprite base " + base + " frame " + f + " should differ from " + next);
-            }
-        }
+        assertTrue(cellsDiffer(pixels, PixelAtlas.FIRE_0, PixelAtlas.FIRE_1),
+                "Flame variants FIRE_0 and FIRE_1 should differ");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.FIRE_0, PixelAtlas.TORCH_FIRE),
+                "Dedicated TORCH_FIRE should differ from brazier FIRE_0");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.THRALL, PixelAtlas.THRALL_ATTACK),
+                "Thrall attack pose should differ from idle pose");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.GOBLIN, PixelAtlas.GOBLIN_AIM),
+                "Goblin archer aim pose should differ from idle");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.GOBLIN, PixelAtlas.GOBLIN_AFTER_SHOT),
+                "Goblin archer after-shot pose should differ from idle");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.GOBLIN_AIM, PixelAtlas.GOBLIN_AFTER_SHOT),
+                "Goblin archer after-shot pose should differ from aim pose");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.GOBLIN_ASSASSIN, PixelAtlas.GOBLIN_ASSASSIN_ATTACK),
+                "Goblin assassin attack pose should differ from idle");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.OGRE, PixelAtlas.OGRE_ATTACK),
+                "Ogre attack pose should differ from idle");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.OGRE, PixelAtlas.OGRE_ATTACK_2),
+                "Ogre attack 2 pose should differ from idle");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.OGRE_ATTACK, PixelAtlas.OGRE_ATTACK_2),
+                "Ogre attack poses should differ from each other");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.ORC, PixelAtlas.ORC_ATTACK),
+                "Orc attack pose should differ from idle");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.BLOOD_SPLAT_0, PixelAtlas.BLOOD_SPLAT_1),
+                "Blood splat variants BLOOD_SPLAT_0 and BLOOD_SPLAT_1 should differ");
+        assertTrue(cellsDiffer(pixels, PixelAtlas.FLOOR_0, PixelAtlas.FLOOR_1),
+                "Floor variants FLOOR_0 and FLOOR_1 should differ");
 
-        assertEquals(PixelAtlas.THRALL_MOVE_2, PixelAtlas.thrallSprite(PixelAtlas.POSE_MOVE, 2));
-        assertEquals(PixelAtlas.THRALL_ATTACK_3, PixelAtlas.thrallSprite(PixelAtlas.POSE_ATTACK, 3));
-        assertEquals(PixelAtlas.THRALL_CAST_1, PixelAtlas.thrallSprite(PixelAtlas.POSE_CAST, 1));
-        assertEquals(PixelAtlas.THRALL_GUARD, PixelAtlas.thrallSprite(PixelAtlas.POSE_GUARD, 0));
-        assertEquals(PixelAtlas.THRALL_HURT, PixelAtlas.thrallSprite(PixelAtlas.POSE_HURT, 0));
+        // Ogre torso/belly center must remain solid opaque with no punched-out paper hole,
+        // outer background cutout remains transparent, and Goblin Assassin back-arm gap is transparent
+        assertOpaqueRegion(pixels, PixelAtlas.OGRE, 120, 112, 144, 140);
+        assertOpaqueRegion(pixels, PixelAtlas.OGRE_ATTACK, 124, 108, 146, 138);
+        assertEquals(0, cellAlpha(pixels, PixelAtlas.OGRE_ATTACK, 220, 40));
+        assertEquals(0, cellAlpha(pixels, PixelAtlas.OGRE_ATTACK, 40, 60));
+        assertEquals(0, cellAlpha(pixels, PixelAtlas.GOBLIN_ASSASSIN, 170, 108));
+
+        // Every creature sprite (Thrall poses + all enemies) must expose valid eye anchors; props stay empty
+        int[] creatureSprites = {
+            PixelAtlas.THRALL, PixelAtlas.THRALL_ATTACK, PixelAtlas.THRALL_CAST,
+            PixelAtlas.THRALL_GUARD, PixelAtlas.THRALL_HURT,
+            PixelAtlas.ORC, PixelAtlas.ORC_ATTACK,
+            PixelAtlas.GOBLIN, PixelAtlas.GOBLIN_AIM, PixelAtlas.GOBLIN_AFTER_SHOT,
+            PixelAtlas.GOBLIN_ASSASSIN, PixelAtlas.GOBLIN_ASSASSIN_ATTACK,
+            PixelAtlas.OGRE, PixelAtlas.OGRE_ATTACK, PixelAtlas.OGRE_ATTACK_2, PixelAtlas.RAT
+        };
+        for (int spr : creatureSprites) {
+            float[] eyes = PixelAtlas.entityEyes(spr);
+            assertTrue(eyes.length >= 2 && eyes.length % 2 == 0, "Expected eye anchors for sprite " + spr);
+            for (float c : eyes) assertTrue(c > 0f && c < 1f);
+        }
+        assertEquals(0, PixelAtlas.entityEyes(PixelAtlas.BRAZIER).length);
+
+        assertEquals(5, PixelAtlas.weaponGlows(PixelAtlas.ORC).length);
+        assertEquals(5, PixelAtlas.weaponGlows(PixelAtlas.ORC_ATTACK).length);
+        assertEquals(10, PixelAtlas.weaponGlows(PixelAtlas.GOBLIN_ASSASSIN).length);
+        assertEquals(10, PixelAtlas.weaponGlows(PixelAtlas.GOBLIN_ASSASSIN_ATTACK).length);
+        assertEquals(0, PixelAtlas.weaponGlows(PixelAtlas.GOBLIN).length);
+        assertEquals(0, PixelAtlas.weaponGlows(PixelAtlas.OGRE).length);
+        assertEquals(0, PixelAtlas.weaponGlows(PixelAtlas.THRALL).length);
+
+        assertTrue(GdxView.GOBLIN_SCALE < 1f);
+        assertTrue(GdxView.BRAZIER_SCALE < 1f);
+        assertEquals(GdxView.GOBLIN_SCALE, GdxView.entityScale(PixelAtlas.GOBLIN));
+        assertEquals(GdxView.GOBLIN_SCALE, GdxView.entityScale(PixelAtlas.GOBLIN_AIM));
+        assertEquals(GdxView.GOBLIN_SCALE, GdxView.entityScale(PixelAtlas.GOBLIN_AFTER_SHOT));
+        assertEquals(GdxView.GOBLIN_SCALE, GdxView.entityScale(PixelAtlas.GOBLIN_ASSASSIN));
+        assertEquals(GdxView.GOBLIN_SCALE, GdxView.entityScale(PixelAtlas.GOBLIN_ASSASSIN_ATTACK));
+        assertEquals(GdxView.BRAZIER_SCALE, GdxView.entityScale(PixelAtlas.BRAZIER));
+        assertEquals(1f, GdxView.entityScale(PixelAtlas.THRALL));
+        assertEquals(1f, GdxView.entityScale(PixelAtlas.ORC));
+        assertEquals(1f, GdxView.entityScale(PixelAtlas.ORC_ATTACK));
+        assertEquals(1f, GdxView.entityScale(PixelAtlas.OGRE));
+        assertEquals(1f, GdxView.entityScale(PixelAtlas.OGRE_ATTACK));
+        assertEquals(1f, GdxView.entityScale(PixelAtlas.OGRE_ATTACK_2));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.ORC));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.ORC_ATTACK));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.GOBLIN));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.GOBLIN_AIM));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.GOBLIN_AFTER_SHOT));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.GOBLIN_ASSASSIN));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.GOBLIN_ASSASSIN_ATTACK));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.OGRE));
+        assertEquals(-1, PixelAtlas.naturalFacing(PixelAtlas.OGRE_ATTACK));
+        assertEquals(1, PixelAtlas.naturalFacing(PixelAtlas.OGRE_ATTACK_2));
+        assertEquals(1, PixelAtlas.naturalFacing(PixelAtlas.THRALL));
+
+        assertEquals(PixelAtlas.ORC, PixelAtlas.entitySprite(PixelAtlas.ORC, PixelAtlas.POSE_IDLE));
+        assertEquals(PixelAtlas.ORC_ATTACK, PixelAtlas.entitySprite(PixelAtlas.ORC, PixelAtlas.POSE_ATTACK));
+        assertEquals(PixelAtlas.GOBLIN, PixelAtlas.entitySprite(PixelAtlas.GOBLIN, PixelAtlas.POSE_IDLE));
+        assertEquals(PixelAtlas.GOBLIN_AIM, PixelAtlas.entitySprite(PixelAtlas.GOBLIN, PixelAtlas.POSE_ATTACK));
+        assertEquals(PixelAtlas.GOBLIN_AFTER_SHOT, PixelAtlas.entitySprite(PixelAtlas.GOBLIN, PixelAtlas.POSE_AFTER_ATTACK));
+        assertEquals(PixelAtlas.GOBLIN_ASSASSIN, PixelAtlas.entitySprite(PixelAtlas.GOBLIN_ASSASSIN, PixelAtlas.POSE_IDLE));
+        assertEquals(PixelAtlas.GOBLIN_ASSASSIN_ATTACK, PixelAtlas.entitySprite(PixelAtlas.GOBLIN_ASSASSIN, PixelAtlas.POSE_ATTACK));
+        assertEquals(PixelAtlas.OGRE, PixelAtlas.entitySprite(PixelAtlas.OGRE, PixelAtlas.POSE_IDLE));
+        assertEquals(PixelAtlas.OGRE_ATTACK, PixelAtlas.entitySprite(PixelAtlas.OGRE, PixelAtlas.POSE_ATTACK));
+        assertEquals(PixelAtlas.OGRE_ATTACK_2, PixelAtlas.entitySprite(PixelAtlas.OGRE, PixelAtlas.POSE_ATTACK_ALT));
+
+        assertEquals(PixelAtlas.THRALL, PixelAtlas.thrallSprite(PixelAtlas.POSE_IDLE));
+        assertEquals(PixelAtlas.THRALL_MOVE, PixelAtlas.thrallSprite(PixelAtlas.POSE_MOVE));
+        assertEquals(PixelAtlas.THRALL_ATTACK, PixelAtlas.thrallSprite(PixelAtlas.POSE_ATTACK));
+        assertEquals(PixelAtlas.THRALL_CAST, PixelAtlas.thrallSprite(PixelAtlas.POSE_CAST));
+        assertEquals(PixelAtlas.THRALL_GUARD, PixelAtlas.thrallSprite(PixelAtlas.POSE_GUARD));
+        assertEquals(PixelAtlas.THRALL_HURT, PixelAtlas.thrallSprite(PixelAtlas.POSE_HURT));
 
         assertEquals(PixelAtlas.LOOT_BLADE, PixelAtlas.spriteForLoot(Scene.LOOT_BLADE));
         assertEquals(PixelAtlas.LOOT_OIL, PixelAtlas.spriteForLoot(Scene.LOOT_FLASK_OIL));
@@ -193,36 +272,67 @@ class PresentationUpgradeTest {
         assertTrue(sr.overwatchEntity[sr.indexOf("g1")], "Goblin Archer in testRoom starts on overwatch");
         assertFalse(sr.overwatchEntity[sr.indexOf("o1")]);
 
-        assertEquals(PixelAtlas.THRALL_0, PixelAtlas.spriteForEntity(s, 0, 0));
-        assertEquals(PixelAtlas.THRALL_2, PixelAtlas.spriteForEntity(s, 0, 2));
-        assertEquals(PixelAtlas.ORC_1, PixelAtlas.spriteForEntity(s, s.indexOf("o1"), 1));
-        assertEquals(PixelAtlas.ORC_3, PixelAtlas.spriteForEntity(s, s.indexOf("o1"), 3));
-        assertEquals(PixelAtlas.GOBLIN_0, PixelAtlas.spriteForEntity(s, s.indexOf("g1"), 0));
-        assertEquals(PixelAtlas.GOBLIN_2, PixelAtlas.spriteForEntity(s, s.indexOf("g1"), 2));
-        assertEquals(PixelAtlas.OGRE_0, PixelAtlas.spriteForEntity(s, s.indexOf("og1"), 0));
-        assertEquals(PixelAtlas.OGRE_3, PixelAtlas.spriteForEntity(s, s.indexOf("og1"), 3));
-        assertEquals(PixelAtlas.RAT_0, PixelAtlas.spriteForEntity(s, s.indexOf("r1"), 0));
-        assertEquals(PixelAtlas.RAT_2, PixelAtlas.spriteForEntity(s, s.indexOf("r1"), 2));
-        assertEquals(PixelAtlas.BRAZIER_1, PixelAtlas.spriteForEntity(s, s.indexOf("br1"), 1));
-        assertEquals(PixelAtlas.BRAZIER_3, PixelAtlas.spriteForEntity(s, s.indexOf("br1"), 3));
-        assertEquals(PixelAtlas.BARREL, PixelAtlas.spriteForEntity(s, s.indexOf("b1"), 0));
+        assertEquals(PixelAtlas.THRALL, PixelAtlas.spriteForEntity(s, 0));
+        assertEquals(PixelAtlas.ORC, PixelAtlas.spriteForEntity(s, s.indexOf("o1")));
+        assertEquals(PixelAtlas.GOBLIN, PixelAtlas.spriteForEntity(s, s.indexOf("g1")));
+        assertEquals(PixelAtlas.GOBLIN_ASSASSIN, PixelAtlas.spriteForEntity(s, s.indexOf("ga1")));
+        assertEquals(PixelAtlas.OGRE, PixelAtlas.spriteForEntity(s, s.indexOf("og1")));
+        assertEquals(PixelAtlas.RAT, PixelAtlas.spriteForEntity(s, s.indexOf("r1")));
+        assertEquals(PixelAtlas.BRAZIER, PixelAtlas.spriteForEntity(s, s.indexOf("br1")));
+        assertEquals(PixelAtlas.BARREL, PixelAtlas.spriteForEntity(s, s.indexOf("b1")));
+        assertTrue(s.nockedEntity[s.indexOf("g1")]);
+        assertFalse(s.nockedEntity[s.indexOf("ga1")]);
+        assertTrue(sr.nockedEntity[sr.indexOf("g1")]);
 
         assertEquals("rusted cleaver", s.rightHand);
         assertEquals("torch [LIT]", s.leftHand);
+        assertTrue(GdxView.hasLitTorch(s));
         assertEquals(5, s.packCount);
         assertEquals(Balance.PACK_MAX, s.packMax);
         assertEquals(5, s.packItems.length);
 
         arena.get("br1").removeTag(Tag.LIT);
+        arena.thrall().inventory().equipped(EquipmentSlot.HAND_LEFT).tags().remove(Tag.LIT);
         arena.actor("o1").applyTag(Tag.FROZEN);
         Scene offAndFrozen = new Scene(arena);
-        assertEquals(PixelAtlas.BRAZIER_OFF, PixelAtlas.spriteForEntity(offAndFrozen, offAndFrozen.indexOf("br1"), 3));
-        assertEquals(PixelAtlas.ORC_0, PixelAtlas.spriteForEntity(offAndFrozen, offAndFrozen.indexOf("o1"), 3));
+        assertFalse(offAndFrozen.litEntity[offAndFrozen.indexOf("br1")]);
+        assertFalse(GdxView.hasLitTorch(offAndFrozen));
+        assertEquals(PixelAtlas.BRAZIER, PixelAtlas.spriteForEntity(offAndFrozen, offAndFrozen.indexOf("br1")));
+        assertEquals(PixelAtlas.ORC, PixelAtlas.spriteForEntity(offAndFrozen, offAndFrozen.indexOf("o1")));
+    }
+
+    @Test
+    void cameraClampsToViewportBoundsAndRespectsSmallMaps() {
+        assertEquals(0f, GdxView.clampCam(-2f, 12, 6f));
+        assertEquals(3.5f, GdxView.clampCam(3.5f, 12, 6f));
+        assertEquals(6f, GdxView.clampCam(9f, 12, 6f));
+        assertEquals(0f, GdxView.clampCam(-1f, 8, 4f));
+        assertEquals(4f, GdxView.clampCam(7f, 8, 4f));
+        assertEquals(0f, GdxView.clampCam(2f, 4, 6f));
+    }
+
+    private static int cellAlpha(int[] pixels, int cellIdx, int x, int y) {
+        int ox = (cellIdx % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int oy = (cellIdx / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        return pixels[(oy + y) * PixelAtlas.ATLAS_W + (ox + x)] & 0xFF;
+    }
+
+    private static void assertOpaqueRegion(int[] pixels, int cellIdx, int x0, int y0, int x1, int y1) {
+        int ox = (cellIdx % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int oy = (cellIdx / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                int alpha = pixels[(oy + y) * PixelAtlas.ATLAS_W + (ox + x)] & 0xFF;
+                assertTrue(alpha >= 220, "Expected solid opaque pixel in cell " + cellIdx + " at (" + x + "," + y + "), alpha=" + alpha);
+            }
+        }
     }
 
     private static boolean cellsDiffer(int[] pixels, int a, int b) {
-        int ax = (a % PixelAtlas.COLS) * PixelAtlas.CELL, ay = (a / PixelAtlas.COLS) * PixelAtlas.CELL;
-        int bx = (b % PixelAtlas.COLS) * PixelAtlas.CELL, by = (b / PixelAtlas.COLS) * PixelAtlas.CELL;
+        int ax = (a % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int ay = (a / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int bx = (b % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int by = (b / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
         for (int y = 0; y < PixelAtlas.CELL; y++) {
             for (int x = 0; x < PixelAtlas.CELL; x++) {
                 if (pixels[(ay + y) * PixelAtlas.ATLAS_W + (ax + x)] != pixels[(by + y) * PixelAtlas.ATLAS_W + (bx + x)]) {
@@ -308,38 +418,42 @@ class PresentationUpgradeTest {
         Scene s0 = new Scene(arena);
         view.scene(s0, null);
         assertEquals(1, view.thrallFacing());
-        assertEquals(PixelAtlas.THRALL_2, view.thrallDrawSprite(2));
+        assertEquals(PixelAtlas.THRALL, view.thrallDrawSprite(2));
 
-        // Move left -> flips facing to -1 and cycles THRALL_MOVE_0..3 over SLIDE (0.4s)
+        // Move left -> flips facing to -1 and selects THRALL_MOVE over SLIDE (0.4s)
         Vec2 start = arena.thrall().pos();
         arena.thrall().moveTo(new Vec2(start.x() - 1, start.y()));
         Scene s1 = new Scene(arena);
         view.scene(s1, s0);
         assertEquals(-1, view.thrallFacing());
-        assertEquals(PixelAtlas.THRALL_MOVE_0, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL_MOVE, view.thrallDrawSprite(0));
         view.stepAnim(0.25f);
-        assertEquals(PixelAtlas.THRALL_MOVE_2, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL_MOVE, view.thrallDrawSprite(0));
         view.stepAnim(0.20f);
-        assertEquals(PixelAtlas.THRALL_1, view.thrallDrawSprite(1));
+        assertEquals(PixelAtlas.THRALL, view.thrallDrawSprite(1));
 
-        // Strike to the right -> flips facing back to 1 and plays THRALL_ATTACK_0..3
+        // Strike to the right -> flips facing back to 1, holds THRALL_ATTACK (stab -> hold -> pull back)
         view.handle(new GameEvent.StageResult(1, 1, "strike o1", ExitCode.SUCCESS, 1, 4));
         assertEquals(1, view.thrallFacing());
-        assertEquals(PixelAtlas.THRALL_ATTACK_0, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL_ATTACK, view.thrallDrawSprite(0));
         view.stepAnim(0.18f);
-        assertEquals(PixelAtlas.THRALL_ATTACK_2, view.thrallDrawSprite(0));
-        view.stepAnim(0.22f);
-        assertEquals(PixelAtlas.THRALL_0, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL_ATTACK, view.thrallDrawSprite(0));
+        view.stepAnim(0.32f);
+        assertEquals(PixelAtlas.THRALL_ATTACK, view.thrallDrawSprite(0));
+        view.stepAnim(0.35f);
+        assertEquals(PixelAtlas.THRALL, view.thrallDrawSprite(0));
+
+        assertTrue(GdxView.lungeFactor(0.61f, 0.72f, true) > 0.9f);
+        assertEquals(1.0f, GdxView.lungeFactor(0.42f, 0.72f, true), 1e-4f);
+        assertEquals(0.0f, GdxView.lungeFactor(0.0f, 0.72f, true), 1e-4f);
 
         // Cast & Guard
         view.handle(new GameEvent.StageResult(1, 1, "bolt o1", ExitCode.SUCCESS, 1, 3));
-        assertEquals(PixelAtlas.THRALL_CAST_0, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL_CAST, view.thrallDrawSprite(0));
         view.stepAnim(0.20f);
-        assertEquals(PixelAtlas.THRALL_CAST_1, view.thrallDrawSprite(0));
-        view.stepAnim(0.20f);
-        assertEquals(PixelAtlas.THRALL_CAST_2, view.thrallDrawSprite(0));
-        view.stepAnim(0.35f);
-        assertEquals(PixelAtlas.THRALL_0, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL_CAST, view.thrallDrawSprite(0));
+        view.stepAnim(0.55f);
+        assertEquals(PixelAtlas.THRALL, view.thrallDrawSprite(0));
 
         view.handle(new GameEvent.StageResult(1, 1, "guard", ExitCode.SUCCESS, 1, 2));
         assertEquals(PixelAtlas.THRALL_GUARD, view.thrallDrawSprite(0));
@@ -351,12 +465,12 @@ class PresentationUpgradeTest {
         view.scene(sHurt, s1);
         assertEquals(PixelAtlas.THRALL_HURT, view.thrallDrawSprite(0));
         view.stepAnim(0.30f);
-        assertEquals(PixelAtlas.THRALL_0, view.thrallDrawSprite(0));
+        assertEquals(PixelAtlas.THRALL, view.thrallDrawSprite(0));
 
-        // Frozen Thrall locks to idle frame 0
+        // Frozen Thrall locks to idle
         arena.thrall().applyTag(Tag.FROZEN);
         view.scene(new Scene(arena), sHurt);
-        assertEquals(PixelAtlas.THRALL_0, view.thrallDrawSprite(3));
+        assertEquals(PixelAtlas.THRALL, view.thrallDrawSprite(3));
     }
 
     @Test
@@ -417,5 +531,139 @@ class PresentationUpgradeTest {
         view.scene(s3, s2);
         assertEquals("CRIT! -5", view.recentFloaterText(0));
         assertEquals(9, view.recentFxKind(2));
+    }
+
+    @Test
+    void enemyPosesAnimateArcherAssassinAndOgreCombat() {
+        World arena = Scenario.magicArena(new Dice.Seeded(1L));
+        GdxView view = new GdxView(1L, true);
+        Scene s0 = new Scene(arena);
+        view.scene(s0, null);
+
+        int gi = s0.indexOf("g1");
+        int gai = s0.indexOf("ga1");
+        int ogi = s0.indexOf("og1");
+
+        // Idle poses
+        assertEquals(PixelAtlas.GOBLIN, view.entityDrawSprite(gi, 0));
+        assertEquals(PixelAtlas.GOBLIN_ASSASSIN, view.entityDrawSprite(gai, 0));
+        assertEquals(PixelAtlas.OGRE, view.entityDrawSprite(ogi, 0));
+
+        // Goblin Archer nocking does NOT trigger attack aim pose
+        view.handle(new GameEvent.ActorBeat("g1", "Goblin Archer", new Vec2(9, 2), new Vec2(9, 2),
+                List.of("Goblin Archer nocks an arrow.")));
+        assertEquals(PixelAtlas.GOBLIN, view.entityDrawSprite(gi, 0));
+
+        // Goblin Archer firing -> GOBLIN_AIM -> step past 0.36s -> GOBLIN_AFTER_SHOT -> expires
+        arena.actor("g1").fireNocked();
+        view.handle(new GameEvent.ActorBeat("g1", "Goblin Archer", new Vec2(9, 2), new Vec2(9, 2),
+                List.of("Goblin Archer's arrow hits Thrall's torso for 4 dmg. [60% | roll 50 vs 41+]")));
+        Scene sShot = new Scene(arena);
+        view.scene(sShot, s0);
+        assertEquals(PixelAtlas.GOBLIN_AIM, view.entityDrawSprite(gi, 0));
+        view.stepAnim(0.20f);
+        assertEquals(PixelAtlas.GOBLIN_AIM, view.entityDrawSprite(gi, 0));
+        view.stepAnim(0.20f);
+        assertEquals(PixelAtlas.GOBLIN_AFTER_SHOT, view.entityDrawSprite(gi, 0));
+        view.stepAnim(0.55f);
+        assertEquals(PixelAtlas.GOBLIN_AFTER_SHOT, view.entityDrawSprite(gi, 0),
+                "Un-nocked archer should remain in after-shot pose without arrow");
+
+        // Re-nocking returns archer to idle (bow down with arrow), and overwatch raises bow (GOBLIN_AIM)
+        arena.actor("g1").nock();
+        Scene sNocked = new Scene(arena);
+        view.scene(sNocked, sShot);
+        assertEquals(PixelAtlas.GOBLIN, view.entityDrawSprite(gi, 0));
+
+        arena.actor("g1").ready(com.archon.model.Actor.Trigger.ON_MOVEMENT_IN_LOS, "fires on movement", 6);
+        Scene sOverwatch = new Scene(arena);
+        view.scene(sOverwatch, sNocked);
+        assertEquals(PixelAtlas.GOBLIN_AIM, view.entityDrawSprite(gi, 0));
+
+        // InterruptFired transitions archer to GOBLIN_AFTER_SHOT and stays there once un-nocked
+        view.handle(new GameEvent.InterruptFired("g1", "fires on movement", 6));
+        arena.actor("g1").fireNocked();
+        arena.actor("g1").spendReadied();
+        Scene sAfterInterrupt = new Scene(arena);
+        view.scene(sAfterInterrupt, sOverwatch);
+        assertEquals(PixelAtlas.GOBLIN_AFTER_SHOT, view.entityDrawSprite(gi, 0));
+        view.stepAnim(0.60f);
+        assertEquals(PixelAtlas.GOBLIN_AFTER_SHOT, view.entityDrawSprite(gi, 0));
+
+        // Goblin Assassin melee attack -> GOBLIN_ASSASSIN_ATTACK -> expires back to GOBLIN_ASSASSIN
+        view.handle(new GameEvent.ActorBeat("ga1", "Goblin Assassin", new Vec2(6, 5), new Vec2(3, 4),
+                List.of("Goblin Assassin's twin daggers hits Thrall's torso for 5 dmg. [70% | roll 50 vs 31+]")));
+        assertEquals(PixelAtlas.GOBLIN_ASSASSIN_ATTACK, view.entityDrawSprite(gai, 0));
+        view.stepAnim(0.85f);
+        assertEquals(PixelAtlas.GOBLIN_ASSASSIN, view.entityDrawSprite(gai, 0));
+
+        // Orc melee attack -> ORC_ATTACK -> expires back to ORC
+        int oi = s0.indexOf("o1");
+        assertEquals(PixelAtlas.ORC, view.entityDrawSprite(oi, 0));
+        view.handle(new GameEvent.ActorBeat("o1", "Orc Guard", new Vec2(7, 4), new Vec2(3, 4),
+                List.of("Orc Guard's iron sword hits Thrall's torso for 5 dmg. [70% | roll 50 vs 31+]")));
+        assertEquals(PixelAtlas.ORC_ATTACK, view.entityDrawSprite(oi, 0));
+        view.stepAnim(0.85f);
+        assertEquals(PixelAtlas.ORC, view.entityDrawSprite(oi, 0));
+
+        // Ogre non-attack ("raises guard") stays OGRE; melee attacks randomly pick OGRE_ATTACK / OGRE_ATTACK_2
+        view.handle(new GameEvent.ActorBeat("og1", "Ogre Brute", new Vec2(9, 5), new Vec2(8, 5),
+                List.of("Ogre Brute advances to (8,5).", "Ogre Brute raises guard.")));
+        assertEquals(PixelAtlas.OGRE, view.entityDrawSprite(ogi, 0));
+
+        boolean sawAttack1 = false, sawAttack2 = false;
+        for (int attempt = 0; attempt < 16; attempt++) {
+            view.handle(new GameEvent.ActorBeat("og1", "Ogre Brute", new Vec2(8, 5), new Vec2(3, 5),
+                    List.of("Ogre Brute's fists misses Thrall's legs. [55% | roll 20 vs 46+]")));
+            int spr = view.entityDrawSprite(ogi, 0);
+            assertTrue(spr == PixelAtlas.OGRE_ATTACK || spr == PixelAtlas.OGRE_ATTACK_2,
+                    "Expected OGRE_ATTACK or OGRE_ATTACK_2, got " + spr);
+            if (spr == PixelAtlas.OGRE_ATTACK) sawAttack1 = true;
+            else sawAttack2 = true;
+            view.stepAnim(0.85f);
+            assertEquals(spr, view.entityDrawSprite(ogi, 0),
+                    "Ogre attack should still hold attack texture at 0.85s");
+            view.stepAnim(0.45f);
+            assertEquals(PixelAtlas.OGRE, view.entityDrawSprite(ogi, 0));
+        }
+        assertTrue(sawAttack1 && sawAttack2, "Expected Ogre to randomly use both attack animations");
+    }
+
+    @Test
+    void bloodSplatsSpawnOnCreatureHitsWithoutAffectingWorldState() {
+        World arena = Scenario.magicArena(new Dice.Seeded(1L));
+        GdxView view = new GdxView(1L, true);
+        Scene s0 = new Scene(arena);
+        view.scene(s0, null);
+        assertEquals(0, view.bloodSplatCount());
+
+        // Damaging a prop leaves zero blood splats
+        arena.get("c1").takeDamage(4);
+        Scene sProp = new Scene(arena);
+        view.scene(sProp, s0);
+        assertEquals(0, view.bloodSplatCount());
+
+        // Normal creature hit spawns 2 blood splats without mutating world tags or entity state
+        Vec2 ratPos = arena.actor("r1").pos();
+        int tagsBefore = arena.tile(ratPos).tags().size();
+        arena.actor("r1").takeDamage(5);
+        Scene sHit = new Scene(arena);
+        view.scene(sHit, sProp);
+        assertEquals(2, view.bloodSplatCount());
+        assertEquals(tagsBefore, arena.tile(ratPos).tags().size());
+        assertFalse(arena.actor("r1").has(Tag.BLEEDING));
+
+        // Crit creature hit spawns 4 blood splats
+        view.handle(new GameEvent.Narrative("CRITICAL! Cleaver hits Orc Guard's torso for 8 dmg. [70% | roll 90 vs 31+]"));
+        arena.actor("o1").takeDamage(8);
+        Scene sCrit = new Scene(arena);
+        view.scene(sCrit, sHit);
+        assertEquals(6, view.bloodSplatCount());
+
+        // Lethal creature hit spawns 6 blood splats
+        arena.actor("ga1").takeDamage(99);
+        Scene sKill = new Scene(arena);
+        view.scene(sKill, sCrit);
+        assertEquals(12, view.bloodSplatCount());
     }
 }

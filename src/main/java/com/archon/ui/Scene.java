@@ -41,7 +41,7 @@ public final class Scene {
     public final Entity.Kind[] kind;
     public final int[] x, y, hp, maxHp, entityTemp;
     public final boolean[] burningEntity, frozenEntity, stunnedEntity, bleedingEntity;
-    public final boolean[] proneEntity, wetEntity, oiledEntity, litEntity, overwatchEntity;
+    public final boolean[] proneEntity, wetEntity, oiledEntity, litEntity, overwatchEntity, nockedEntity;
 
     public final int magic, concentration, temp;
     public final String channel, shortConds;
@@ -125,6 +125,7 @@ public final class Scene {
         oiledEntity = new boolean[n];
         litEntity = new boolean[n];
         overwatchEntity = new boolean[n];
+        nockedEntity = new boolean[n];
         put(0, thrall);
         for (int e = 0; e < entities.size(); e++) put(e + 1, entities.get(e));
 
@@ -191,6 +192,7 @@ public final class Scene {
         oiledEntity[i] = e.has(Tag.OIL);
         litEntity[i] = e.has(Tag.LIT) || e.has(Tag.BURNING) || hasLitEquipment(e);
         overwatchEntity[i] = e instanceof Actor a && a.readied() != null && !a.isReadiedSpent();
+        nockedEntity[i] = e instanceof Actor a && a.isNocked();
     }
 
     private static boolean hasLitEquipment(Entity e) {

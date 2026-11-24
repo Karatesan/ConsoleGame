@@ -141,6 +141,13 @@ public final class Scenario {
         archer.nock();
         world.add(archer);
 
+        Actor assassin = new Actor("ga1", "Goblin Assassin", 'a', new Vec2(6, 5), new CreatureStats(16, 1, 15, 3, 0, 0.8));
+        assassin.inventory().placeInSlotForSetup(
+                EquipmentSlot.HAND_RIGHT,
+                Item.weapon("twin_daggers", "twin daggers", 4, 7, 10, Tag.METAL));
+        assassin.with(Tag.ORGANIC, Tag.FLESH);
+        world.add(assassin);
+
         return world;
     }
 }

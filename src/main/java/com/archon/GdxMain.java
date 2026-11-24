@@ -15,7 +15,7 @@ public final class GdxMain {
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("Archon");
-        config.setWindowedMode(GdxView.WIN_W, GdxView.WIN_H);
+        config.setFullscreenMode(Lwjgl3ApplicationConfiguration.getDisplayMode());
         config.setBackBufferConfig(8, 8, 8, 8, 16, 0, 4);
         config.useVsync(true);
         config.setForegroundFPS(60);
