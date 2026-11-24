@@ -13,11 +13,11 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 
 /**
- * High-detail 252x252 (256 stride with 2px gutter padding) monochrome ink sprite atlas loaded from
+ * High-detail 508x508 (512 stride with 2px gutter padding) monochrome ink sprite atlas loaded from
  * resources/sprites/atlas.png with mipmapped linear filtering, plus procedural glow and white textures.
  */
 public final class PixelAtlas {
-    public static final int CELL = 252, PAD = 2, STRIDE = CELL + PAD * 2;
+    public static final int CELL = 508, PAD = 2, STRIDE = CELL + PAD * 2;
     public static final int COLS = 8, ROWS = 8, ATLAS_W = COLS * STRIDE, ATLAS_H = ROWS * STRIDE;
 
     public static final int POSE_IDLE = 0, POSE_MOVE = 1, POSE_ATTACK = 2,
@@ -130,10 +130,9 @@ public final class PixelAtlas {
         if (img.getWidth() != ATLAS_W || img.getHeight() != ATLAS_H) {
             throw new IllegalStateException("Unexpected atlas dimensions: " + img.getWidth() + "x" + img.getHeight());
         }
-        int[] argb = img.getRGB(0, 0, ATLAS_W, ATLAS_H, null, 0, ATLAS_W);
-        int[] rgba = new int[argb.length];
-        for (int i = 0; i < argb.length; i++) {
-            int p = argb[i];
+        int[] rgba = img.getRGB(0, 0, ATLAS_W, ATLAS_H, null, 0, ATLAS_W);
+        for (int i = 0; i < rgba.length; i++) {
+            int p = rgba[i];
             rgba[i] = (p << 8) | ((p >>> 24) & 0xFF);
         }
         return rgba;

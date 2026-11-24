@@ -23,6 +23,9 @@ class PresentationUpgradeTest {
     @Test
     void pixelAtlasBakesValidNonEmptyCells() {
         int[] pixels = PixelAtlas.loadRgbaPixels();
+        assertEquals(508, PixelAtlas.CELL);
+        assertEquals(4096, PixelAtlas.ATLAS_W);
+        assertEquals(4096, PixelAtlas.ATLAS_H);
         assertEquals(PixelAtlas.ATLAS_W * PixelAtlas.ATLAS_H, pixels.length);
 
         for (int idx = 0; idx < PixelAtlas.COUNT; idx++) {
@@ -72,11 +75,14 @@ class PresentationUpgradeTest {
 
         // Ogre torso/belly center must remain solid opaque with no punched-out paper hole,
         // outer background cutout remains transparent, and Goblin Assassin back-arm gap is transparent
-        assertOpaqueRegion(pixels, PixelAtlas.OGRE, 120, 112, 144, 140);
-        assertOpaqueRegion(pixels, PixelAtlas.OGRE_ATTACK, 124, 108, 146, 138);
-        assertEquals(0, cellAlpha(pixels, PixelAtlas.OGRE_ATTACK, 220, 40));
-        assertEquals(0, cellAlpha(pixels, PixelAtlas.OGRE_ATTACK, 40, 60));
-        assertEquals(0, cellAlpha(pixels, PixelAtlas.GOBLIN_ASSASSIN, 170, 108));
+        assertOpaqueRegion(pixels, PixelAtlas.OGRE, 0.476f, 0.444f, 0.571f, 0.556f);
+        assertOpaqueRegion(pixels, PixelAtlas.OGRE_ATTACK, 0.492f, 0.429f, 0.579f, 0.548f);
+        assertEquals(0, cellAlpha(pixels, PixelAtlas.OGRE_ATTACK, 0.873f, 0.159f));
+        assertEquals(0, cellAlpha(pixels, PixelAtlas.OGRE_ATTACK, 0.159f, 0.238f));
+        assertEquals(0, cellAlpha(pixels, PixelAtlas.GOBLIN_ASSASSIN, 0.675f, 0.429f));
+
+        assertEquals(0xFFFFFF80, MonoFont.packWhiteAlpha(0x80204060));
+        assertEquals(0xFFFFFF00, MonoFont.packWhiteAlpha(0x00000000));
 
         // Every creature sprite (Thrall poses + all enemies) must expose valid eye anchors; props stay empty
         int[] creatureSprites = {
@@ -308,18 +314,26 @@ class PresentationUpgradeTest {
         assertEquals(6f, GdxView.clampCam(9f, 12, 6f));
         assertEquals(0f, GdxView.clampCam(-1f, 8, 4f));
         assertEquals(4f, GdxView.clampCam(7f, 8, 4f));
-        assertEquals(0f, GdxView.clampCam(2f, 4, 6f));
+        assertEquals(-1f, GdxView.clampCam(2f, 4, 6f), 1e-5f);
+        assertEquals(-1f, GdxView.clampCam(0f, 10, 12f), 1e-5f);
+        assertEquals(0f, GdxView.clampCam(5f, 10, 10f), 1e-5f);
     }
 
-    private static int cellAlpha(int[] pixels, int cellIdx, int x, int y) {
+    private static int cellAlpha(int[] pixels, int cellIdx, float nx, float ny) {
         int ox = (cellIdx % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
         int oy = (cellIdx / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int x = Math.round(nx * (PixelAtlas.CELL - 1));
+        int y = Math.round(ny * (PixelAtlas.CELL - 1));
         return pixels[(oy + y) * PixelAtlas.ATLAS_W + (ox + x)] & 0xFF;
     }
 
-    private static void assertOpaqueRegion(int[] pixels, int cellIdx, int x0, int y0, int x1, int y1) {
+    private static void assertOpaqueRegion(int[] pixels, int cellIdx, float nx0, float ny0, float nx1, float ny1) {
         int ox = (cellIdx % PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
         int oy = (cellIdx / PixelAtlas.COLS) * PixelAtlas.STRIDE + PixelAtlas.PAD;
+        int x0 = Math.round(nx0 * (PixelAtlas.CELL - 1));
+        int y0 = Math.round(ny0 * (PixelAtlas.CELL - 1));
+        int x1 = Math.round(nx1 * (PixelAtlas.CELL - 1));
+        int y1 = Math.round(ny1 * (PixelAtlas.CELL - 1));
         for (int y = y0; y <= y1; y++) {
             for (int x = x0; x <= x1; x++) {
                 int alpha = pixels[(oy + y) * PixelAtlas.ATLAS_W + (ox + x)] & 0xFF;

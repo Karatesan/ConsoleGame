@@ -26,18 +26,19 @@ import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.ExtendViewport;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Desktop front end (100% fullscreen with F11 toggle). Renders via ScreenViewport with 2x
- * supersampled fonts, 252x252 monochrome comic/graphite sprites at 192px tiles (camera follow),
- * dynamic tile lighting, faded selective-color FX/elements/blood, and procedural synth audio.
+ * Desktop front end (100% fullscreen with F11 toggle). Renders via ExtendViewport (1080p virtual
+ * vertical height) with native-pixel fonts, 508x508 monochrome comic/graphite sprites at 192
+ * virtual-unit tiles, dynamic tile lighting, faded selective-color FX/elements/blood, and audio.
  */
 public final class GdxView extends ApplicationAdapter implements View {
     public static final int WIN_W = 1140, WIN_H = 820;
+    static final float VIRTUAL_MIN_W = 1440f, VIRTUAL_H = 1080f;
     private static final int TILE = 192, SIDE_W = 228, MAP_X = 28, MAP_Y = 24,
             GAP = 12, PAD_R = 14, PAD_B = 10, LINE_H = 22, MAX_FLOATERS = 16;
     private static final int INPUT_H = 32, SCROLLBAR_W = 8, JUMP_PILL_H = 22;
@@ -103,9 +104,9 @@ public final class GdxView extends ApplicationAdapter implements View {
     private final float[] tmpTorch = new float[2];
     private BitmapFont font, hudFont, badgeFont;
     private final SynthAudio audio = new SynthAudio();
-    private float charW = 8f, fontH = 14f, hudFontH = 12f;
-    private final ScreenViewport viewport = new ScreenViewport();
-    private int viewW = WIN_W, viewH = WIN_H;
+    private float charW = 8f, fontH = 14f, hudFontH = 12f, fontPixelScale = -1f;
+    private final ExtendViewport viewport = new ExtendViewport(VIRTUAL_MIN_W, VIRTUAL_H);
+    private int viewW = 1920, viewH = 1080;
 
     private Scene cur, prev;
     private int[] prevIdx = new int[0];
@@ -204,18 +205,8 @@ public final class GdxView extends ApplicationAdapter implements View {
         atlas = new PixelAtlas();
         lightFbo = new FrameBuffer(Pixmap.Format.RGBA8888, 512, 512, false);
         lightFbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        MonoFont primary = MonoFont.build(14);
-        font = primary.font;
-        charW = primary.charW;
-        fontH = primary.fontH;
-        MonoFont hud = MonoFont.build(12);
-        hudFont = hud.font;
-        hudFontH = hud.fontH;
-        badgeFont = MonoFont.build(10).font;
         audio.init();
-        viewW = Math.max(1, Gdx.graphics.getWidth());
-        viewH = Math.max(1, Gdx.graphics.getHeight());
-        viewport.update(viewW, viewH, true);
+        updateViewport(Math.max(1, Gdx.graphics.getWidth()), Math.max(1, Gdx.graphics.getHeight()));
 
         game = new Game(seed, magicArena);
         presenter = new Presenter(this, game.world);
@@ -333,12 +324,35 @@ public final class GdxView extends ApplicationAdapter implements View {
         });
     }
 
+    private void rebuildFonts(float pxScale) {
+        if (font != null) font.dispose();
+        if (hudFont != null) hudFont.dispose();
+        if (badgeFont != null) badgeFont.dispose();
+        MonoFont primary = MonoFont.build(14, pxScale);
+        font = primary.font;
+        charW = primary.charW;
+        fontH = primary.fontH;
+        MonoFont hud = MonoFont.build(12, pxScale);
+        hudFont = hud.font;
+        hudFontH = hud.fontH;
+        badgeFont = MonoFont.build(10, pxScale).font;
+        fontPixelScale = pxScale;
+    }
+
+    private void updateViewport(int width, int height) {
+        viewport.update(width, height, true);
+        viewW = Math.max(1, Math.round(viewport.getWorldWidth()));
+        viewH = Math.max(1, Math.round(viewport.getWorldHeight()));
+        float pxScale = MathUtils.clamp(Gdx.graphics.getBackBufferHeight() / viewport.getWorldHeight(), 1f, 3f);
+        if (font == null || Math.abs(pxScale - fontPixelScale) > 0.05f) {
+            rebuildFonts(pxScale);
+        }
+    }
+
     @Override
     public void resize(int width, int height) {
         if (width <= 0 || height <= 0) return;
-        viewW = width;
-        viewH = height;
-        viewport.update(width, height, true);
+        updateViewport(width, height);
         if (cur != null) {
             camX = clampCam(camX, cur.w, viewTilesX());
             camY = clampCam(camY, cur.h, viewTilesY());
@@ -478,9 +492,9 @@ public final class GdxView extends ApplicationAdapter implements View {
         batch.dispose();
         if (atlas != null) atlas.dispose();
         if (lightFbo != null) lightFbo.dispose();
-        font.dispose();
-        hudFont.dispose();
-        badgeFont.dispose();
+        if (font != null) font.dispose();
+        if (hudFont != null) hudFont.dispose();
+        if (badgeFont != null) badgeFont.dispose();
         audio.dispose();
     }
 
@@ -1474,7 +1488,8 @@ public final class GdxView extends ApplicationAdapter implements View {
     }
 
     static float clampCam(float v, int mapTiles, float viewTiles) {
-        return MathUtils.clamp(v, 0f, Math.max(0f, mapTiles - viewTiles));
+        if (mapTiles <= viewTiles) return (mapTiles - viewTiles) * 0.5f;
+        return MathUtils.clamp(v, 0f, mapTiles - viewTiles);
     }
 
     static boolean hasLitTorch(Scene s) {
@@ -1533,8 +1548,8 @@ public final class GdxView extends ApplicationAdapter implements View {
 
     private void beginMapScissor() {
         int mw = mapW(), mh = mapH();
-        float scaleX = viewport.getScreenWidth() / (float) viewW;
-        float scaleY = viewport.getScreenHeight() / (float) viewH;
+        float scaleX = viewport.getScreenWidth() / viewport.getWorldWidth();
+        float scaleY = viewport.getScreenHeight() / viewport.getWorldHeight();
         int sx = viewport.getScreenX() + Math.round(MAP_X * scaleX);
         int sy = viewport.getScreenY() + Math.round((viewH - MAP_Y - mh) * scaleY);
         int sw = Math.max(1, Math.round(mw * scaleX));

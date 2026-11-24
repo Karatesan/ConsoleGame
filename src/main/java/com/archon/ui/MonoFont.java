@@ -11,7 +11,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
-/** 2x supersampled mipmapped monospace font builder (sharp on macOS Retina and 1x displays). */
+/** Native-pixel monospace font builder with white-alpha padding (sharp on 1x, 1440p, and Retina). */
 final class MonoFont {
     final BitmapFont font;
     final float charW, fontH;
@@ -22,13 +22,17 @@ final class MonoFont {
         this.fontH = fontH;
     }
 
-    static MonoFont build(int sizePx) {
+    static MonoFont build(int virtualPx) {
+        return build(virtualPx, 1f);
+    }
+
+    static MonoFont build(int virtualPx, float pixelScale) {
         System.setProperty("java.awt.headless", "true");
-        int scale = 2;
-        int hiPx = sizePx * scale;
-        Font awtFont = new Font(Font.MONOSPACED, Font.PLAIN, hiPx);
+        float scale = Math.max(1f, Math.min(3f, pixelScale));
+        int rasterPx = Math.max(8, Math.round(virtualPx * scale));
+        Font awtFont = new Font(Font.MONOSPACED, Font.PLAIN, rasterPx);
         for (String name : new String[]{"JetBrains Mono", "SF Mono", "Menlo", "Monaco", "Consolas"}) {
-            Font candidate = new Font(name, Font.PLAIN, hiPx);
+            Font candidate = new Font(name, Font.PLAIN, rasterPx);
             if (!Font.DIALOG.equals(candidate.getFamily())) { awtFont = candidate; break; }
         }
         BufferedImage scratch = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
@@ -36,12 +40,21 @@ final class MonoFont {
         g0.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
         g0.setFont(awtFont);
         FontMetrics fm = g0.getFontMetrics();
-        int hiCharW = Math.max(12, fm.charWidth('M'));
+        int hiCharW = Math.max(6, fm.charWidth('M'));
         int ascent = fm.getAscent(), descent = fm.getDescent(), glyphH = ascent + descent;
         int cellW = hiCharW + 6, cellH = glyphH + 6;
         g0.dispose();
 
-        int texW = 512, texH = 512, cols = texW / cellW;
+        int texW = 512;
+        int cols = Math.max(1, texW / cellW);
+        int rows = (95 + cols - 1) / cols;
+        int texH = rows * cellH <= 512 ? 512 : 1024;
+        if (rows * cellH > texH) {
+            texW = 1024;
+            cols = Math.max(1, texW / cellW);
+            rows = (95 + cols - 1) / cols;
+            texH = rows * cellH <= 512 ? 512 : 1024;
+        }
         BufferedImage img = new BufferedImage(texW, texH, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -72,12 +85,11 @@ final class MonoFont {
         int[] argb = img.getRGB(0, 0, texW, texH, null, 0, texW);
         for (int y = 0; y < texH; y++) {
             for (int x = 0; x < texW; x++) {
-                int p = argb[y * texW + x];
-                pm.drawPixel(x, y, (p << 8) | ((p >>> 24) & 0xFF));
+                pm.drawPixel(x, y, packWhiteAlpha(argb[y * texW + x]));
             }
         }
-        Texture tex = new Texture(pm, true);
-        tex.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
+        Texture tex = new Texture(pm, false);
+        tex.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         pm.dispose();
         reg.getTexture().dispose();
         reg.setTexture(tex);
@@ -93,6 +105,10 @@ final class MonoFont {
         bf.getData().ascent = 0;
         bf.getData().descent = -descent;
         bf.getData().setScale(1f / scale);
-        return new MonoFont(bf, hiCharW / (float) scale, glyphH / (float) scale);
+        return new MonoFont(bf, hiCharW / scale, glyphH / scale);
+    }
+
+    static int packWhiteAlpha(int argb) {
+        return 0xFFFFFF00 | ((argb >>> 24) & 0xFF);
     }
 }

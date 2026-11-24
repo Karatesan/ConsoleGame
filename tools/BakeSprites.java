@@ -13,14 +13,14 @@ import javax.imageio.ImageIO;
 /**
  * Offline asset baker: extracts hand-drawn graphite sprites, wispy fire drawings, and dark
  * high-contrast weathered dungeon flagstones from images/, applies grounding (bottom-masked rim
- * + foot AO), and packs src/main/resources/sprites/atlas.png (2048x2048, 8x8 cells, stride 256).
+ * + foot AO), and packs src/main/resources/sprites/atlas.png (4096x4096, 8x8 cells, stride 512).
  *
  * Run: java -Djava.awt.headless=true tools/BakeSprites.java [--preview path/to/bake_check.png]
  */
 public final class BakeSprites {
-    static final int CELL = 252, PAD = 2, STRIDE = CELL + PAD * 2; // 256
+    static final int CELL = 508, PAD = 2, STRIDE = CELL + PAD * 2; // 512
     static final int COLS = 8, ROWS = 8, COUNT = 41;
-    static final int ATLAS_W = COLS * STRIDE, ATLAS_H = ROWS * STRIDE; // 2048 x 2048
+    static final int ATLAS_W = COLS * STRIDE, ATLAS_H = ROWS * STRIDE; // 4096 x 4096
 
     // Atlas slot indices (must match com.archon.ui.PixelAtlas)
     static final int
@@ -104,7 +104,7 @@ public final class BakeSprites {
         cells[BLOOD_SPLAT_0] = loadOrDrawSprite(imagesDir, new String[]{"BloodSplat0", "blood_splat_0"}, 0.90, 0.05, false, false, g -> drawBloodSplat(g, 0));
         cells[BLOOD_SPLAT_1] = loadOrDrawSprite(imagesDir, new String[]{"BloodSplat1", "blood_splat_1"}, 0.90, 0.05, false, false, g -> drawBloodSplat(g, 1));
 
-        // Pack into 2048x2048 atlas with 2px gutter padding
+        // Pack into 4096x4096 atlas with 2px gutter padding
         BufferedImage atlas = new BufferedImage(ATLAS_W, ATLAS_H, BufferedImage.TYPE_INT_ARGB);
         for (int i = 0; i < COUNT; i++) {
             int ox = (i % COLS) * STRIDE + PAD;
@@ -181,6 +181,7 @@ public final class BakeSprites {
         BufferedImage raw = ImageIO.read(f);
         BufferedImage clean = extractPaperSprite(raw, fillFrac, bottomMargin, seedInterior, holeSeeds);
         BufferedImage scaled = downscaleProgressive(clean, CELL, CELL);
+        sharpenGraphite(scaled, 0.45f);
         applyFootAo(scaled);
         return addContrastRim(scaled, 0xBCC6D2, 30, true);
     }
@@ -193,6 +194,7 @@ public final class BakeSprites {
             BufferedImage raw = ImageIO.read(f);
             BufferedImage clean = extractPaperSprite(raw, fillFrac, bottomMargin);
             scaled = downscaleProgressive(clean, CELL, CELL);
+            sharpenGraphite(scaled, 0.45f);
         } else {
             BufferedImage hi = new BufferedImage(DRAW_RES, DRAW_RES, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = hi.createGraphics();
@@ -212,6 +214,7 @@ public final class BakeSprites {
         BufferedImage raw = ImageIO.read(f);
         BufferedImage clean = extractPaperSprite(raw, 0.93, 0.06);
         BufferedImage scaled = downscaleProgressive(clean, CELL, CELL);
+        sharpenGraphite(scaled, 0.45f);
         applyFootAo(scaled);
         return addContrastRim(scaled, 0xBCC6D2, 30, true);
     }
@@ -583,6 +586,7 @@ public final class BakeSprites {
             }
         }
         BufferedImage scaled = downscaleProgressive(bw, CELL, CELL);
+        sharpenGraphite(scaled, 0.45f);
         if (!flipX) return scaled;
         BufferedImage out = new BufferedImage(CELL, CELL, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
@@ -607,6 +611,7 @@ public final class BakeSprites {
         }
         int half = CELL / 2;
         BufferedImage sub = downscaleProgressive(bw, half, half);
+        sharpenGraphite(sub, 0.45f);
         BufferedImage out = new BufferedImage(CELL, CELL, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
         for (int gy = 0; gy < 2; gy++) {
@@ -623,17 +628,52 @@ public final class BakeSprites {
         return out;
     }
 
-    /** Draws a crisp 3px black border around the combined floor tile. */
+    /** Draws a crisp proportional black border around the combined floor tile. */
     private static BufferedImage addTileBorder(BufferedImage tile) {
         int w = tile.getWidth(), h = tile.getHeight();
+        int border = Math.max(3, Math.round(w * 3f / 252f));
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                if (Math.min(Math.min(x, w - 1 - x), Math.min(y, h - 1 - y)) < 3) {
+                if (Math.min(Math.min(x, w - 1 - x), Math.min(y, h - 1 - y)) < border) {
                     tile.setRGB(x, y, 0xFF080808);
                 }
             }
         }
         return tile;
+    }
+
+    /** Subtle unsharp mask restoring fine pencil/graphite contrast after progressive downscaling. */
+    private static void sharpenGraphite(BufferedImage img, float amount) {
+        int w = img.getWidth(), h = img.getHeight();
+        int[] src = img.getRGB(0, 0, w, h, null, 0, w);
+        for (int y = 1; y < h - 1; y++) {
+            for (int x = 1; x < w - 1; x++) {
+                int c = src[y * w + x];
+                int a = (c >>> 24) & 0xFF;
+                if (a < 200) continue;
+                int wSum = 0;
+                float rSum = 0f, gSum = 0f, bSum = 0f;
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        int np = src[(y + dy) * w + (x + dx)];
+                        int na = (np >>> 24) & 0xFF;
+                        if (na == 0) continue;
+                        int k = (dx == 0 && dy == 0) ? 4 : (dx == 0 || dy == 0) ? 2 : 1;
+                        int wt = k * na;
+                        wSum += wt;
+                        rSum += wt * ((np >> 16) & 0xFF);
+                        gSum += wt * ((np >> 8) & 0xFF);
+                        bSum += wt * (np & 0xFF);
+                    }
+                }
+                if (wSum == 0) continue;
+                int r0 = (c >> 16) & 0xFF, g0 = (c >> 8) & 0xFF, b0 = c & 0xFF;
+                int r = clamp255(Math.round(r0 + amount * (r0 - rSum / wSum)));
+                int g = clamp255(Math.round(g0 + amount * (g0 - gSum / wSum)));
+                int b = clamp255(Math.round(b0 + amount * (b0 - bSum / wSum)));
+                img.setRGB(x, y, (a << 24) | (r << 16) | (g << 8) | b);
+            }
+        }
     }
 
     // ---- Grounding (foot AO + bottom-masked rim) & downscaling ----
@@ -706,6 +746,8 @@ public final class BakeSprites {
         for (int i = 0; i < alpha.length; i++) alpha[i] = (sprite.getRGB(i % w, i / w) >>> 24) & 0xFF;
         int rr = (rimRgb >> 16) & 0xFF, rg = (rimRgb >> 8) & 0xFF, rb = rimRgb & 0xFF;
 
+        int rad = Math.max(2, Math.round(w / 170f));
+        int maxD2 = rad * rad, innerD2 = Math.max(1, (rad - 1) * (rad - 1));
         for (int y = 0; y < h; y++) {
             float rimWeight = 1f;
             if (maskBottom && y >= h * 0.78f) {
@@ -717,11 +759,11 @@ public final class BakeSprites {
                 int a = (argb >>> 24) & 0xFF;
                 if (a >= 210 || rimWeight <= 0.01f) { out.setRGB(x, y, argb); continue; }
                 int near = 0;
-                for (int dy = -2; dy <= 2; dy++) {
-                    for (int dx = -2; dx <= 2; dx++) {
-                        int nx = x + dx, ny = y + dy;
-                        if (nx >= 0 && nx < w && ny >= 0 && ny < h && dx * dx + dy * dy <= 4) {
-                            int wVal = dx * dx + dy * dy <= 1 ? alpha[ny * w + nx] : (alpha[ny * w + nx] * 2) / 3;
+                for (int dy = -rad; dy <= rad; dy++) {
+                    for (int dx = -rad; dx <= rad; dx++) {
+                        int nx = x + dx, ny = y + dy, d2 = dx * dx + dy * dy;
+                        if (nx >= 0 && nx < w && ny >= 0 && ny < h && d2 <= maxD2) {
+                            int wVal = d2 <= innerD2 ? alpha[ny * w + nx] : (alpha[ny * w + nx] * 2) / 3;
                             if (wVal > near) near = wVal;
                         }
                     }
@@ -1080,8 +1122,11 @@ public final class BakeSprites {
             }
         }
         // Tinted blood splats on sample floor tiles before entities
-        g.drawImage(tintSample(cells[BLOOD_SPLAT_0], 195, 28, 34), CELL * 3 + 22, CELL * 3 + 48, 136, 136, null);
-        g.drawImage(tintSample(cells[BLOOD_SPLAT_1], 180, 24, 30), CELL * 3 + 60, CELL * 3 + 22, 170, 170, null);
+        int s0 = Math.round(0.54f * CELL), s1 = Math.round(0.67f * CELL);
+        g.drawImage(tintSample(cells[BLOOD_SPLAT_0], 195, 28, 34),
+                CELL * 3 + Math.round(0.09f * CELL), CELL * 3 + Math.round(0.19f * CELL), s0, s0, null);
+        g.drawImage(tintSample(cells[BLOOD_SPLAT_1], 180, 24, 30),
+                CELL * 3 + Math.round(0.24f * CELL), CELL * 3 + Math.round(0.09f * CELL), s1, s1, null);
 
         // Row 0: Thrall + torch, Thrall_attack + torch, Orc, Orc_attack
         drawGroundShadow(g, 0, 0);
@@ -1126,9 +1171,11 @@ public final class BakeSprites {
 
     private static void drawGroundShadow(Graphics2D g, int ox, int oy) {
         g.setColor(new Color(0, 0, 0, 115));
-        g.fillOval(ox + 26, oy + CELL - 38, CELL - 52, 30);
+        g.fillOval(ox + Math.round(0.10f * CELL), oy + CELL - Math.round(0.15f * CELL),
+                Math.round(0.80f * CELL), Math.round(0.12f * CELL));
         g.setColor(new Color(0, 0, 0, 210));
-        g.fillOval(ox + 44, oy + CELL - 28, CELL - 88, 18);
+        g.fillOval(ox + Math.round(0.175f * CELL), oy + CELL - Math.round(0.11f * CELL),
+                Math.round(0.65f * CELL), Math.round(0.07f * CELL));
     }
 
     private static void drawTorchTest(Graphics2D g, BufferedImage flame, int ox, int oy, float txNorm, float tyNorm) {
